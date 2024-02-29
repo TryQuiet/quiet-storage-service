@@ -1,12 +1,27 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Put, Query, Body, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { AppService } from './app.service';
+import { InvitationDTO } from './dto/invitation.dto';
 
 @Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
-  @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  @Get('invite')
+  invite(@Query('CID') cid: string) {
+    const contents = this.appService.getInvitationFile(cid);
+    if (contents === null) {
+      throw new NotFoundException('Invitation data not found');
+    }
+    return contents;
+  }
+
+  @Put('invite')
+  storeInvitation(@Query('CID') cid: string, @Body() invitationDTO: InvitationDTO) {
+    const filename = `${cid}.json`;
+    const result = this.appService.storeInvitationFile(filename, invitationDTO);
+    if (!result) {
+      throw new InternalServerErrorException('Failed to store invitation data');
+    }
+    return { message: 'Invitation data stored successfully' };
   }
 }
