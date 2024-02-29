@@ -37,6 +37,13 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
+  it('/invite (PUT) validates payload schema', () => {
+    return request(app.getHttpServer())
+      .put(`/invite/?CID=${cid}`)
+      .send({})
+      .expect(400)
+  });
+
   it('/invite (PUT) 200', () => {
     return request(app.getHttpServer())
     .put(`/invite/?CID=${cid}`)
@@ -54,7 +61,7 @@ describe('AppController (e2e)', () => {
   it('/invite (PUT) doesn\'t override file', () => {
     return request(app.getHttpServer())
       .put(`/invite/?CID=${cid}`)
-      .send({})
+      .send(invitationData)
       .expect(500)
       .expect({"message":"File already exists","error":"Internal Server Error","statusCode":500});
   });

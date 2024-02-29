@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Query, Body, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import { Controller, Get, Put, Query, Body, NotFoundException, InternalServerErrorException, UsePipes, ValidationPipe } from '@nestjs/common';
 import { AppService } from './app.service';
 import { InvitationDTO } from './dto/invitation.dto';
 
@@ -16,6 +16,7 @@ export class AppController {
   }
 
   @Put('invite')
+  @UsePipes(new ValidationPipe())
   storeInvitation(@Query('CID') cid: string, @Body() invitationDTO: InvitationDTO) {
     const filename = `${cid}.json`;
     const result = this.appService.storeInvitationFile(filename, invitationDTO);
