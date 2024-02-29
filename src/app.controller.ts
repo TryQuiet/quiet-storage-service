@@ -19,9 +19,8 @@ export class AppController {
   storeInvitation(@Query('CID') cid: string, @Body() invitationDTO: InvitationDTO) {
     const filename = `${cid}.json`;
     const result = this.appService.storeInvitationFile(filename, invitationDTO);
-    if (!result) {
-      throw new InternalServerErrorException('Failed to store invitation data');
+    if (!result.status) {
+      throw new InternalServerErrorException(result.message);
     }
-    return { message: 'Invitation data stored successfully' };
   }
 }

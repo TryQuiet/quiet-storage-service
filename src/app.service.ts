@@ -5,14 +5,17 @@ import * as path from 'path';
 @Injectable()
 export class AppService {
 
-  storeInvitationFile(cid: string, data: any): boolean {
+  storeInvitationFile(cid: string, data: any): { status: boolean, message?: string } {
     const filePath = path.join(__dirname, '../storage', cid);
     try {
+      if (fs.existsSync(filePath)) {
+        throw new Error(`File already exists`);
+      }
       fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-      return true;
+      return { status: true };
     } catch (error) {
       console.error(`Could not write file ${cid}`, error);
-      return false;
+      return { status: false, message: error.message };
     }
   }
 
