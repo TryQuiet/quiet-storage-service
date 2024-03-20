@@ -1,2 +1,2 @@
-source /home/ubuntu/.bashrc
+source /home/ubuntu/.profile
 npm run start
