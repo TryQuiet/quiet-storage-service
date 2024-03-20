@@ -1,12 +1,14 @@
-import { Controller, Get, Put, Query, Body, NotFoundException, InternalServerErrorException, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Controller, Get, Put, Query, Body, NotFoundException, InternalServerErrorException, UsePipes, ValidationPipe, UseGuards } from '@nestjs/common';
 import { AppService } from './app.service';
 import { InvitationDTO } from './dto/invitation.dto';
+import { AuthGuard } from './auth/auth.guard';
 
 @Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get('invite')
+  @UseGuards(AuthGuard)
   invite(@Query('CID') cid: string) {
     const contents = this.appService.getInvitationFile(cid);
     if (contents === null) {
@@ -16,6 +18,7 @@ export class AppController {
   }
 
   @Put('invite')
+  @UseGuards(AuthGuard)
   @UsePipes(new ValidationPipe())
   storeInvitation(@Query('CID') cid: string, @Body() invitationDTO: InvitationDTO) {
     const filename = `${cid}.json`;
