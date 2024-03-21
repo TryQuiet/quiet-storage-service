@@ -2,7 +2,7 @@ version: 0.0
 os: linux
 files:
   - source: /
-    destination: /qss
+    destination: ~/qss
 hooks:
   AfterInstall:
     - location: aws/scripts/after-install.sh
