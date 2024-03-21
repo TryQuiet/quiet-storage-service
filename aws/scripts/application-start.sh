@@ -1,2 +1,2 @@
 cd /home/ubuntu/qss
-npm run start
+pm2 --name QSS start npm -- start
