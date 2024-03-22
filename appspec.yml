@@ -4,6 +4,10 @@ files:
   - source: /
     destination: /home/ubuntu/qss
 hooks:
+  BeforeInstall:
+    - location: aws/scripts/before-install.sh
+      timeout: 300
+      runas: root
   AfterInstall:
     - location: aws/scripts/after-install.sh
       timeout: 300
