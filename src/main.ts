@@ -1,10 +1,13 @@
+import '@dotenvx/dotenvx/config'
+
 import { Logger } from '@nestjs/common'
-import { QSS } from './app/server'
+import { QSSService } from './app/qss.service'
+import { env } from 'process'
 
 const logger: Logger = new Logger('Main')
 
 async function bootstrap(): Promise<void> {
-  const server = new QSS(3004)
+  const server = new QSSService(Number(env.PORT), env.HOSTNAME)
   await server.init()
   await server.start()
 }
