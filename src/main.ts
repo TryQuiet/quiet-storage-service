@@ -4,7 +4,7 @@ import { QSS } from './app/server'
 const logger: Logger = new Logger('Main')
 
 async function bootstrap(): Promise<void> {
-  const server = new QSS(3000)
+  const server = new QSS(3004)
   await server.init()
   await server.start()
 }

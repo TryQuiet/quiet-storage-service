@@ -38,7 +38,7 @@ export class QSS {
 
   public async start(): Promise<void> {
     await this.app.listen({
-      port: 3004,
+      port: this.port,
       host: 'localhost',
     })
   }
