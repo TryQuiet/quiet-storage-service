@@ -110,7 +110,7 @@ export class NestFastifyLogger implements FastifyBaseLogger {
         2,
       )
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unnecessary-condition -- This is a valid type assertion
-    } else if ((obj as RequestLog).req.routeOptions != null) {
+    } else if ((obj as RequestLog).req != null) {
       // @eslint-ignore
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- This is a valid type assertion
       const { req: request } = obj as RequestLog
@@ -133,7 +133,7 @@ export class NestFastifyLogger implements FastifyBaseLogger {
         2,
       )
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unnecessary-condition -- This is a valid type assertion
-    } else if ((obj as ReplyLog).res.compileSerializationSchema != null) {
+    } else if ((obj as ReplyLog).res != null) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- This is a valid type assertion
       const { res: reply } = obj as ReplyLog
       return JSON.stringify(

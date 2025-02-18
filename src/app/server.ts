@@ -24,6 +24,7 @@ export class QSS {
   }
 
   public async init(): Promise<QSS> {
+    this.logger.log(`Initializing QSS`)
     this.app = await NestFactory.create<NestFastifyApplication>(
       AppModule,
       this.adapter,
@@ -37,6 +38,7 @@ export class QSS {
   }
 
   public async start(): Promise<void> {
+    this.logger.log(`Starting QSS`)
     await this.app.listen({
       port: this.port,
       host: 'localhost',
@@ -44,6 +46,7 @@ export class QSS {
   }
 
   public async close(): Promise<void> {
+    this.logger.log(`Closing QSS`)
     await this.app.close()
   }
 }
