@@ -1,4 +1,4 @@
-import { Logger } from "@nestjs/common";
+import { Logger } from '@nestjs/common'
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -6,53 +6,54 @@ import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
-} from "@nestjs/websockets";
+} from '@nestjs/websockets'
 
-import { Server, Socket } from "socket.io";
+import { Server, Socket } from 'socket.io'
 
-const DEFAULT_ROOMS: string[] = [
-  "messages"
-]
+const DEFAULT_ROOMS: string[] = ['messages']
 
 @WebSocketGateway({
-  transports: ["websocket"],
+  transports: ['websocket'],
   cors: {
-      origin: "*",
+    origin: '*',
   },
-  path: "/socket.io",
+  path: '/socket.io',
   allowEIO3: true,
 })
 export class SocketGateway
   implements OnGatewayInit, OnGatewayConnection<Socket>, OnGatewayDisconnect
 {
-  private readonly logger = new Logger(SocketGateway.name);
+  private readonly logger = new Logger(SocketGateway.name)
 
-  @WebSocketServer() io: Server;
+  @WebSocketServer() io: Server
 
   afterInit(): void {
-    this.logger.log("Initialized");
+    this.logger.log('Initialized')
     this.io.socketsJoin(DEFAULT_ROOMS)
   }
 
   handleConnection(client: Socket, ...args: unknown[]): void {
     // eslint-disable-next-line @typescript-eslint/prefer-destructuring -- Decomposing from `this` is wild
-    const { sockets } = this.io.sockets;
+    const { sockets } = this.io.sockets
 
-    this.logger.log(`Client id: ${client.id} connected`, `Rooms: ${JSON.stringify([...client.rooms])}`);
-    this.logger.debug(`Number of connected clients: ${sockets.size}`);
+    this.logger.log(
+      `Client id: ${client.id} connected`,
+      `Rooms: ${JSON.stringify([...client.rooms])}`,
+    )
+    this.logger.debug(`Number of connected clients: ${sockets.size}`)
   }
 
   handleDisconnect(client: Socket): void {
-    this.logger.log(`Cliend id:${client.id} disconnected`);
+    this.logger.log(`Cliend id:${client.id} disconnected`)
   }
 
-  @SubscribeMessage("ping")
+  @SubscribeMessage('ping')
   handleMessage(client: Socket, data: unknown): unknown {
-    this.logger.log(`Message received from client id: ${client.id}`);
-    this.logger.debug(`Payload: ${JSON.stringify(data)}`);
+    this.logger.log(`Message received from client id: ${client.id}`)
+    this.logger.debug(`Payload: ${JSON.stringify(data)}`)
     return {
-      event: "pong",
-      data: "Wrong data that will make the test fail",
-    };
+      event: 'pong',
+      data: 'Wrong data that will make the test fail',
+    }
   }
 }

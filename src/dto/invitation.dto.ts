@@ -1,19 +1,19 @@
-import { IsString, IsArray } from 'class-validator';
+import { IsString, IsArray } from 'class-validator'
 
 export class InvitationDTO {
   @IsString()
-  id: string;
+  id: string
 
   @IsString()
-  rootCa: string;
+  rootCa: string
 
   @IsString()
-  ownerCertificate: string;
+  ownerCertificate: string
 
   @IsString()
-  ownerOrbitDbIdentity: string;
+  ownerOrbitDbIdentity: string
 
   @IsArray()
   @IsString({ each: true })
-  peerList: string[];
+  peerList: string[]
 }
