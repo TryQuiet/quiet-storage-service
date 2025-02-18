@@ -1,8 +1,14 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { Logger } from '@nestjs/common';
+import { QSS } from './app/server';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  await app.listen(3000);
+const logger: Logger = new Logger('Main');
+
+async function bootstrap(): Promise<void> {
+  const server = new QSS(3000)
+  await server.init()
+  await server.start()
 }
-bootstrap();
+
+bootstrap().catch((reason: unknown) => {
+  logger.error(reason)
+});
