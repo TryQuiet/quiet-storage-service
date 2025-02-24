@@ -3,12 +3,12 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
   OnGatewayInit,
-  SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets'
 
 import { Server, Socket } from 'socket.io'
+import { registerPingHandlers } from './handlers/ping.handler'
 
 const DEFAULT_ROOMS: string[] = ['messages']
 
@@ -41,19 +41,10 @@ export class SocketGateway
       `Rooms: ${JSON.stringify([...client.rooms])}`,
     )
     this.logger.debug(`Number of connected clients: ${sockets.size}`)
+    registerPingHandlers(this.io, client)
   }
 
   handleDisconnect(client: Socket): void {
     this.logger.log(`Cliend id:${client.id} disconnected`)
-  }
-
-  @SubscribeMessage('ping')
-  handleMessage(client: Socket, data: unknown): unknown {
-    this.logger.log(`Message received from client id: ${client.id}`)
-    this.logger.debug(`Payload: ${JSON.stringify(data)}`)
-    return {
-      event: 'pong',
-      data: 'Wrong data that will make the test fail',
-    }
   }
 }
