@@ -3,18 +3,18 @@ import { CommunityController } from './community.controller'
 import { CommunityService } from './community.service'
 
 describe('CommunityController', () => {
-  let controller: CommunityController | undefined = undefined;
+  let controller: CommunityController | undefined = undefined
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CommunityController],
       providers: [CommunityService],
-    }).compile();
+    }).compile()
 
-    controller = module.get<CommunityController>(CommunityController);
+    controller = module.get<CommunityController>(CommunityController)
   })
 
   it('should be defined', () => {
-    expect(controller).toBeDefined();
+    expect(controller).toBeDefined()
   })
 })

@@ -16,7 +16,10 @@ export class QSSService {
 
   private readonly logger = new Logger(QSSService.name)
 
-  constructor(private readonly port: number, private readonly hostname = 'localhost') {
+  constructor(
+    private readonly port: number,
+    private readonly hostname = 'localhost',
+  ) {
     this.fastify = Fastify({
       logger: new NestFastifyLogger(),
     })

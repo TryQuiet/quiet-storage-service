@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  Delete,
-} from '@nestjs/common'
+import { Controller, Get, Post, Body, Param, Delete } from '@nestjs/common'
 import { CommunityService } from './community.service'
 import { CreateCommunityDto } from './dto/create-community.dto'
 import { Community } from './entities/community.entity'
@@ -16,12 +9,12 @@ export class CommunityController {
 
   @Post()
   public create(@Body() createCommunityDto: CreateCommunityDto): Community {
-    return this.communityService.create(createCommunityDto);
+    return this.communityService.create(createCommunityDto)
   }
 
   @Get()
   public findAll(): Community[] {
-    return this.communityService.findAll();
+    return this.communityService.findAll()
   }
 
   @Get(':id')
@@ -32,7 +25,7 @@ export class CommunityController {
   @Delete(':id')
   public remove(@Param('id') id: string): { removed: boolean } {
     return {
-      removed: this.communityService.remove({ id })
+      removed: this.communityService.remove({ id }),
     }
   }
 }
