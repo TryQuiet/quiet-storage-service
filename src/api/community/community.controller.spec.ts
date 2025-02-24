@@ -1,6 +1,6 @@
 import { Test, type TestingModule } from '@nestjs/testing'
-import { CommunityController } from './community.controller'
-import { CommunityService } from './community.service'
+import { CommunityController } from './community.controller.js'
+import { CommunityService } from './community.service.js'
 
 describe('CommunityController', () => {
   let controller: CommunityController | undefined = undefined

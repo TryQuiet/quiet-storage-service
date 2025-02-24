@@ -8,7 +8,7 @@ import {
 } from '@nestjs/websockets'
 
 import { Server, Socket } from 'socket.io'
-import { registerPingHandlers } from './handlers/ping.handler'
+import { registerPingHandlers } from './handlers/ping.handler.js'
 
 const DEFAULT_ROOMS: string[] = ['messages']
 
@@ -25,6 +25,7 @@ export class SocketGateway
 {
   private readonly logger = new Logger(SocketGateway.name)
 
+  // @ts-expect-error Initialized by Nest
   @WebSocketServer() io: Server
 
   afterInit(): void {

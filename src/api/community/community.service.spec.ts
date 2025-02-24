@@ -1,5 +1,5 @@
 import { Test, type TestingModule } from '@nestjs/testing'
-import { CommunityService } from './community.service'
+import { CommunityService } from './community.service.js'
 
 describe('CommunityService', () => {
   let service: CommunityService | undefined = undefined

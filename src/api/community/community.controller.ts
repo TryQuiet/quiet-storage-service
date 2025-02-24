@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Param, Delete } from '@nestjs/common'
-import { CommunityService } from './community.service'
-import { CreateCommunityDto } from './dto/create-community.dto'
-import { Community } from './entities/community.entity'
+import { CommunityService } from './community.service.js'
+import { CreateCommunityDto } from './dto/create-community.dto.js'
+import { Community } from './entities/community.entity.js'
 
 @Controller('community')
 export class CommunityController {

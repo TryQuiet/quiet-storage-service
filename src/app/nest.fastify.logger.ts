@@ -4,7 +4,6 @@ import Fastify, {
   type FastifyRequest,
   type FastifyReply,
 } from 'fastify'
-import type { Bindings, ChildLoggerOptions } from 'fastify/types/logger'
 import type pino from 'pino'
 import { Socket as SocketIoSocket } from 'socket.io'
 
@@ -17,10 +16,11 @@ interface ReplyLog {
 }
 
 export class NestFastifyLogger implements FastifyBaseLogger {
+  // @ts-expect-error This is initialized in the base logger
   level: pino.LevelWithSilentOrString
   private readonly nestLogger: LoggerService = new Logger(Fastify.name)
 
-  public child(bindings: Bindings, options?: ChildLoggerOptions): this {
+  public child(bindings: unknown, options?: unknown): this {
     return this
   }
 

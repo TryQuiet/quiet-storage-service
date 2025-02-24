@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common'
-import { CommunityModule } from 'src/api/community/community.module'
+import { CommunityModule } from '../api/community/community.module.js'
 
-import { SocketModule } from 'src/socket/socket.module'
+import { SocketModule } from '..//socket/socket.module.js'
 
 @Module({
   imports: [SocketModule, CommunityModule],

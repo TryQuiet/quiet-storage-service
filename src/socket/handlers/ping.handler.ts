@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common'
 import type { Server, Socket } from 'socket.io'
-import { WebsocketEvents } from '../types'
-import type { Pong } from './types'
+import { WebsocketEvents } from '../types.js'
+import type { Pong } from './types.js'
 import { DateTime } from 'luxon'
 
 const logger = new Logger('Websocket:Event:Ping')

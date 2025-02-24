@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
-import { CreateCommunityDto } from './dto/create-community.dto'
-import { Community } from './entities/community.entity'
+import { CreateCommunityDto } from './dto/create-community.dto.js'
+import { Community } from './entities/community.entity.js'
 
 @Injectable()
 export class CommunityService {
