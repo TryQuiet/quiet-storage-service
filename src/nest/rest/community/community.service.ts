@@ -15,10 +15,6 @@ export class CommunityService {
     return community
   }
 
-  public findAll(): Community[] {
-    return this.communities
-  }
-
   public findOne(query: { id?: string; name?: string }): Community | undefined {
     if (query.id == null && query.name == null) {
       throw new Error(`Must pass in an id or name to filter on`)
@@ -59,5 +55,9 @@ export class CommunityService {
     })
 
     return true
+  }
+
+  public clear(): void {
+    this.communities = []
   }
 }

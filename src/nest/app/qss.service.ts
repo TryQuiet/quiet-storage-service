@@ -6,7 +6,7 @@ import {
 } from '@nestjs/platform-fastify'
 import Fastify, { type FastifyInstance } from 'fastify'
 
-import { AppModule } from '../app/app.module.js'
+import { AppModule } from './app.module.js'
 import { NestFastifyLogger } from './nest.fastify.logger.js'
 
 export class QSSService {

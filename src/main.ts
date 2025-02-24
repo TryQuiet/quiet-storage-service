@@ -3,7 +3,7 @@ import '@dotenvx/dotenvx/config'
 import { Logger } from '@nestjs/common'
 import { env } from 'process'
 
-import { QSSService } from './app/qss.service.js'
+import { QSSService } from './nest/app/qss.service.js'
 
 const logger: Logger = new Logger('Main')
 

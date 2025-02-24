@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common'
 import type { Server, Socket } from 'socket.io'
-import { WebsocketEvents } from '../types.js'
+import { WebsocketEvents } from '../ws.types.js'
 import type { Pong } from './types.js'
 import { DateTime } from 'luxon'
 

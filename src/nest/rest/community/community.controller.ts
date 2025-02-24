@@ -12,11 +12,6 @@ export class CommunityController {
     return this.communityService.create(createCommunityDto)
   }
 
-  @Get()
-  public findAll(): Community[] {
-    return this.communityService.findAll()
-  }
-
   @Get(':id')
   public findOne(@Param('id') id: string): Community | undefined {
     return this.communityService.findOne({ id })
