@@ -1,1 +1,1 @@
-npm run format:lint
+pnpm run lint-staged

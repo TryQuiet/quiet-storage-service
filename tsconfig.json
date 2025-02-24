@@ -9,7 +9,6 @@
     "esModuleInterop": true,
     "moduleResolution": "NodeNext",
     "allowSyntheticDefaultImports": true,
-    "typeRoots": ["./node_modules/@types", "./src/types/"],
     "skipLibCheck": true,
     "incremental": true,
     "strictNullChecks": true,

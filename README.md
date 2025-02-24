@@ -1,73 +1,93 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
-</p>
-
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
-
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+# QSS
 
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Quiet Storage Service (QSS)
 
 ## Installation
 
+### Preparation
+
+The Node engine is managed via Volta and should be installed prior to running anything in this README.  Instructions for installing volta can be found [here](https://docs.volta.sh/guide/getting-started).
+
+*NOTE: Because QSS uses `pnpm` you should add `VOLTA_FEATURE_PNPM=1` to an environment file in your shell (e.g. `.zshrc`).*
+
+#### Installing Node engine
+
+Once Volta is installed navigating to this directory should automatically install and use the correct versions of `node` and `npm` but as a first time setup you can manually install both
+
 ```bash
-$ npm install
+$ volta install node@22.11.0
+$ volta install npm@10.9.0
+```
+
+Once `node` and `npm` are installed via Volta you can install `pnpm`
+
+```bash
+$ volta install pnpm@10.4.1
+```
+
+### Dependencies
+
+```bash
+$ pnpm i
+```
+
+### Building the app
+
+```bash
+$ pnpm run build
 ```
 
 ## Running the app
 
 ```bash
-# development
-$ npm run start
+# development with watch mode
+$ pnpm run start:dev
 
-# watch mode
-$ npm run start:dev
+# development with watch mode and debug on
+$ pnpm run start:debug
+
+# development using compiled code
+$ pnpm run start:dist:dev
 
 # production mode
-$ npm run start:prod
+$ pnpm run start:dist:prod
 ```
 
 ## Test
 
 ```bash
 # unit tests
-$ npm run test
+$ pnpm run test
 
 # e2e tests
-$ npm run test:e2e
+$ pnpm run test:e2e
 
 # test coverage
-$ npm run test:cov
+$ pnpm run test:cov
 ```
 
-## Support
+## Linting and Formatting
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+We use `eslint` and `prettier` to format code as well as a `husky` precommit hook to verify formatting on commits.
 
-## Stay in touch
+```bash
+# run prettier
+$ pnpm run format
 
-- Author - [Kamil Myśliwiec](https://kamilmysliwiec.com)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+# run prettier with auto-fix
+$ pnpm run format:fix
 
-## License
+# run eslint
+$ pnpm run lint
 
-Nest is [MIT licensed](LICENSE).
+# run eslint with auto-fix
+$ pnpm run lint:fix
+
+# run prettier and eslint -> NOTE: this is run as the precommit hook via husky and lint-staged
+$ pnpm run format:lint
+
+# run prettier and eslint with auto-fix
+$ pnpm run format:lint:fix
+```

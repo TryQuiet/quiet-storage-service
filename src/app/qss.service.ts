@@ -24,6 +24,7 @@ export class QSSService {
     this.fastify = Fastify({
       logger: new NestFastifyLogger(),
     })
+    // @ts-expect-error Type is correct
     this.adapter = new FastifyAdapter(this.fastify)
   }
 
