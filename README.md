@@ -24,7 +24,7 @@ $ volta install npm@10.9.0
 Once `node` and `npm` are installed via Volta you can install `pnpm`
 
 ```bash
-$ volta install pnpm@10.4.1
+$ volta install pnpm@9.6.0
 ```
 
 ### Dependencies

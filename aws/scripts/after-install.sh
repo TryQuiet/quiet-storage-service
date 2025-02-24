@@ -1,2 +1,3 @@
 cd /home/ubuntu/qss
-npm i
+pnpm i
+pnpm run build
