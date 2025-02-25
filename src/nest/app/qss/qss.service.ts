@@ -2,7 +2,7 @@
  * Service for handling setup and initializtion of QSS application
  */
 
-import { Inject, Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import {
   FastifyAdapter,
@@ -11,12 +11,13 @@ import {
 
 import { AppModule } from '../app.module.js'
 import { FASTIFY_ADAPTER, HOSTNAME, LISTEN_PORT } from '../const.js'
+import { QuietNestLogger } from '../logger/nest.logger.js'
 
 @Injectable()
 export class QSSService {
   public app: NestFastifyApplication | undefined = undefined
 
-  private readonly logger = new Logger(QSSService.name)
+  private readonly logger = new QuietNestLogger(QSSService.name)
 
   constructor(
     @Inject(LISTEN_PORT) private readonly port: number,

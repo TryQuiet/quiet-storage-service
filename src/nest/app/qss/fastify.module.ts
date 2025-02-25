@@ -7,7 +7,7 @@ import {
   HOSTNAME,
   LISTEN_PORT,
 } from '../const.js'
-import { NestFastifyLogger } from '../nest.fastify.logger.js'
+import { NestFastifyLogger } from '../logger/nest.fastify.logger.js'
 import Fastify, { FastifyInstance } from 'fastify'
 import { FastifyAdapter } from '@nestjs/platform-fastify'
 

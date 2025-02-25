@@ -3,15 +3,20 @@
  * has its own ping handler.
  */
 
-import { Logger } from '@nestjs/common'
 import type { Server, Socket } from 'socket.io'
 import { WebsocketEvents } from '../ws.types.js'
 import type { Ping, Pong } from './types.js'
 import { DateTime } from 'luxon'
 import type { CryptoKX } from 'libsodium-wrappers-sumo'
 import type { WebsocketEncryptionService } from '../../encryption/ws.enc.service.js'
+import {
+  DecryptionError,
+  EncryptionBase64Error,
+  EncryptionError,
+} from '../../encryption/types.js'
+import { QuietNestLogger } from '../../app/logger/nest.logger.js'
 
-const logger = new Logger('Websocket:Event:Ping')
+const logger = new QuietNestLogger('Websocket:Event:Ping')
 
 /**
  * Adds event handlers for 'ping' and 'pong' events
@@ -31,15 +36,48 @@ export function registerPingHandlers(
     encryptedPayload: string,
     callback: (payload: string) => void,
   ): void {
-    const payload = encryption.decrypt(encryptedPayload, sessionKey) as Ping
-    logger.debug(`Got a ping`, payload)
-    const pong: Pong = {
-      success: true,
-      ts: DateTime.utc().toMillis(),
+    try {
+      const payload = encryption.decrypt(encryptedPayload, sessionKey) as Ping
+      if (!Number.isInteger(payload.ts)) {
+        const pong: Pong = {
+          success: false,
+          reason: 'Invalid ts',
+          ts: DateTime.utc().toMillis(),
+        }
+        callback(encryption.encrypt(pong, sessionKey))
+        return
+      }
+
+      const pong: Pong = {
+        success: true,
+        ts: DateTime.utc().toMillis(),
+      }
+      logger.debug(`Responding with pong`, JSON.stringify(pong))
+      const encryptedResponse = encryption.encrypt(pong, sessionKey)
+      callback(encryptedResponse)
+    } catch (e) {
+      logger.error(`Error while processing ping event`, e)
+      let reason: string | undefined = undefined
+      if (
+        e instanceof EncryptionBase64Error ||
+        e instanceof EncryptionError ||
+        e instanceof DecryptionError
+      ) {
+        reason = e.message
+      } else {
+        reason = `Error while processing ping`
+      }
+
+      const pong: Pong = {
+        success: false,
+        reason,
+        ts: DateTime.utc().toMillis(),
+      }
+      callback(encryption.encrypt(pong, sessionKey))
+
+      logger.warn(`Disconnecting socket due to ping failure`)
+      socket.disconnect(true)
     }
-    logger.debug(`Responding with pong`, JSON.stringify(pong))
-    const encryptedResponse = encryption.encrypt(pong, sessionKey)
-    callback(encryptedResponse)
   }
 
   function handlePong(payload: Pong): void {

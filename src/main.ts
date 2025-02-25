@@ -1,13 +1,15 @@
 import '@dotenvx/dotenvx/config'
 
-import { Logger } from '@nestjs/common'
-
 import { AppModule } from './nest/app/app.module.js'
 import { NestFactory } from '@nestjs/core'
 import { QSSService } from './nest/app/qss/qss.service.js'
 import { WebsocketClient } from './client/ws.client.js'
+import type { Ping, Pong } from './nest/websocket/handlers/types.js'
+import { DateTime } from 'luxon'
+import { WebsocketEvents } from './nest/websocket/ws.types.js'
+import { QuietNestLogger } from './nest/app/logger/nest.logger.js'
 
-const logger: Logger = new Logger('Main')
+const logger: QuietNestLogger = new QuietNestLogger('Main')
 
 async function bootstrap(): Promise<void> {
   logger.log(`Bootstrapping QSS`)
@@ -23,7 +25,15 @@ async function bootstrap(): Promise<void> {
   await client.createSocket()
 
   logger.log(`Sending ping from client`)
-  await client.sendPing()
+  const payload: Ping = {
+    ts: DateTime.utc().toMillis(),
+  }
+  const pong = await client.sendMessage<Pong>(
+    WebsocketEvents.Ping,
+    payload,
+    true,
+  )
+  logger.log(`Got pong`, pong)
 }
 
 bootstrap().catch((reason: unknown) => {

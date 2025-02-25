@@ -2,7 +2,6 @@
  * Manages the websocket server and websocket event handler initialization
  */
 
-import { Logger } from '@nestjs/common'
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -21,6 +20,7 @@ import {
 } from './ws.types.js'
 import { WebsocketEncryptionService } from '../encryption/ws.enc.service.js'
 import sodium, { CryptoKX } from 'libsodium-wrappers-sumo'
+import { QuietNestLogger } from '../app/logger/nest.logger.js'
 
 @WebSocketGateway({
   transports: ['websocket'],
@@ -33,7 +33,7 @@ import sodium, { CryptoKX } from 'libsodium-wrappers-sumo'
 export class WebsocketGateway
   implements OnGatewayInit, OnGatewayConnection<Socket>, OnGatewayDisconnect
 {
-  private readonly logger = new Logger(WebsocketGateway.name)
+  private readonly logger = new QuietNestLogger(WebsocketGateway.name)
   private readonly connections: Map<string, ActiveConnection>
 
   // @ts-expect-error Initialized by Nest

@@ -5,22 +5,25 @@ import {
   FastifyAdapter,
   type NestFastifyApplication,
 } from '@nestjs/platform-fastify'
-import { NestFastifyLogger } from '../../src/nest/app/nest.fastify.logger'
+import { NestFastifyLogger } from '../../src/nest/app/logger/nest.fastify.logger'
 import { Logger } from '@nestjs/common'
 import { Server, Socket as ServerSocket } from 'socket.io'
 import { WebsocketGateway } from '../../src/nest/websocket/ws.gateway'
 import { TestSockets } from './types'
 import { WebsocketClient } from '../../src/client/ws.client'
+import { WebsocketEncryptionService } from '../../src/nest/encryption/ws.enc.service'
+import { QuietNestLogger } from '../../src/nest/app/logger/nest.logger'
 
 export class TestUtils {
   public static client: WebsocketClient
   public static serverSocket: ServerSocket
   public static server: Server
+  public static encryption: WebsocketEncryptionService
   private static module: TestingModule
   private static adapter: FastifyAdapter
   private static app: INestApplication
 
-  private static logger = new Logger(TestUtils.name)
+  private static logger = new QuietNestLogger(TestUtils.name)
 
   public static async startServer(testingModule: TestingModule): Promise<void> {
     this.module = testingModule
@@ -32,7 +35,10 @@ export class TestUtils {
     )
     this.app = this.module.createNestApplication<NestFastifyApplication>(
       this.adapter,
-      { logger: new Logger('Test') },
+      { logger: new QuietNestLogger('Test') },
+    )
+    this.encryption = this.app.get<WebsocketEncryptionService>(
+      WebsocketEncryptionService,
     )
     this.client = this.app.get<WebsocketClient>(WebsocketClient)
     this.logger.log(`Starting server`)

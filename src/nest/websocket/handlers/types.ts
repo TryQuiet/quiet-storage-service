@@ -4,5 +4,6 @@ export interface Ping {
 
 export interface Pong {
   success: boolean
+  reason?: string
   ts: number
 }

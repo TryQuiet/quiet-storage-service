@@ -1,6 +1,6 @@
 import '@dotenvx/dotenvx/config'
 import 'reflect-metadata'
-import '@jest/globals'
 import 'expect-more-jest'
+import { jest } from '@jest/globals'
 
-// jest.setTimeout(30_000)
+jest.setTimeout(15_000)

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import sodium, { type CryptoKX, type KeyPair } from 'libsodium-wrappers-sumo'
 import { connect, type Socket as ClientSocket } from 'socket.io-client'
 import { WebsocketEncryptionService } from '../nest/encryption/ws.enc.service.js'
@@ -8,8 +8,7 @@ import {
   HandshakeStatus,
   WebsocketEvents,
 } from '../nest/websocket/ws.types.js'
-import { Ping, Pong } from '../nest/websocket/handlers/types.js'
-import { DateTime } from 'luxon'
+import { QuietNestLogger } from '../nest/app/logger/nest.logger.js'
 
 @Injectable()
 export class WebsocketClient {
@@ -17,7 +16,7 @@ export class WebsocketClient {
   private keyPair: KeyPair | undefined = undefined
   private sessionKey: CryptoKX | undefined = undefined
 
-  private readonly logger = new Logger(WebsocketClient.name)
+  private readonly logger = new QuietNestLogger(WebsocketClient.name)
 
   constructor(private readonly encryption: WebsocketEncryptionService) {}
 
@@ -81,24 +80,42 @@ export class WebsocketClient {
     this.logger.log(sodium.to_base64(this.sessionKey!.sharedTx))
   }
 
-  // public async sendMessage<T, V>(payload: T): Promise<V> {
-
-  // }
-
-  public async sendPing(): Promise<Pong> {
+  public async sendMessage<T>(
+    event: WebsocketEvents,
+    payload: unknown,
+    withAck = false,
+  ): Promise<T> {
     if (this.clientSocket == null || this.sessionKey == null) {
       throw new Error(`Must run createSocket first!`)
     }
 
-    const payload: Ping = {
-      ts: DateTime.utc().toMillis(),
+    const encryptedPayload = this.encryptPayload(payload)
+    if (withAck) {
+      const encryptedResponse = (await this.clientSocket.emitWithAck(
+        event,
+        encryptedPayload,
+      )) as string
+      return this.decryptPayload(encryptedResponse) as T
     }
-    const encryptedPayload = this.encryption.encrypt(payload, this.sessionKey)
-    const encryptedResponse = (await this.clientSocket.emitWithAck(
-      WebsocketEvents.Ping,
-      encryptedPayload,
-    )) as string
-    return this.encryption.decrypt(encryptedResponse, this.sessionKey) as Pong
+
+    this.clientSocket.emit(event, encryptedPayload)
+    return undefined as T
+  }
+
+  public encryptPayload(payload: unknown): string {
+    if (this.clientSocket == null || this.sessionKey == null) {
+      throw new Error(`Must run createSocket first!`)
+    }
+
+    return this.encryption.encrypt(payload, this.sessionKey)
+  }
+
+  public decryptPayload(encryptedPayload: string): unknown {
+    if (this.clientSocket == null || this.sessionKey == null) {
+      throw new Error(`Must run createSocket first!`)
+    }
+
+    return this.encryption.decrypt(encryptedPayload, this.sessionKey)
   }
 
   public close(): void {
