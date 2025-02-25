@@ -39,7 +39,7 @@ export class TestUtils {
       this.clientSocket = connect(
           `ws://${process.env.HOSTNAME}:${process.env.PORT}`,
           {
-              autoConnect: true,
+              autoConnect: false,
               forceNew: true,
               transports: ["websocket"]
           },
@@ -62,6 +62,8 @@ export class TestUtils {
             throw new Error(`Expected 1 connected client, got ${this.server.sockets.sockets.size}`)
         }
       })
+      
+      this.clientSocket.connect()
       let count = 20
       while(!this.clientSocket.connected) {
         if (count < 0) {
