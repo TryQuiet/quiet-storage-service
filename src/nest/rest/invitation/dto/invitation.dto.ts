@@ -1,3 +1,7 @@
+/**
+ * NOTE: This was an old implementation.  I only kept it around as a reference but I don't expect this to remain in this form.
+ */
+
 import { IsString, IsArray } from 'class-validator'
 
 export class InvitationDTO {

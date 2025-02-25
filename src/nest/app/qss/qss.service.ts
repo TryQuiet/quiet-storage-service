@@ -1,34 +1,30 @@
-import { Logger } from '@nestjs/common'
+/**
+ * Service for handling setup and initializtion of QSS application
+ */
+
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import {
   FastifyAdapter,
   type NestFastifyApplication,
 } from '@nestjs/platform-fastify'
-import Fastify, { type FastifyInstance } from 'fastify'
 
-import { AppModule } from './app.module.js'
-import { NestFastifyLogger } from './nest.fastify.logger.js'
+import { AppModule } from '../app.module.js'
+import { FASTIFY_ADAPTER, HOSTNAME, LISTEN_PORT } from '../const.js'
 
+@Injectable()
 export class QSSService {
-  public readonly fastify: FastifyInstance
-  private readonly adapter: FastifyAdapter
   public app: NestFastifyApplication | undefined = undefined
 
   private readonly logger = new Logger(QSSService.name)
 
   constructor(
-    private readonly port: number,
-    private readonly hostname = 'localhost',
-  ) {
-    // @ts-expect-error Type is correct
-    this.fastify = Fastify({
-      logger: new NestFastifyLogger(),
-    })
-    // @ts-expect-error Type is correct
-    this.adapter = new FastifyAdapter(this.fastify)
-  }
+    @Inject(LISTEN_PORT) private readonly port: number,
+    @Inject(HOSTNAME) private readonly hostname: string,
+    @Inject(FASTIFY_ADAPTER) private readonly adapter: FastifyAdapter,
+  ) {}
 
-  public async init(): Promise<QSSService> {
+  public async init(): Promise<void> {
     this.logger.log(`Initializing QSS`)
     this.app = await NestFactory.create<NestFastifyApplication>(
       AppModule,
@@ -39,7 +35,6 @@ export class QSSService {
       origin: '*',
     })
     await this.app.init()
-    return this
   }
 
   public async start(): Promise<void> {

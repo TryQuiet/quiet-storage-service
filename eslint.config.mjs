@@ -13,6 +13,7 @@ export default [
         '@typescript-eslint/no-magic-numbers': 'off',
         '@typescript-eslint/no-non-null-assertion': 'off',
         "@typescript-eslint/prefer-destructuring": "warn",
+        "@typescript-eslint/no-unsafe-type-assertion": "warn",
         'max-nested-callbacks': 'off'
       },
       files: [
@@ -24,7 +25,6 @@ export default [
     ignores: [
       "**/*.config.mjs", 
       "dist/*",
-      "test/*"
     ],
   }
 ];

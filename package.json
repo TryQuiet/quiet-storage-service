@@ -17,8 +17,8 @@
   },
   "scripts": {
     "build": "nest build",
-    "format": "prettier \"src/**/*.ts\"",
-    "format:fix": "prettier -w \"src/**/*.ts\"",
+    "format": "prettier \"./**/*.ts\"",
+    "format:fix": "prettier -w \"./**/*.ts\"",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "format:lint": "pnpm run format && pnpm run lint",
@@ -32,7 +32,7 @@
     "test:watch": "dotenvx run -f .env.test -- jest --watch",
     "test:cov": "dotenvx run -f .env.test -- jest --coverage",
     "test:debug": "dotenvx run -f .env.test -- node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --config ./test/jest-e2e.json --verbose",
+    "test:e2e": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --config ./test/jest.e2e.config.mjs --verbose",
     "prepare": "husky"
   },
   "dependencies": {
@@ -47,19 +47,22 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "fastify": "^4.28.1",
+    "libsodium-wrappers-sumo": "^0.7.15",
     "luxon": "^3.5.0",
     "p-defer": "^4.0.1",
     "pino": "^9.6.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.1",
-    "socket.io-client": "4.8.1"
+    "socket.io-client": "4.8.1",
+    "uint8arrays": "^5.1.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.9",
     "@nestjs/schematics": "^10.2.3",
     "@nestjs/testing": "^10.4.15",
     "@types/jest": "^29.5.14",
+    "@types/libsodium-wrappers-sumo": "^0.7.8",
     "@types/luxon": "^3.4.2",
     "@types/node": "^20.3.1",
     "@types/supertest": "^2.0.12",
@@ -79,6 +82,7 @@
     "source-map-support": "^0.5.21",
     "supertest": "^6.3.3",
     "ts-jest": "^29.2.5",
+    "ts-jest-resolver": "^2.0.1",
     "ts-loader": "^9.4.3",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",

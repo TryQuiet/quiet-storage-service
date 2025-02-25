@@ -1,4 +1,4 @@
-import { Logger, type LoggerService } from '@nestjs/common'
+import { Injectable, Logger, type LoggerService } from '@nestjs/common'
 import Fastify, {
   type FastifyBaseLogger,
   type FastifyRequest,
@@ -15,6 +15,7 @@ interface ReplyLog {
   res: FastifyReply
 }
 
+@Injectable()
 export class NestFastifyLogger implements FastifyBaseLogger {
   // @ts-expect-error This is initialized in the base logger
   level: pino.LevelWithSilentOrString
