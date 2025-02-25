@@ -53,7 +53,7 @@ describe('CommunityService', () => {
     })
 
     it('throws an error when no query is provided', () => {
-      expect(service?.findOne({})).toThrow(
+      expect(() => service?.findOne({})).toThrow(
         'Must pass in an id or name to filter on',
       )
     })
@@ -80,7 +80,7 @@ describe('CommunityService', () => {
     })
 
     it('throws an error when no query is provided', () => {
-      expect(service?.remove({})).toThrow(
+      expect(() => service?.remove({})).toThrow(
         'Must pass in an id or name to filter on',
       )
     })

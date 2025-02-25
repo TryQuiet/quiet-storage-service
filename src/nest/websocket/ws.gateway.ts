@@ -20,10 +20,10 @@ const DEFAULT_ROOMS: string[] = ['messages']
   path: '/socket.io',
   allowEIO3: true,
 })
-export class SocketGateway
+export class WebsocketGateway
   implements OnGatewayInit, OnGatewayConnection<Socket>, OnGatewayDisconnect
 {
-  private readonly logger = new Logger(SocketGateway.name)
+  private readonly logger = new Logger(WebsocketGateway.name)
 
   // @ts-expect-error Initialized by Nest
   @WebSocketServer() io: Server
@@ -34,6 +34,8 @@ export class SocketGateway
   }
 
   handleConnection(client: Socket, ...args: unknown[]): void {
+    registerPingHandlers(this.io, client)
+
     // eslint-disable-next-line @typescript-eslint/prefer-destructuring -- Decomposing from `this` is wild
     const { sockets } = this.io.sockets
 
@@ -42,10 +44,9 @@ export class SocketGateway
       `Rooms: ${JSON.stringify([...client.rooms])}`,
     )
     this.logger.debug(`Number of connected clients: ${sockets.size}`)
-    registerPingHandlers(this.io, client)
   }
 
   handleDisconnect(client: Socket): void {
-    this.logger.log(`Cliend id:${client.id} disconnected`)
+    this.logger.log(`Client id:${client.id} disconnected`)
   }
 }

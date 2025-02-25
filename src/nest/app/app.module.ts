@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common'
 import { CommunityModule } from '../rest/community/community.module.js'
 
-import { SocketModule } from '../websocket/ws.module.js'
+import { WebsocketModule } from '../websocket/ws.module.js'
 
 @Module({
-  imports: [SocketModule, CommunityModule],
+  imports: [WebsocketModule, CommunityModule],
   controllers: [],
   providers: [],
 })

@@ -13,6 +13,7 @@ export default [
         '@typescript-eslint/no-magic-numbers': 'off',
         '@typescript-eslint/no-non-null-assertion': 'off',
         "@typescript-eslint/prefer-destructuring": "warn",
+        'max-nested-callbacks': 'off'
       },
       files: [
         "src/**/*.ts",

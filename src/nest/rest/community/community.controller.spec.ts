@@ -30,6 +30,13 @@ describe('CommunityController', () => {
   })
 
   describe('Find One', () => {
+    beforeEach(() => {
+      controller?.create({
+        id,
+        name: 'foobar',
+      })
+    })
+
     it('finds a community', () => {
       const community = controller?.findOne(id)
       expect(community?.id).toBe(id)
@@ -37,6 +44,13 @@ describe('CommunityController', () => {
   })
 
   describe('Remove', () => {
+    beforeEach(() => {
+      controller?.create({
+        id,
+        name: 'foobar',
+      })
+    })
+
     it('removes a community', () => {
       const result = controller?.remove(id)
       expect(result).toBeDefined()
