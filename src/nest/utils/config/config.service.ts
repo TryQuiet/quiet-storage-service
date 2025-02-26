@@ -51,6 +51,7 @@ export class ConfigService {
   }
 
   public getList<T = string | number | boolean>(
+    type: 'string' | 'number' | 'boolean',
     key: string | EnvVars,
     defaultValue?: T[],
   ): T[] | undefined {
@@ -60,6 +61,17 @@ export class ConfigService {
     }
 
     const splitValue = stringValue.split(',')
-    return splitValue.map(val => val as T)
+    let convert: (val: string) => unknown = (val: string) => val
+    switch (type) {
+      case 'string':
+        break
+      case 'number':
+        convert = (val: string) => Number(val)
+        break
+      case 'boolean':
+        convert = (val: string) => val === 'true'
+        break
+    }
+    return splitValue.map(val => convert(val)) as T[]
   }
 }

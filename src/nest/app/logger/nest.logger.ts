@@ -5,7 +5,7 @@
  * the regular Logger class anymore.  What's more baffling is it only threw errors in tests.
  */
 
-import { ConsoleLogger, type LogLevel } from '@nestjs/common'
+import { ConsoleLogger } from '@nestjs/common'
 import type { CompoundError } from '../../types.js'
 
 import colors from 'ansi-colors'
@@ -15,7 +15,8 @@ import { DEFAULT_LOG_LEVELS } from './const.js'
 
 export const createLogger = (context: string): QuietNestLogger => {
   const logger = new QuietNestLogger(context, {
-    logLevels: ConfigService.instance.getList<LogLevel>(
+    logLevels: ConfigService.instance.getList(
+      'string',
       EnvVars.LOG_LEVELS,
       DEFAULT_LOG_LEVELS,
     ),
