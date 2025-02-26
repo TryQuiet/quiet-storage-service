@@ -7,8 +7,10 @@ import { WebsocketClientModule } from '../../../src/client/ws.client.module.js'
 import { WebsocketEvents } from '../../../src/nest/websocket/ws.types.js'
 import { Ping, Pong } from '../../../src/nest/websocket/handlers/types.js'
 import { DateTime } from 'luxon'
-import { QuietNestLogger } from '../../../src/nest/app/logger/nest.logger.js'
-import { TextEncoder } from 'node:util'
+import {
+  createLogger,
+  QuietNestLogger,
+} from '../../../src/nest/app/logger/nest.logger.js'
 
 describe('Ping', () => {
   let sockets: TestSockets
@@ -21,7 +23,7 @@ describe('Ping', () => {
     }).compile()
 
     await TestUtils.startServer(testingModule)
-    logger = new QuietNestLogger('E2E:Websocket:Ping')
+    logger = createLogger('E2E:Websocket:Ping')
     // each test need a new socket connection
     sockets = await TestUtils.connectClient()
   })

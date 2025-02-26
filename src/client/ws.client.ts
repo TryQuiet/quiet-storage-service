@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common'
-import sodium, { type CryptoKX, type KeyPair } from 'libsodium-wrappers-sumo'
+import { Inject, Injectable } from '@nestjs/common'
+import type { CryptoKX, KeyPair } from 'libsodium-wrappers-sumo'
 import { connect, type Socket as ClientSocket } from 'socket.io-client'
 import { WebsocketEncryptionService } from '../nest/encryption/ws.enc.service.js'
 import { sleep } from '../nest/utils/sleep.js'
@@ -8,7 +8,8 @@ import {
   HandshakeStatus,
   WebsocketEvents,
 } from '../nest/websocket/ws.types.js'
-import { QuietNestLogger } from '../nest/app/logger/nest.logger.js'
+import { createLogger } from '../nest/app/logger/nest.logger.js'
+import { HOSTNAME, LISTEN_PORT } from '../nest/app/const.js'
 
 @Injectable()
 export class WebsocketClient {
@@ -16,21 +17,27 @@ export class WebsocketClient {
   private keyPair: KeyPair | undefined = undefined
   private sessionKey: CryptoKX | undefined = undefined
 
-  private readonly logger = new QuietNestLogger(WebsocketClient.name)
+  private readonly logger = createLogger(WebsocketClient.name)
 
-  constructor(private readonly encryption: WebsocketEncryptionService) {}
+  constructor(
+    @Inject(LISTEN_PORT) private readonly serverPort: number,
+    @Inject(HOSTNAME) private readonly serverHostname: string,
+    private readonly encryption: WebsocketEncryptionService,
+  ) {}
 
   public async createSocket(): Promise<ClientSocket> {
     this.logger.log(`Creating client socket`)
+    this.logger.verbose(`Poop`)
+
     this.keyPair = this.encryption.generateKeyPair()
     this.clientSocket = connect(
-      `ws://${process.env.HOSTNAME}:${process.env.PORT}`,
+      `ws://${this.serverHostname}:${this.serverPort}`,
       {
         autoConnect: false,
         forceNew: true,
         transports: ['websocket'],
         auth: {
-          publicKey: sodium.to_base64(this.keyPair.publicKey),
+          publicKey: this.encryption.toBase64(this.keyPair.publicKey),
         },
       },
     )
@@ -57,7 +64,7 @@ export class WebsocketClient {
 
         this.sessionKey = this.encryption.generateSharedSessionKeyPair(
           this.keyPair!,
-          sodium.from_base64(handshake.payload.publicKey),
+          this.encryption.fromBase64(handshake.payload.publicKey),
           true,
         )
         callback({ status: HandshakeStatus.Success })
@@ -75,9 +82,6 @@ export class WebsocketClient {
       await sleep(500)
       count--
     }
-
-    this.logger.log(sodium.to_base64(this.sessionKey!.sharedRx))
-    this.logger.log(sodium.to_base64(this.sessionKey!.sharedTx))
   }
 
   public async sendMessage<T>(

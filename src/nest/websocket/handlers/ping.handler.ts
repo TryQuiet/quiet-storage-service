@@ -14,9 +14,9 @@ import {
   EncryptionBase64Error,
   EncryptionError,
 } from '../../encryption/types.js'
-import { QuietNestLogger } from '../../app/logger/nest.logger.js'
+import { createLogger } from '../../app/logger/nest.logger.js'
 
-const logger = new QuietNestLogger('Websocket:Event:Ping')
+const baseLogger = createLogger('Websocket:Event:Ping')
 
 /**
  * Adds event handlers for 'ping' and 'pong' events
@@ -30,7 +30,8 @@ export function registerPingHandlers(
   sessionKey: CryptoKX,
   encryption: WebsocketEncryptionService,
 ): void {
-  logger.debug(`Initializing ping WS event handlers`)
+  const _logger = baseLogger.extend(socket.id)
+  _logger.debug(`Initializing ping WS event handlers`)
 
   function handlePing(
     encryptedPayload: string,
@@ -52,11 +53,10 @@ export function registerPingHandlers(
         success: true,
         ts: DateTime.utc().toMillis(),
       }
-      logger.debug(`Responding with pong`, JSON.stringify(pong))
       const encryptedResponse = encryption.encrypt(pong, sessionKey)
       callback(encryptedResponse)
     } catch (e) {
-      logger.error(`Error while processing ping event`, e)
+      _logger.error(`Error while processing ping event`, e)
       let reason: string | undefined = undefined
       if (
         e instanceof EncryptionBase64Error ||
@@ -75,21 +75,11 @@ export function registerPingHandlers(
       }
       callback(encryption.encrypt(pong, sessionKey))
 
-      logger.warn(`Disconnecting socket due to ping failure`)
+      _logger.warn(`Disconnecting socket due to ping failure`)
       socket.disconnect(true)
-    }
-  }
-
-  function handlePong(payload: Pong): void {
-    logger.debug(`Got a pong`, JSON.stringify(payload))
-    if (payload.success) {
-      logger.debug(`Received successful pong response!`)
-    } else {
-      logger.error(`Ping was not successful!`)
     }
   }
 
   // register event handlers
   socket.on(WebsocketEvents.Ping, handlePing)
-  socket.on(WebsocketEvents.Pong, handlePong)
 }

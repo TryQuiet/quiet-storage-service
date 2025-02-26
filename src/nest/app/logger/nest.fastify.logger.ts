@@ -1,3 +1,7 @@
+/**
+ * Custom Fastify logger that outputs into a Nest logger for logging consistency
+ */
+
 import { Injectable } from '@nestjs/common'
 import Fastify, {
   type FastifyBaseLogger,
@@ -6,7 +10,7 @@ import Fastify, {
 } from 'fastify'
 import type pino from 'pino'
 import { Socket as SocketIoSocket } from 'socket.io'
-import { QuietNestLogger } from './nest.logger.js'
+import { createLogger } from './nest.logger.js'
 
 interface RequestLog {
   req: FastifyRequest
@@ -20,7 +24,7 @@ interface ReplyLog {
 export class NestFastifyLogger implements FastifyBaseLogger {
   // @ts-expect-error This is initialized in the base logger
   level: pino.LevelWithSilentOrString
-  private readonly nestLogger = new QuietNestLogger(Fastify.name)
+  private readonly nestLogger = createLogger(Fastify.name)
 
   public child(bindings: unknown, options?: unknown): this {
     return this
@@ -31,7 +35,7 @@ export class NestFastifyLogger implements FastifyBaseLogger {
   public fatal<T>(objOrMsg: T, ...args: unknown[]): void {
     const message =
       typeof objOrMsg === 'string' ? objOrMsg : this.parseObj(objOrMsg)
-    this.nestLogger.fatal(message, ...args)
+    this.nestLogger.fatal(message, undefined, ...args)
   }
 
   public error(obj: unknown, msg?: string, ...args: unknown[]): void
@@ -39,7 +43,7 @@ export class NestFastifyLogger implements FastifyBaseLogger {
   public error<T>(objOrMsg: T, ...args: unknown[]): void {
     const message =
       typeof objOrMsg === 'string' ? objOrMsg : this.parseObj(objOrMsg)
-    this.nestLogger.error(message, ...args)
+    this.nestLogger.error(message, undefined, ...args)
   }
 
   public warn(obj: unknown, msg?: string, ...args: unknown[]): void
@@ -47,7 +51,7 @@ export class NestFastifyLogger implements FastifyBaseLogger {
   public warn<T>(objOrMsg: T, ...args: unknown[]): void {
     const message =
       typeof objOrMsg === 'string' ? objOrMsg : this.parseObj(objOrMsg)
-    this.nestLogger.warn(message, ...args)
+    this.nestLogger.warn(message, undefined, ...args)
   }
 
   public info(obj: unknown, msg?: string, ...args: unknown[]): void
@@ -55,7 +59,7 @@ export class NestFastifyLogger implements FastifyBaseLogger {
   public info<T>(objOrMsg: T, ...args: unknown[]): void {
     const message =
       typeof objOrMsg === 'string' ? objOrMsg : this.parseObj(objOrMsg)
-    this.nestLogger.log(message, ...args)
+    this.nestLogger.log(message, undefined, ...args)
   }
 
   public debug(obj: unknown, msg?: string, ...args: unknown[]): void
@@ -63,7 +67,7 @@ export class NestFastifyLogger implements FastifyBaseLogger {
   public debug<T>(objOrMsg: T, ...args: unknown[]): void {
     const message =
       typeof objOrMsg === 'string' ? objOrMsg : this.parseObj(objOrMsg)
-    this.nestLogger.debug(message, ...args)
+    this.nestLogger.debug(message, undefined, ...args)
   }
 
   public trace(obj: unknown, msg?: string, ...args: unknown[]): void
@@ -71,7 +75,7 @@ export class NestFastifyLogger implements FastifyBaseLogger {
   public trace<T>(objOrMsg: T, ...args: unknown[]): void {
     const message =
       typeof objOrMsg === 'string' ? objOrMsg : this.parseObj(objOrMsg)
-    this.nestLogger.verbose(message, ...args)
+    this.nestLogger.verbose(message, undefined, ...args)
   }
 
   public silent(obj: unknown, msg?: string, ...args: unknown[]): void
@@ -79,7 +83,7 @@ export class NestFastifyLogger implements FastifyBaseLogger {
   public silent<T>(objOrMsg: T, ...args: unknown[]): void {
     const message =
       typeof objOrMsg === 'string' ? objOrMsg : this.parseObj(objOrMsg)
-    this.nestLogger.verbose(message, ...args)
+    this.nestLogger.verbose(message, undefined, ...args)
   }
 
   private parseObj(obj: unknown): string {

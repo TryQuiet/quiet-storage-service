@@ -20,7 +20,7 @@ import {
 } from './ws.types.js'
 import { WebsocketEncryptionService } from '../encryption/ws.enc.service.js'
 import sodium, { CryptoKX } from 'libsodium-wrappers-sumo'
-import { QuietNestLogger } from '../app/logger/nest.logger.js'
+import { createLogger } from '../app/logger/nest.logger.js'
 
 @WebSocketGateway({
   transports: ['websocket'],
@@ -33,7 +33,7 @@ import { QuietNestLogger } from '../app/logger/nest.logger.js'
 export class WebsocketGateway
   implements OnGatewayInit, OnGatewayConnection<Socket>, OnGatewayDisconnect
 {
-  private readonly logger = new QuietNestLogger(WebsocketGateway.name)
+  private readonly logger = createLogger(WebsocketGateway.name)
   private readonly connections: Map<string, ActiveConnection>
 
   // @ts-expect-error Initialized by Nest
@@ -55,6 +55,7 @@ export class WebsocketGateway
    * @param args Extra arguments to the connection
    */
   async handleConnection(client: Socket, ...args: unknown[]): Promise<void> {
+    const _logger = this.logger.extend(client.id)
     // eslint-disable-next-line @typescript-eslint/prefer-destructuring -- Decomposing from `this` is wild
     const { sockets } = this.io.sockets
 
@@ -66,11 +67,10 @@ export class WebsocketGateway
       return
     }
 
-    this.logger.log(
-      `Client id: ${client.id} connected`,
-      `Rooms: ${JSON.stringify([...client.rooms])}`,
+    _logger.log(
+      `Client id: ${client.id} connected, Rooms: ${JSON.stringify([...client.rooms])}`,
     )
-    this.logger.debug(`Number of connected clients: ${sockets.size}`)
+    _logger.debug(`Number of connected clients: ${sockets.size}`)
 
     this._registerEventHandlers(client, sessionKey)
   }
@@ -81,7 +81,8 @@ export class WebsocketGateway
    * @param client Socket connection with a new client
    */
   handleDisconnect(client: Socket): void {
-    this.logger.log(`Client id:${client.id} disconnected`)
+    const _logger = this.logger.extend(client.id)
+    _logger.log(`Client id:${client.id} disconnected`)
   }
 
   /**
@@ -97,8 +98,10 @@ export class WebsocketGateway
     client: Socket,
     publicKey?: Uint8Array,
   ): Promise<CryptoKX | undefined> {
+    const _logger = this.logger.extend(client.id)
+    _logger.log(`Handling handshake`)
     if (publicKey == null) {
-      this.logger.error(
+      _logger.error(
         `Client sent an invalid handshake message on connect; disconnecting`,
       )
       const response: HandshakeMessage = {
@@ -115,8 +118,6 @@ export class WebsocketGateway
       serverKey,
       publicKey,
     )
-    this.logger.log(sodium.to_base64(sessionKey.sharedRx))
-    this.logger.log(sodium.to_base64(sessionKey.sharedTx))
     const response: HandshakeMessage = {
       status: HandshakeStatus.Active,
       payload: {
@@ -130,7 +131,7 @@ export class WebsocketGateway
         .timeout(5_000)
         .emitWithAck(WebsocketEvents.Handshake, response)) as HandshakeMessage
       if (ack.status !== HandshakeStatus.Success) {
-        this.logger.error(
+        _logger.error(
           `Client returned an error on handshake response; disconnecting.  Reason:`,
           ack.reason,
         )
@@ -138,13 +139,15 @@ export class WebsocketGateway
         return undefined
       }
     } catch (e) {
-      this.logger.error(
+      _logger.error(
         `Error while sending public key to client on handshake; disconnecting.`,
         e,
       )
       client.disconnect(true)
       return undefined
     }
+
+    _logger.log(`Handshake complete!`)
 
     this.connections.set(client.id, { sessionKey })
     return sessionKey

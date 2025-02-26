@@ -21,3 +21,4 @@ export class EncryptionBase64Error<T extends Error> extends CompoundError<T> {
 
 export class EncryptionError<T extends Error> extends CompoundError<T> {}
 export class DecryptionError<T extends Error> extends CompoundError<T> {}
+export class KeyGenError<T extends Error> extends CompoundError<T> {}

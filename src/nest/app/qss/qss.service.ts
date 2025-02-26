@@ -11,13 +11,13 @@ import {
 
 import { AppModule } from '../app.module.js'
 import { FASTIFY_ADAPTER, HOSTNAME, LISTEN_PORT } from '../const.js'
-import { QuietNestLogger } from '../logger/nest.logger.js'
+import { createLogger } from '../logger/nest.logger.js'
 
 @Injectable()
 export class QSSService {
   public app: NestFastifyApplication | undefined = undefined
 
-  private readonly logger = new QuietNestLogger(QSSService.name)
+  private readonly logger = createLogger(QSSService.name)
 
   constructor(
     @Inject(LISTEN_PORT) private readonly port: number,
