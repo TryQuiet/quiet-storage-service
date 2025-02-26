@@ -35,7 +35,9 @@ export class TestUtils {
     )
     this.app = this.module.createNestApplication<NestFastifyApplication>(
       this.adapter,
-      { logger: createLogger('Test') },
+      {
+        logger: createLogger('Test'),
+      },
     )
     this.encryption = this.app.get<WebsocketEncryptionService>(
       WebsocketEncryptionService,
