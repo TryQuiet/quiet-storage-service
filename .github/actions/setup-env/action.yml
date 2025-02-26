@@ -3,13 +3,6 @@ name: 'Setup environment'
 runs:
   using: "composite"
   steps:
-    - name: "Print OS"
-      shell: bash
-      run: echo ${{ matrix.os }}
-
-    - name: Checkout Branch
-      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-
     - name: Install Node 22
       uses: actions/setup-node@v4
       with:
