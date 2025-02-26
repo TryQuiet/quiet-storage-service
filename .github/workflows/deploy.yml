@@ -29,3 +29,4 @@ jobs:
         --deployment-group-name ${{ secrets.CODE_DEPLOY_GROUP_NAME }} \
         --github-location repository=TryQuiet/quiet-storage-service,commitId=$commit_id \
         --ignore-application-stop-failures
+        --color on

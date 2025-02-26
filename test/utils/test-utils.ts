@@ -13,6 +13,7 @@ import { TestSockets } from './types'
 import { WebsocketClient } from '../../src/client/ws.client'
 import { WebsocketEncryptionService } from '../../src/nest/encryption/ws.enc.service'
 import { createLogger } from '../../src/nest/app/logger/nest.logger'
+import { LISTEN_PORT } from '../../src/nest/app/const'
 
 export class TestUtils {
   public static client: WebsocketClient
@@ -45,7 +46,7 @@ export class TestUtils {
     this.client = this.app.get<WebsocketClient>(WebsocketClient)
     this.logger.log(`Starting server`)
     await this.app.init()
-    await this.app.listen(3004)
+    await this.app.listen(this.app.get<number>(LISTEN_PORT))
   }
 
   public static async connectClient(): Promise<TestSockets> {
