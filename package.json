@@ -88,6 +88,7 @@
     "eslint-plugin-eslint-comments": "^3.2.0",
     "eslint-plugin-prettier": "^5.2.3",
     "expect-more-jest": "^5.5.0",
+    "figures": "^6.1.0",
     "husky": "^9.1.7",
     "jest": "^29.7.0",
     "lint-staged": "^15.4.3",
