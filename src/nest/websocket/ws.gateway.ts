@@ -45,7 +45,7 @@ export class WebsocketGateway
   }
 
   afterInit(): void {
-    this.logger.log('Initialized')
+    // Do nothing for now
   }
 
   /**
@@ -99,7 +99,7 @@ export class WebsocketGateway
     publicKey?: Uint8Array,
   ): Promise<CryptoKX | undefined> {
     const _logger = this.logger.extend(client.id)
-    _logger.log(`Handling handshake`)
+    _logger.debug(`Handling handshake`)
     if (publicKey == null) {
       _logger.error(
         `Client sent an invalid handshake message on connect; disconnecting`,
@@ -147,7 +147,7 @@ export class WebsocketGateway
       return undefined
     }
 
-    _logger.log(`Handshake complete!`)
+    _logger.debug(`Handshake complete!`)
 
     this.connections.set(client.id, { sessionKey })
     return sessionKey

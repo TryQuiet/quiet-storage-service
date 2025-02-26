@@ -29,7 +29,7 @@ describe('Ping', () => {
   })
 
   beforeEach(() => {
-    logger.debug(`###### ${expect.getState().currentTestName}`)
+    logger.log(`###### ${expect.getState().currentTestName}`)
   })
 
   afterEach(async () => {

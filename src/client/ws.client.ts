@@ -27,7 +27,6 @@ export class WebsocketClient {
 
   public async createSocket(): Promise<ClientSocket> {
     this.logger.log(`Creating client socket`)
-    this.logger.verbose(`Poop`)
 
     this.keyPair = this.encryption.generateKeyPair()
     this.clientSocket = connect(
