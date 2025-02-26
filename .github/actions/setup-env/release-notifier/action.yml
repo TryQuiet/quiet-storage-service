@@ -1,0 +1,69 @@
+###
+### Handles sending release-releated messages to the #releases channel in Slack
+###
+### Notification Action: https://github.com/actions-ecosystem/action-slack-notifier
+###
+
+name: 'Release Notifier'
+
+inputs:
+  version:
+    description: 'Semantic version string for this release (e.g. 4.0.0-alpha.0)'
+    required: true
+  status:
+    description: 'Final status of the release job (available values: success, failure, cancelled, started)'
+    required: true
+  slack_oauth_token:
+    description: 'OAuth token for our Slack bot'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: 'Started Notification'
+      uses: actions-ecosystem/action-slack-notifier@v1
+      if: ${{ inputs.status == 'started' }}
+      with:
+        slack_token: ${{ inputs.slack_oauth_token }}
+        username: Github Actions
+        color: white
+        verbose: false
+        message: |
+          QSS Release Started - `${{ inputs.version }}`
+        channel: releases
+
+    - name: 'Success Notification'
+      uses: actions-ecosystem/action-slack-notifier@v1
+      if: ${{ inputs.status == 'success' }}
+      with:
+        slack_token: ${{ inputs.slack_oauth_token }}
+        username: Github Actions
+        color: green
+        verbose: true
+        message: |
+          QSS Release Success - `${{ inputs.version }}`
+        channel: releases
+        
+    - name: 'Failure Notification'
+      uses: actions-ecosystem/action-slack-notifier@v1
+      if: ${{ inputs.status == 'failure' }}
+      with:
+        slack_token: ${{ inputs.slack_oauth_token }}
+        username: Github Actions
+        color: red
+        verbose: true
+        message: |
+          QSS Release Failed - `${{ inputs.version }}`
+        channel: releases
+
+    - name: 'Cancelled Notification'
+      uses: actions-ecosystem/action-slack-notifier@v1
+      if: ${{ inputs.status == 'cancelled' }}
+      with:
+        slack_token: ${{ inputs.slack_oauth_token }}
+        username: Github Actions
+        color: yellow
+        verbose: true
+        message: |
+          QSS Release Cancelled - `${{ inputs.version }}`
+        channel: releases

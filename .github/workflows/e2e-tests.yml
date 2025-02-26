@@ -1,0 +1,22 @@
+name: E2E Tests
+
+on:
+  pull_request:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: "Print OS"
+        run: echo ${{ matrix.os }}
+
+      - name: Checkout Branch
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: "Setup environment"
+        uses: ./.github/actions/setup-env
+
+      - name: "Run E2E tests"
+        shell: bash
+        run: pnpm run test:e2e:ci

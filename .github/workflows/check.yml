@@ -1,0 +1,29 @@
+name: Check Code Formatting
+
+on:
+  pull_request:
+
+jobs:
+  check:
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: "Print OS"
+        run: echo ${{ matrix.os }}
+
+      - name: "Checkout branch"
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: "Setup environment"
+        uses: ./.github/actions/setup-env
+
+      - name: "Run Prettier"
+        shell: bash
+        if: always()
+        run: pnpm run format
+      
+      - name: "Run ESLint"
+        shell: bash
+        if: always()
+        run: pnpm run lint
