@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- It's a pain in the ass getting the typing to work otherwise */
-
 /**
  * Extension of the NestJS Logger class that improves error logging
  *
@@ -11,14 +9,16 @@ import { ConsoleLogger, type LogLevel } from '@nestjs/common'
 import type { CompoundError } from '../../types.js'
 
 import colors from 'ansi-colors'
+import { ConfigService } from '../../utils/config/config.service.js'
+import { EnvVars } from '../../utils/config/env_vars.js'
+import { DEFAULT_LOG_LEVELS } from './const.js'
 
 export const createLogger = (context: string): QuietNestLogger => {
-  const logLevels: LogLevel[] =
-    process.env.LOG_LEVELS != null && process.env.LOG_LEVELS !== ''
-      ? (process.env.LOG_LEVELS.split(',') as LogLevel[])
-      : (['debug', 'verbose', 'log', 'warn', 'error', 'fatal'] as LogLevel[])
   const logger = new QuietNestLogger(context, {
-    logLevels,
+    logLevels: ConfigService.instance.getList<LogLevel>(
+      EnvVars.LOG_LEVELS,
+      DEFAULT_LOG_LEVELS,
+    ),
   })
   return logger
 }
@@ -102,7 +102,6 @@ export class QuietNestLogger extends ConsoleLogger {
     return this.colorize(formattedErrors, level)
   }
 
-  // eslint-disable-next-line @typescript-eslint/class-methods-use-this -- this overrides an existing method
   protected override formatContext(context?: string): string {
     if (context == null) {
       return ''

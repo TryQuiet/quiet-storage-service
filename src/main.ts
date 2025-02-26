@@ -1,4 +1,4 @@
-import '@dotenvx/dotenvx/config'
+import './nest/utils/config/config.service.js'
 
 import { AppModule } from './nest/app/app.module.js'
 import { NestFactory } from '@nestjs/core'

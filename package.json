@@ -113,7 +113,8 @@
       "src/**/*.!(module\\.)(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "setupFilesAfterEnv": ["<rootDir>/test/jest.setup.ts"]
   },
   "volta": {
     "node": "22.11.0",
