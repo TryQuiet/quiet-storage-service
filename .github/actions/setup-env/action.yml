@@ -15,7 +15,9 @@ runs:
       shell: bash
       run: |
         # install pnpm 9
-        curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=9.6.0 sh -
+        curl -fsSL https://get.pnpm.io/install.sh -o pnpm_install.sh
+        export PNPM_VERSION=9.6.0
+        sudo -E bash pnpm_install.sh
 
     - name: "Install dependencies"
       shell: bash
