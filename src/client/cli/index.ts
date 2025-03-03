@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access -- ignore */
 /* eslint-disable @typescript-eslint/no-unsafe-call -- ignore */
 
-import '../../../nest/utils/config/config.service.js'
+import '../../nest/utils/config/config.service.js'
 
 import { program } from '@commander-js/extra-typings'
 import type { RuntimeOptions } from './types.js'

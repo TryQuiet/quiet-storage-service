@@ -5,8 +5,9 @@ import type { WebsocketClient } from '../../ws.client.js'
 import { WebsocketEvents } from '../../../nest/websocket/ws.types.js'
 import { DateTime } from 'luxon'
 import { createLogger } from '../../../nest/app/logger/nest.logger.js'
-import type { Pong } from '../../../nest/websocket/handlers/types.js'
+import type { Pong } from '../../../nest/websocket/handlers/ping/types.js'
 import { confirm } from '@inquirer/prompts'
+import { createCommunityPrompt } from './community.prompt.js'
 
 const logger = createLogger('Client:Main')
 
@@ -35,6 +36,11 @@ const mainLoop = async (
         name: 'Send ping',
         value: 'sendPing',
         description: 'Send ping message to server',
+      },
+      {
+        name: 'Create community',
+        value: 'createCommunity',
+        description: 'Create a new community on the server',
       },
       {
         name: 'Disconnect',
@@ -66,6 +72,10 @@ const mainLoop = async (
             } else {
               logger.log(`Ping success!`)
             }
+            break
+          }
+          case 'createCommunity': {
+            await createCommunityPrompt(client)
             break
           }
           case 'disconnect': {
