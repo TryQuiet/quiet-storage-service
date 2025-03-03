@@ -11,7 +11,7 @@ import {
 } from '@nestjs/websockets'
 
 import { Server, Socket } from 'socket.io'
-import { registerPingHandlers } from './handlers/ping.handler.js'
+import { registerPingHandlers } from './handlers/ping/ping.handler.js'
 import {
   ActiveConnection,
   HandshakeMessage,
@@ -21,6 +21,9 @@ import {
 import { WebsocketEncryptionService } from '../encryption/ws.enc.service.js'
 import sodium, { CryptoKX } from 'libsodium-wrappers-sumo'
 import { createLogger } from '../app/logger/nest.logger.js'
+import { CommunityStorageService } from '../storage/communities/community.storage.service.js'
+import { registerCommunitiesHandlers } from './handlers/communities/communities.handler.js'
+import { BaseHandlerOptions } from './handlers/types.js'
 
 @WebSocketGateway({
   transports: ['websocket'],
@@ -40,7 +43,10 @@ export class WebsocketGateway
   // Socket.io Server instance
   @WebSocketServer() io: Server
 
-  constructor(private readonly encryption: WebsocketEncryptionService) {
+  constructor(
+    private readonly encryption: WebsocketEncryptionService,
+    private readonly communityStorageService: CommunityStorageService,
+  ) {
     this.connections = new Map()
   }
 
@@ -91,7 +97,18 @@ export class WebsocketGateway
    * @param client Socket connection with a new client
    */
   private _registerEventHandlers(client: Socket, sessionKey: CryptoKX): void {
-    registerPingHandlers(this.io, client, sessionKey, this.encryption)
+    const baseOptions: BaseHandlerOptions = {
+      socketServer: this.io,
+      socket: client,
+      sessionKey,
+      encryption: this.encryption,
+    }
+
+    registerPingHandlers(baseOptions)
+    registerCommunitiesHandlers({
+      ...baseOptions,
+      storage: this.communityStorageService,
+    })
   }
 
   private async _handleHandshake(

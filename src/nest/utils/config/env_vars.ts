@@ -1,8 +1,25 @@
 export enum EnvVars {
+  // general settings
+  ENV = 'ENV',
+
   // logger settings
   LOG_LEVELS = 'LOG_LEVELS',
 
   // server settings
   PORT = 'PORT',
   HOSTNAME = 'HOSTNAME',
+
+  // aws settings
+  AWS_REGION = 'AWS_REGION',
+  AWS_ACCOUNT_ID = 'AWS_ACCOUNT_ID',
+  AWS_ACCESS_KEY_ID = 'AWS_ACCESS_KEY_ID',
+  AWS_SECRET_KEY = 'AWS_SECRET_KEY',
+
+  // postgres setting
+  POSTGRES_HOST = 'POSTGRES_HOST',
+  POSTGRES_PORT = 'POSTGRES_PORT',
+  POSTGRES_DB_NAME = 'POSTGRES_DB_NAME',
+  POSTGRES_USERNAME = 'POSTGRES_USERNAME',
+  POSTGRES_PASSWORD = 'POSTGRES_PASSWORD',
+  POSTGRES_DEBUG = 'POSTGRES_DEBUG',
 }

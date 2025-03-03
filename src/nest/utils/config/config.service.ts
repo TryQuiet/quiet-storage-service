@@ -1,6 +1,7 @@
 import '@dotenvx/dotenvx/config' // load config from .env* file(s)
-import type { EnvVars } from './env_vars.js'
+import { EnvVars } from './env_vars.js'
 import { Injectable } from '@nestjs/common'
+import { Environment } from './types.js'
 
 @Injectable()
 export class ConfigService {
@@ -13,6 +14,27 @@ export class ConfigService {
   public static get instance(): ConfigService {
     ConfigService._instance ??= new ConfigService()
     return ConfigService._instance
+  }
+
+  public getEnv(): Environment {
+    const value = this.getString(EnvVars.ENV)
+    if (value == null) {
+      throw new Error(`ENV is not set!`)
+    }
+
+    switch (value.toLowerCase()) {
+      case 'dev':
+      case 'development':
+        return Environment.Development
+      case 'prod':
+      case 'production':
+        return Environment.Production
+      case 'test':
+      case 'testing':
+        return Environment.Test
+      default:
+        throw new Error(`Invalid ENV value ${value}`)
+    }
   }
 
   public getString(

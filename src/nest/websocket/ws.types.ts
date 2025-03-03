@@ -7,6 +7,7 @@ export enum WebsocketEvents {
   Ping = 'ping',
   Pong = 'pong',
   Handshake = 'handshake',
+  CreateCommunity = 'create-community',
 }
 
 /**

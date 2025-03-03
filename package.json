@@ -12,22 +12,23 @@
   },
   "main": "./dist/src/main.js",
   "exports": "./dist/src/main.js",
-  "bin": {
-    "qss": "./dist/src/main.js"
-  },
   "scripts": {
     "build": "nest build",
-    "format": "prettier \"./**/*.ts\" --check",
-    "format:fix": "prettier \"./**/*.ts\" --write",
+    "build:submodules": "pnpm run build:auth",
+    "build:auth": "cd ./3rd-party/auth && pnpm i && pnpm build",
+    "bootstrap": "pnpm run build:submodules && pnpm i && pnpm run build",
+    "format": "prettier \"./(src|test)/**/*.ts\" --check",
+    "format:fix": "prettier \"./(src|test)/**/*.ts\" --write",
     "lint": "eslint \"{src,test}/**/*.ts\" --stats --format=pretty",
     "lint:fix": "eslint \"{src,test}/**/*.ts\" --stats --format=pretty --fix",
     "format:lint": "pnpm run format && pnpm run lint",
     "format:lint:fix": "pnpm run format:fix && pnpm run lint:fix",
     "lint-staged": "lint-staged --no-stash",
-    "start:dev": "dotenvx run -f .env.dev -- nest start --watch",
-    "start:debug": "dotenvx run -f .env.dev -- nest start --debug --watch",
-    "start:dist:dev": "dotenvx run -f .env.dev -- nest start dist/src",
-    "start:dist:prod": "dotenvx run -f .env.prod -- nest start dist/src",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down --remove-orphans",
+    "start:dev": "pnpm run migrate:up && pnpm run docker:up && dotenvx run -f .env.dev -- nest start dist/src --watch",
+    "start:dev:debug": "pnpm run migrate:up && pnpm run docker:up && dotenvx run -f .env.dev -- nest start dist/src --debug --watch",
+    "start:prod": "dotenvx run -f .env.prod -- nest start dist/src",
     "test": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --runInBand --colors --detectOpenHandles --forceExit --verbose",
     "test:ci": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --runInBand --colors --detectOpenHandles --forceExit --ci --silent --verbose",
     "test:watch": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --watch",
@@ -36,10 +37,22 @@
     "test:e2e": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --config ./test/jest.e2e.config.mjs --runInBand --colors --detectOpenHandles --forceExit --verbose",
     "test:e2e:ci": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --config ./test/jest.e2e.config.mjs --runInBand --colors --detectOpenHandles --forceExit --ci --silent --verbose",
     "prepare": "husky",
-    "start:client": "dotenvx run -f .env.dev.client -- node dist/src/client/cli/index.js"
+    "start:client": "dotenvx run -f .env.dev.client -- node dist/src/client/cli/index.js",
+    "migrate:create:initial": "dotenvx run -f .env.dev -- npx mikro-orm-esm migration:create --initial --config src/nest/storage/mikro-orm.postgres.config.ts",
+    "migrate:up": "dotenvx run -f .env.dev -- npx mikro-orm-esm migration:up --config src/nest/storage/mikro-orm.postgres.config.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.750.0",
     "@dotenvx/dotenvx": "^1.36.0",
+    "@localfirst/auth": "file:./3rd-party/auth/packages/auth/dist",
+    "@localfirst/crdx": "file:./3rd-party/auth/packages/crdx/dist",
+    "@mikro-orm/cli": "^6.4.7",
+    "@mikro-orm/core": "^6.4.7",
+    "@mikro-orm/migrations": "^6.4.7",
+    "@mikro-orm/nestjs": "^6.1.1",
+    "@mikro-orm/postgresql": "^6.4.7",
+    "@mikro-orm/reflection": "^6.4.7",
+    "@mikro-orm/seeder": "^6.4.7",
     "@nestjs/common": "^10.4.15",
     "@nestjs/core": "^10.4.15",
     "@nestjs/jwt": "^10.2.0",
@@ -60,6 +73,7 @@
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.1",
     "socket.io-client": "4.8.1",
+    "timeout-abort-controller": "^3.0.0",
     "uint8arrays": "^5.1.0"
   },
   "devDependencies": {
@@ -102,6 +116,7 @@
     "ts-loader": "^9.4.3",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.19.3",
     "typescript": "^5.1.3"
   },
   "jest": {
