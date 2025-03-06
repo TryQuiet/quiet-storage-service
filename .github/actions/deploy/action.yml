@@ -10,14 +10,20 @@ inputs:
   aws_region:
     description: 'AWS region containing EC2 instance(s)'
     required: true
+  aws_access_key_id:
+    description: 'AWS access key ID for EC2 instance(s)'
+    required: true
+  aws_secret_access_key:
+    description: 'AWS secret access key for EC2 instance(s)'
+    required: true
 
 runs:
   using: composite
   steps:
     - uses: aws-actions/configure-aws-credentials@v1
       with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-access-key-id: ${{ inputs.aws_access_key_id }}
+        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
         aws-region: ${{ inputs.aws_region }}
     - name: Deploy QSS to AWS
       shell: bash

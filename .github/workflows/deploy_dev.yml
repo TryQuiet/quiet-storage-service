@@ -33,6 +33,8 @@ jobs:
           code_deploy_group: ${{ secrets.CODE_DEPLOY_GROUP_NAME_DEV }}
           code_deploy_application: ${{ secrets.CODE_DEPLOY_APPLICATION_NAME }}
           aws_region: ${{ env.AWS_REGION }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
       - name: Send Release Start Notificaton
         uses: ./.github/actions/release-notifier
         if: always()
