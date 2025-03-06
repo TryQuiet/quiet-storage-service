@@ -23,19 +23,14 @@ inputs:
     description: 'S3 bucket that code is pushed to'
     required: true
 
-env:
-  ZIP_FILE_NAME: ${{ inputs.code_deploy_application }}_${{ inputs.version }}_${{ github.sha }}.zip
-
 runs:
   using: composite
   steps:
-    # - name: Install zip
-    #   uses: montudor/action-zip@v1
-    # - name: Archive code directory
-    #   shell: bash
-    #   run: |
-    #     zip -qq -r ${{ inputs.code_deploy_application }}_${{ inputs.version }}_${{ github.sha	 }}.zip . -x ./dist/**\* ./node_modules/**\*
-    - uses: aws-actions/configure-aws-credentials@v1
+    - name: Generate release archive name
+      shell: bash
+      run: echo "{ZIP_FILE_NAME}=${{ inputs.code_deploy_application }}_${{ inputs.version }}_${{ github.sha }}.zip" >> $GITHUB_ENV
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
       with:
         aws-access-key-id: ${{ inputs.aws_access_key_id }}
         aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
@@ -45,7 +40,7 @@ runs:
       run: |
         aws deploy push \
           --application-name ${{ inputs.code_deploy_application }} \
-          --s3-location s3://${{ inputs.s3_bucket }}/${{ env.ZIP_FILE_NAME }} \
+          --s3-location s3://${{ inputs.s3_bucket }}/$ZIP_FILE_NAME \
           --no-ignore-hidden-files \
           --color on
     - name: Deploy QSS to AWS
@@ -54,5 +49,5 @@ runs:
         aws deploy create-deployment \
           --application-name ${{ inputs.code_deploy_application }} \
           --deployment-group-name ${{ inputs.code_deploy_group }} \
-          --s3-location bucket=${{ inputs.s3_bucket }},bundleType=zip,key=${{ env.ZIP_FILE_NAME }} \
+          --s3-location bucket=${{ inputs.s3_bucket }},bundleType=zip,key=$ZIP_FILE_NAME \
           --color on
