@@ -7,8 +7,9 @@ sudo apt-get install -y nodejs
 
 # install pnpm 10
 curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=10.4.1 sh -
+source /home/ubuntu/.bashrc
 
-npm install pm2@latest -g
+pnpm add pm2@latest -g
 
 pm2 stop QSS
 rm -rf /home/ubuntu/qss
