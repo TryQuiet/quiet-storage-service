@@ -1,4 +1,6 @@
 cd /home/ubuntu/qss
+
+source /home/ubuntu/.bashrc
 pnpm i
 pnpm run build
 

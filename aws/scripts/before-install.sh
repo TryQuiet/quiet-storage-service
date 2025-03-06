@@ -6,7 +6,7 @@ sudo -E bash nodesource_setup.sh
 sudo apt-get install -y nodejs
 
 # install pnpm 10
-curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=10.4.1 sh -
+curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=10.4.1 sudo sh -
 source /home/ubuntu/.bashrc
 
 pnpm add pm2@latest -g
