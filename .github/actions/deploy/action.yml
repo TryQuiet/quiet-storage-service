@@ -49,5 +49,5 @@ runs:
         aws deploy create-deployment \
           --application-name ${{ inputs.code_deploy_application }} \
           --deployment-group-name ${{ inputs.code_deploy_group }} \
-          --s3-location bucket=${{ inputs.s3_bucket }},bundleType=zip,key=$ZIP_FILE_NAME \
+          --s3-location bucket=${{ inputs.s3_bucket }}/$ZIP_FILE_NAME,bundleType=zip \
           --color on
