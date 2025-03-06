@@ -33,5 +33,5 @@ runs:
         --application-name ${{ inputs.code_deploy_application }} \
         --deployment-group-name ${{ inputs.code_deploy_group }} \
         --github-location repository=TryQuiet/quiet-storage-service,commitId=$commit_id \
-        --ignore-application-stop-failures
+        --ignore-application-stop-failures \
         --color on
