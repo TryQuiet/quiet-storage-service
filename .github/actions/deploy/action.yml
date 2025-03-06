@@ -28,7 +28,7 @@ runs:
   steps:
     - name: Generate release archive name
       shell: bash
-      run: echo "{ZIP_FILE_NAME}=${{ inputs.code_deploy_application }}_${{ inputs.version }}_${{ github.sha }}.zip" >> $GITHUB_ENV
+      run: echo "ZIP_FILE_NAME=${{ inputs.code_deploy_application }}_${{ inputs.version }}_${{ github.sha }}.zip" >> $GITHUB_ENV
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
