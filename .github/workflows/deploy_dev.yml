@@ -19,14 +19,14 @@ jobs:
       - name: Extract version
         id: extract_version
         uses: Saionaro/extract-package-version@fdb5b74adc1278ddb777dfed4c988b9d098bb48d # v1.2.1
-      - name: Send Release Start Notificaton
-        uses: ./.github/actions/release-notifier
-        if: always()
-        with:
-          environment: Development
-          version: ${{ steps.extract_version.outputs.version }}
-          status: started
-          slack_oauth_token: ${{ secrets.SLACK_BOT_OAUTH_TOKEN }}
+      # - name: Send Release Start Notificaton
+      #   uses: ./.github/actions/release-notifier
+      #   if: always()
+      #   with:
+      #     environment: Development
+      #     version: ${{ steps.extract_version.outputs.version }}
+      #     status: started
+      #     slack_oauth_token: ${{ secrets.SLACK_BOT_OAUTH_TOKEN }}
       - name: "Deploy to Development"
         uses: ./.github/actions/deploy
         with:
@@ -37,11 +37,11 @@ jobs:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           version: ${{ steps.extract_version.outputs.version }}
           s3_bucket: ${{ secrets.QSS_S3_CODE_DEPLOY_BUCKET }}
-      - name: Send Release Start Notificaton
-        uses: ./.github/actions/release-notifier
-        if: always()
-        with:
-          environment: Development
-          version: ${{ steps.extract_version.outputs.version }}
-          status: ${{ job.status }}
-          slack_oauth_token: ${{ secrets.SLACK_BOT_OAUTH_TOKEN }}
+      # - name: Send Release Start Notificaton
+      #   uses: ./.github/actions/release-notifier
+      #   if: always()
+      #   with:
+      #     environment: Development
+      #     version: ${{ steps.extract_version.outputs.version }}
+      #     status: ${{ job.status }}
+      #     slack_oauth_token: ${{ secrets.SLACK_BOT_OAUTH_TOKEN }}
