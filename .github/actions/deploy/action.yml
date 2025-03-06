@@ -1,6 +1,9 @@
 name: AWS Deploy
 
 inputs:
+  version:
+    description: 'Semantic version string for this release (e.g. 4.0.0-alpha.0)'
+    required: true
   code_deploy_group:
     description: 'AWS CodeDeploy group name'
     required: true
@@ -17,21 +20,36 @@ inputs:
     description: 'AWS secret access key for EC2 instance(s)'
     required: true
 
+env:
+  ZIP_FILE_NAME: ${{ inputs.code_deploy_application }}_${{ inputs.version }}_${{ github.sha }}.zip
+
 runs:
   using: composite
   steps:
+    # - name: Install zip
+    #   uses: montudor/action-zip@v1
+    # - name: Archive code directory
+    #   shell: bash
+    #   run: |
+    #     zip -qq -r ${{ inputs.code_deploy_application }}_${{ inputs.version }}_${{ github.sha	 }}.zip . -x ./dist/**\* ./node_modules/**\*
     - uses: aws-actions/configure-aws-credentials@v1
       with:
         aws-access-key-id: ${{ inputs.aws_access_key_id }}
         aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
         aws-region: ${{ inputs.aws_region }}
+    - name: Bundle code and push to S3
+      shell: bash
+      run: |
+        aws deploy push \
+          --application-name ${{ inputs.code_deploy_application }} \
+          --s3-location s3://${{ secrets.QSS_S3_CODE_DEPLOY_BUCKET }}/${{ env.ZIP_FILE_NAME }} \
+          --no-ignore-hidden-files \
+          --color on
     - name: Deploy QSS to AWS
       shell: bash
       run: |
-        commit_id=`git rev-parse HEAD`
         aws deploy create-deployment \
-        --application-name ${{ inputs.code_deploy_application }} \
-        --deployment-group-name ${{ inputs.code_deploy_group }} \
-        --github-location repository=TryQuiet/quiet-storage-service,commitId=$commit_id \
-        --ignore-application-stop-failures \
-        --color on
+          --application-name ${{ inputs.code_deploy_application }} \
+          --deployment-group-name ${{ inputs.code_deploy_group }} \
+          --s3-location bucket=${{ secrets.QSS_S3_CODE_DEPLOY_BUCKET }},bundleType=zip,key=${{ env.ZIP_FILE_NAME }} \
+          --color on

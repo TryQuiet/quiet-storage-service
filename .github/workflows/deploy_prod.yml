@@ -35,6 +35,7 @@ jobs:
           aws_region: ${{ env.AWS_REGION }}
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          version: ${{ steps.extract_version.outputs.version }}
       - name: Send Release Start Notificaton
         uses: ./.github/actions/release-notifier
         if: always()
