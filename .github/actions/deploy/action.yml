@@ -19,6 +19,9 @@ inputs:
   aws_secret_access_key:
     description: 'AWS secret access key for EC2 instance(s)'
     required: true
+  s3_bucket:
+    description: 'S3 bucket that code is pushed to'
+    required: true
 
 env:
   ZIP_FILE_NAME: ${{ inputs.code_deploy_application }}_${{ inputs.version }}_${{ github.sha }}.zip
@@ -42,7 +45,7 @@ runs:
       run: |
         aws deploy push \
           --application-name ${{ inputs.code_deploy_application }} \
-          --s3-location s3://${{ secrets.QSS_S3_CODE_DEPLOY_BUCKET }}/${{ env.ZIP_FILE_NAME }} \
+          --s3-location s3://${{ inputs.s3_bucket }}/${{ env.ZIP_FILE_NAME }} \
           --no-ignore-hidden-files \
           --color on
     - name: Deploy QSS to AWS
@@ -51,5 +54,5 @@ runs:
         aws deploy create-deployment \
           --application-name ${{ inputs.code_deploy_application }} \
           --deployment-group-name ${{ inputs.code_deploy_group }} \
-          --s3-location bucket=${{ secrets.QSS_S3_CODE_DEPLOY_BUCKET }},bundleType=zip,key=${{ env.ZIP_FILE_NAME }} \
+          --s3-location bucket=${{ inputs.s3_bucket }},bundleType=zip,key=${{ env.ZIP_FILE_NAME }} \
           --color on

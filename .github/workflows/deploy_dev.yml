@@ -36,6 +36,7 @@ jobs:
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           version: ${{ steps.extract_version.outputs.version }}
+          s3_bucket: ${{ secrets.QSS_S3_CODE_DEPLOY_BUCKET }}
       - name: Send Release Start Notificaton
         uses: ./.github/actions/release-notifier
         if: always()
