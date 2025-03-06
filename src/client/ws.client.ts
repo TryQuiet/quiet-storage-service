@@ -87,8 +87,8 @@ export class WebsocketClient {
     event: WebsocketEvents,
     payload: unknown,
     withAck = false,
-  ): Promise<T> {
-    this.logger.debug(`Sending message`, event, payload, withAck)
+  ): Promise<T | undefined> {
+    this.logger.debug(`Sending message`, event)
     if (this.clientSocket == null || this.sessionKey == null) {
       throw new Error(`Must run createSocket first!`)
     }
@@ -103,7 +103,7 @@ export class WebsocketClient {
     }
 
     this.clientSocket.emit(event, encryptedPayload)
-    return undefined as T
+    return undefined
   }
 
   public encryptPayload(payload: unknown): string {

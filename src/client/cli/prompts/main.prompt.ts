@@ -7,7 +7,8 @@ import { DateTime } from 'luxon'
 import { createLogger } from '../../../nest/app/logger/nest.logger.js'
 import type { Pong } from '../../../nest/websocket/handlers/ping/types.js'
 import { confirm } from '@inquirer/prompts'
-import { createCommunityPrompt } from './community.prompt.js'
+import { createCommunity, updateCommunity } from './community.prompt.js'
+import type { Community } from '../../../nest/communities/types.js'
 
 const logger = createLogger('Client:Main')
 
@@ -26,6 +27,7 @@ const connectClientLoop = async (
 }
 
 const mainLoop = async (
+  community: Community | undefined,
   client: WebsocketClient,
   options: RuntimeOptions,
 ): Promise<boolean> => {
@@ -41,6 +43,11 @@ const mainLoop = async (
         name: 'Create community',
         value: 'createCommunity',
         description: 'Create a new community on the server',
+      },
+      {
+        name: 'Update community',
+        value: 'updateCommunity',
+        description: 'Update an existing community on the server',
       },
       {
         name: 'Disconnect',
@@ -67,15 +74,23 @@ const mainLoop = async (
               { ts: DateTime.utc().toMillis() },
               true,
             )
-            if (!response.success) {
-              logger.error(`Unsuccessful ping!`, response.reason)
+            if (!response!.success) {
+              logger.error(`Unsuccessful ping!`, response!.reason)
             } else {
               logger.log(`Ping success!`)
             }
             break
           }
           case 'createCommunity': {
-            await createCommunityPrompt(client)
+            community = await createCommunity(client)
+            break
+          }
+          case 'updateCommunity': {
+            if (community == null) {
+              logger.warn(`No community has been created!`)
+            } else {
+              community = await updateCommunity(client, community)
+            }
             break
           }
           case 'disconnect': {
@@ -103,7 +118,7 @@ const mainLoop = async (
 
 const main = async (options: RuntimeOptions): Promise<void> => {
   const client = await connectClientLoop(options)
-  await mainLoop(client, options)
+  await mainLoop(undefined, client, options)
   logger.log(`Goodbye!`)
 }
 

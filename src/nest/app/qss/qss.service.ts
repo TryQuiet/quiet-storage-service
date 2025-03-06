@@ -12,6 +12,7 @@ import {
 import { AppModule } from '../app.module.js'
 import { FASTIFY_ADAPTER, HOSTNAME, LISTEN_PORT } from '../const.js'
 import { createLogger } from '../logger/nest.logger.js'
+import { PostgresClient } from '../../storage/postgres/postgres.client.js'
 
 @Injectable()
 export class QSSService {
@@ -23,6 +24,7 @@ export class QSSService {
     @Inject(LISTEN_PORT) private readonly port: number,
     @Inject(HOSTNAME) private readonly hostname: string,
     @Inject(FASTIFY_ADAPTER) private readonly adapter: FastifyAdapter,
+    private readonly postgresClient: PostgresClient,
   ) {}
 
   public async init(): Promise<void> {
@@ -58,5 +60,8 @@ export class QSSService {
 
     this.logger.log(`Closing QSS`)
     await this.app.close()
+
+    this.logger.log(`Closing postgres`)
+    await this.postgresClient.close()
   }
 }

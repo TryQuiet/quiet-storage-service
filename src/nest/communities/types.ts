@@ -5,3 +5,5 @@ export interface Community {
   psk: string
   sigChain: Uint8Array | string
 }
+
+export type CommunityUpdate = Omit<Partial<Community>, 'teamId'>

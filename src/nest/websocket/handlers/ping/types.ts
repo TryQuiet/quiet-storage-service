@@ -1,4 +1,4 @@
-import type { BaseHandlerOptions } from '../types.js'
+import type { BaseHandlerOptions } from '../../ws.types.js'
 
 export interface PingHandlerOptions extends BaseHandlerOptions {}
 

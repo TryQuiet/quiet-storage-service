@@ -55,11 +55,11 @@
           "mappedType": "blob"
         }
       },
-      "name": "community",
+      "name": "communities",
       "schema": "public",
       "indexes": [
         {
-          "keyName": "community_pkey",
+          "keyName": "communities_pkey",
           "columnNames": [
             "id"
           ],

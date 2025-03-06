@@ -3,25 +3,28 @@
  * has its own ping handler.
  */
 
-import { WebsocketEvents } from '../../ws.types.js'
+import { WebsocketEvents } from '../../websocket/ws.types.js'
 import { DateTime } from 'luxon'
 import {
   DecryptionError,
   EncryptionBase64Error,
   EncryptionError,
-} from '../../../encryption/types.js'
-import { createLogger } from '../../../app/logger/nest.logger.js'
+} from '../../encryption/types.js'
+import { createLogger } from '../../app/logger/nest.logger.js'
 import {
   type CommunitiesHandlerOptions,
   CreateCommunityStatus,
   type CreateCommunity,
   type CreateCommunityResponse,
+  type UpdateCommunity,
+  type UpdateCommunityResponse,
+  UpdateCommunityStatus,
 } from './types.js'
 
 const baseLogger = createLogger('Websocket:Event:Communities')
 
 /**
- * Adds event handlers for 'ping' and 'pong' events
+ * Adds event handlers for community-related events
  *
  * @param socketServer Socket.io server instance
  * @param socket Socket connection with client
@@ -41,7 +44,6 @@ export function registerCommunitiesHandlers(
         encryptedPayload,
         options.sessionKey,
       ) as CreateCommunity
-      _logger.log(message)
       const written = await options.storage.addCommunity(message.payload)
       let response: CreateCommunityResponse | undefined = undefined
       if (!written) {
@@ -56,10 +58,6 @@ export function registerCommunitiesHandlers(
           status: CreateCommunityStatus.Success,
         }
       }
-      _logger.log(
-        `Read community`,
-        await options.storage.getCommunity(message.payload.teamId),
-      )
       const encryptedResponse = options.encryption.encrypt(
         response,
         options.sessionKey,
@@ -84,12 +82,63 @@ export function registerCommunitiesHandlers(
         reason,
       }
       callback(options.encryption.encrypt(response, options.sessionKey))
+    }
+  }
 
-      _logger.warn(`Disconnecting socket due to ping failure`)
-      options.socket.disconnect(true)
+  async function handleUpdateCommunity(
+    encryptedPayload: string,
+    callback: (payload: string) => void,
+  ): Promise<void> {
+    try {
+      const message = options.encryption.decrypt(
+        encryptedPayload,
+        options.sessionKey,
+      ) as UpdateCommunity
+      const written = await options.storage.updateCommunity(
+        message.payload.teamId,
+        message.payload.updates,
+      )
+      let response: UpdateCommunityResponse | undefined = undefined
+      if (!written) {
+        response = {
+          ts: DateTime.utc().toMillis(),
+          status: UpdateCommunityStatus.Error,
+          reason: 'Failed to write to storage',
+        }
+      } else {
+        response = {
+          ts: DateTime.utc().toMillis(),
+          status: UpdateCommunityStatus.Success,
+        }
+      }
+      const encryptedResponse = options.encryption.encrypt(
+        response,
+        options.sessionKey,
+      )
+      callback(encryptedResponse)
+    } catch (e) {
+      _logger.error(`Error while processing update community event`, e)
+      let reason: string | undefined = undefined
+      if (
+        e instanceof EncryptionBase64Error ||
+        e instanceof EncryptionError ||
+        e instanceof DecryptionError
+      ) {
+        reason = e.message
+      } else {
+        reason = `Error while creating community`
+      }
+
+      const response: UpdateCommunityResponse = {
+        ts: DateTime.utc().toMillis(),
+        status: UpdateCommunityStatus.Error,
+        reason,
+      }
+      callback(options.encryption.encrypt(response, options.sessionKey))
     }
   }
 
   // register event handlers
   options.socket.on(WebsocketEvents.CreateCommunity, handleCreateCommunity)
+  options.socket.on(WebsocketEvents.UpdateCommunity, handleUpdateCommunity)
 }

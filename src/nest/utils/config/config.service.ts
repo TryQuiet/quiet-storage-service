@@ -32,6 +32,8 @@ export class ConfigService {
       case 'test':
       case 'testing':
         return Environment.Test
+      case 'local':
+        return Environment.Local
       default:
         throw new Error(`Invalid ENV value ${value}`)
     }

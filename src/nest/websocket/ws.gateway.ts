@@ -14,6 +14,7 @@ import { Server, Socket } from 'socket.io'
 import { registerPingHandlers } from './handlers/ping/ping.handler.js'
 import {
   ActiveConnection,
+  BaseHandlerOptions,
   HandshakeMessage,
   HandshakeStatus,
   WebsocketEvents,
@@ -21,9 +22,8 @@ import {
 import { WebsocketEncryptionService } from '../encryption/ws.enc.service.js'
 import sodium, { CryptoKX } from 'libsodium-wrappers-sumo'
 import { createLogger } from '../app/logger/nest.logger.js'
-import { CommunityStorageService } from '../storage/communities/community.storage.service.js'
-import { registerCommunitiesHandlers } from './handlers/communities/communities.handler.js'
-import { BaseHandlerOptions } from './handlers/types.js'
+import { registerCommunitiesHandlers } from '../communities/websocket/communities.handler.js'
+import { CommunityStorageService } from '../communities/storage/communities.storage.service.js'
 
 @WebSocketGateway({
   transports: ['websocket'],
