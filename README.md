@@ -17,42 +17,80 @@ The Node engine is managed via Volta and should be installed prior to running an
 Once Volta is installed navigating to this directory should automatically install and use the correct versions of `node` and `npm` but as a first time setup you can manually install both
 
 ```bash
-$ volta install node@22.11.0
+$ volta install node@22.14.0
 $ volta install npm@10.9.0
 ```
 
 Once `node` and `npm` are installed via Volta you can install `pnpm`
 
 ```bash
-$ volta install pnpm@9.6.0
+$ volta install pnpm@10.6.0
 ```
 
-### Dependencies
+#### Docker
+
+You must install `Docker` to run QSS locally as we rely on it to run dependencies like `Postgres`.
+
+##### Linux
+
+Follow the instructions for your distribution on the Docker website [here](https://docs.docker.com/engine/install/).
+
+##### Mac
+
+You can either install via [Docker Desktop](https://docs.docker.com/desktop/) or through brew:
 
 ```bash
-$ pnpm i
-```
+$ brew install docker
+$ brew install docker-compose
+$ brew install colima
+$ colima start
 
-### Building the app
+### Dependencies and building the app
 
 ```bash
-$ pnpm run build
+$ pnpm run bootstrap
 ```
+
+This will build all submodules, install dependencies and build the application.
 
 ## Running the app
 
 ```bash
-# development with watch mode
-$ pnpm run start:dev
+# local
+$ pnpm run start
 
-# development with watch mode and debug on
+# local with debug on
 $ pnpm run start:debug
 
-# development using compiled code
-$ pnpm run start:dist:dev
+# runs against development databases/services
+# NOTE: Don't use this locally if you don't know what you're doing!
+$ pnpm run start:dev
 
-# production mode
-$ pnpm run start:dist:prod
+# runs against production databases/services
+# NOTE: Don't use this locally if you don't know what you're doing!
+$ pnpm run start:prod
+```
+
+_NOTE: Running with `start` and `start:debug` will spin up dockerized dependencies (e.g. postgres) and run database migrations_
+
+## Running the client
+
+```bash
+# runs client against local server (you must start the server in a separate terminal!)
+$ pnpm run start:client
+
+# runs client against development server in AWS
+$ pnpm run start:client:dev
+```
+
+## Database migrations
+
+```bash
+# create a new migration
+$ pnpm run migrate:create
+
+# migrate database with existing migrations
+$ pnpm run migrate:up
 ```
 
 ## Test
