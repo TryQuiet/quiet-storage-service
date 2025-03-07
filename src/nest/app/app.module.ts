@@ -6,6 +6,7 @@ import { EncryptionModule } from '../encryption/enc.module.js'
 import { WebsocketClientModule } from '../../client/ws.client.module.js'
 import { StorageModule } from '../storage/storage.module.js'
 import { CommunitiesModule } from '../communities/communities.module.js'
+import { HealthModule } from '../rest/health/health.module.js'
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { CommunitiesModule } from '../communities/communities.module.js'
     QSSModule,
     WebsocketClientModule,
     StorageModule,
+    HealthModule,
   ],
   controllers: [],
   providers: [],
