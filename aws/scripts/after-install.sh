@@ -2,10 +2,7 @@ cd /home/ubuntu/qss
 
 source /home/ubuntu/.bashrc
 
-rm -rf node_modules/
-rm -rf dist/
-
-pnpm run bootstrap
+# pnpm run bootstrap
 
 ENVIRONMENT=$(TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"` && curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/tags/instance/Environment)
 if [ $ENVIRONMENT == "Production" ]
