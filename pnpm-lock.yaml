@@ -47,6 +47,9 @@ importers:
       '@mikro-orm/seeder':
         specifier: ^6.4.7
         version: 6.4.7(@mikro-orm/core@6.4.7)
+      '@nestjs/cli':
+        specifier: ^10.4.9
+        version: 10.4.9(@swc/core@1.11.5)(esbuild@0.25.0)
       '@nestjs/common':
         specifier: ^10.4.15
         version: 10.4.15(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -80,6 +83,9 @@ importers:
       fastify:
         specifier: ^4.28.1
         version: 4.29.0
+      husky:
+        specifier: ^9.1.7
+        version: 9.1.7
       libsodium-wrappers-sumo:
         specifier: ^0.7.15
         version: 0.7.15
@@ -126,9 +132,6 @@ importers:
       '@inquirer/type':
         specifier: ^3.0.4
         version: 3.0.4(@types/node@20.17.19)
-      '@nestjs/cli':
-        specifier: ^10.4.9
-        version: 10.4.9(@swc/core@1.11.5)(esbuild@0.25.0)
       '@nestjs/schematics':
         specifier: ^10.2.3
         version: 10.2.3(chokidar@3.6.0)(typescript@5.7.3)
@@ -192,9 +195,6 @@ importers:
       figures:
         specifier: ^6.1.0
         version: 6.1.0
-      husky:
-        specifier: ^9.1.7
-        version: 9.1.7
       jest:
         specifier: ^29.7.0
         version: 29.7.0(@types/node@20.17.19)(ts-node@10.9.2(@swc/core@1.11.5)(@types/node@20.17.19)(typescript@5.7.3))

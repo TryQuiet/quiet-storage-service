@@ -1,4 +1,4 @@
-import { defineConfig } from '@mikro-orm/core'
+import { defineConfig, ReflectMetadataProvider } from '@mikro-orm/core'
 import { TSMigrationGenerator } from '@mikro-orm/migrations'
 import { PostgreSqlDriver } from '@mikro-orm/postgresql'
 import { TsMorphMetadataProvider } from '@mikro-orm/reflection'
@@ -74,6 +74,8 @@ const getReplicaConfigs = (): ConnectionOptions[] | undefined => {
     : undefined
 }
 
+const preferTs = configService.getBool(EnvVars.MIKRO_ORM_PREFER_TS) ?? false
+
 export default defineConfig({
   dbName: configService.getString(EnvVars.MIKRO_ORM_DB_NAME),
   host: configService.getString(EnvVars.MIKRO_ORM_HOST),
@@ -84,13 +86,15 @@ export default defineConfig({
   connect: true,
   driver: PostgreSqlDriver,
   entities: [Community],
-  metadataProvider: TsMorphMetadataProvider,
+  metadataProvider: preferTs
+    ? TsMorphMetadataProvider
+    : ReflectMetadataProvider,
   colors: true,
   verbose: true,
   ensureDatabase: true,
   allowGlobalContext: true,
   baseDir: process.cwd(),
-  preferTs: configService.getBool(EnvVars.MIKRO_ORM_PREFER_TS),
+  preferTs,
   migrations: {
     tableName: 'mikro_orm_migrations', // name of database table with log of executed transactions
     path: 'dist/src/migrations', // path to the folder with migrations
@@ -103,6 +107,6 @@ export default defineConfig({
     safe: false, // allow to disable table and column dropping
     snapshot: true, // save snapshot when creating new migrations
     emit: 'ts', // migration generation mode
-    generator: TSMigrationGenerator, // migration generator, e.g. to allow custom formatting
+    generator: preferTs ? TSMigrationGenerator : undefined, // migration generator, e.g. to allow custom formatting
   },
 })
