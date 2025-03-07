@@ -8,7 +8,7 @@ import {
   HandshakeStatus,
   WebsocketEvents,
 } from '../nest/websocket/ws.types.js'
-import { createLogger } from '../nest/app/logger/nest.logger.js'
+import { createLogger } from '../nest/app/logger/logger.js'
 import { HOSTNAME, LISTEN_PORT } from '../nest/app/const.js'
 
 @Injectable()

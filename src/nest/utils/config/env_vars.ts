@@ -4,6 +4,8 @@ export enum EnvVars {
 
   // logger settings
   LOG_LEVELS = 'LOG_LEVELS',
+  USE_WINSTON_LOGGER = 'USE_WINSTON_LOGGER',
+  LOG_DIR = 'LOG_DIR',
 
   // server settings
   PORT = 'PORT',

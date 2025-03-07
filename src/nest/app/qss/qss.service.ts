@@ -11,7 +11,7 @@ import {
 
 import { AppModule } from '../app.module.js'
 import { FASTIFY_ADAPTER, HOSTNAME, LISTEN_PORT } from '../const.js'
-import { createLogger } from '../logger/nest.logger.js'
+import { createLogger } from '../logger/logger.js'
 import { PostgresClient } from '../../storage/postgres/postgres.client.js'
 
 @Injectable()
@@ -32,6 +32,9 @@ export class QSSService {
     this.app = await NestFactory.create<NestFastifyApplication>(
       AppModule,
       this.adapter,
+      {
+        logger: createLogger('Nest'),
+      },
     )
 
     this.app.enableCors({
@@ -45,7 +48,7 @@ export class QSSService {
       throw new Error(`Must initialize app before starting!`)
     }
 
-    this.logger.log(`Starting QSS`)
+    this.logger.log(`Starting QSS`, this.hostname, this.port)
     await this.app.listen({
       port: this.port,
       host: this.hostname,

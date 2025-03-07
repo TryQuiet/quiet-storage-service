@@ -12,7 +12,7 @@ import { WebsocketGateway } from '../../src/nest/websocket/ws.gateway'
 import { TestSockets } from './types'
 import { WebsocketClient } from '../../src/client/ws.client'
 import { WebsocketEncryptionService } from '../../src/nest/encryption/ws.enc.service'
-import { createLogger } from '../../src/nest/app/logger/nest.logger'
+import { createLogger } from '../../src/nest/app/logger/logger.js'
 import { LISTEN_PORT } from '../../src/nest/app/const'
 
 export class TestUtils {

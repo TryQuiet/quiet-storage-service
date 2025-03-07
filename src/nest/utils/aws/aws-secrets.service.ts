@@ -5,7 +5,7 @@ import {
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '../config/config.service.js'
 import { EnvVars } from '../config/env_vars.js'
-import { createLogger } from '../../app/logger/nest.logger.js'
+import { createLogger } from '../../app/logger/logger.js'
 
 @Injectable()
 export class AWSSecretsService {

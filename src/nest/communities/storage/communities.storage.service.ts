@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common'
-import { createLogger } from '../../app/logger/nest.logger.js'
+import { createLogger } from '../../app/logger/logger.js'
 import { Community, CommunityUpdate } from '../../communities/types.js'
 import { ConfigService } from '../../utils/config/config.service.js'
 import { Community as CommunityEntity } from './entities/community.entity.js'

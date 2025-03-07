@@ -1,12 +1,10 @@
 import type { BaseEntity, EntityData, EntityName } from '@mikro-orm/core'
 import type { EntityManager } from '@mikro-orm/postgresql'
-import {
-  createLogger,
-  type QuietNestLogger,
-} from '../../app/logger/nest.logger.js'
+import { createLogger } from '../../app/logger/logger.js'
+import type { QuietLogger } from '../../app/logger/types.js'
 
 export class PostgresRepo<T extends BaseEntity> {
-  private readonly logger: QuietNestLogger
+  private readonly logger: QuietLogger
 
   constructor(
     private readonly entityName: EntityName<T>,

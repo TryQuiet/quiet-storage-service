@@ -13,7 +13,7 @@ import {
   EncryptionError,
   KeyGenError,
 } from './types.js'
-import { createLogger } from '../app/logger/nest.logger.js'
+import { createLogger } from '../app/logger/logger.js'
 
 @Injectable()
 export class WebsocketEncryptionService implements OnModuleInit {

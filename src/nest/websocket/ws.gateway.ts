@@ -21,7 +21,7 @@ import {
 } from './ws.types.js'
 import { WebsocketEncryptionService } from '../encryption/ws.enc.service.js'
 import sodium, { CryptoKX } from 'libsodium-wrappers-sumo'
-import { createLogger } from '../app/logger/nest.logger.js'
+import { createLogger } from '../app/logger/logger.js'
 import { registerCommunitiesHandlers } from '../communities/websocket/communities.handler.js'
 import { CommunityStorageService } from '../communities/storage/communities.storage.service.js'
 

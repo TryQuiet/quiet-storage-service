@@ -10,7 +10,7 @@ import {
   EncryptionBase64Error,
   EncryptionError,
 } from '../../encryption/types.js'
-import { createLogger } from '../../app/logger/nest.logger.js'
+import { createLogger } from '../../app/logger/logger.js'
 import {
   type CommunitiesHandlerOptions,
   CreateCommunityStatus,

@@ -10,7 +10,7 @@ import Fastify, {
 } from 'fastify'
 import type pino from 'pino'
 import { Socket as SocketIoSocket } from 'socket.io'
-import { createLogger } from './nest.logger.js'
+import { createLogger } from './logger.js'
 
 interface RequestLog {
   req: FastifyRequest

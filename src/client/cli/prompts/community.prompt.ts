@@ -7,7 +7,7 @@ import {
   type UpdateCommunityResponse,
   UpdateCommunityStatus,
 } from '../../../nest/communities/websocket/types.js'
-import { createLogger } from '../../../nest/app/logger/nest.logger.js'
+import { createLogger } from '../../../nest/app/logger/logger.js'
 import { isBase64 } from 'class-validator'
 import { DateTime } from 'luxon'
 import { WebsocketEvents } from '../../../nest/websocket/ws.types.js'

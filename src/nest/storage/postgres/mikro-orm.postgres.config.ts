@@ -11,8 +11,10 @@ import { AWSSecretNames } from '../../utils/aws/const.js'
 import type { RDSCredentials } from '../../utils/aws/types.js'
 import type { ConnectionOptions } from 'tls'
 import { Community } from '../../communities/storage/entities/community.entity.js'
+import { createLogger } from '../../app/logger/logger.js'
 
 const configService = ConfigService.instance
+const logger = createLogger('MikroORM')
 
 const getRdsPassword = async (): Promise<string | undefined> => {
   const postgresSource = configService.getString(EnvVars.POSTGRES_SOURCE)
@@ -95,6 +97,9 @@ export default defineConfig({
   allowGlobalContext: true,
   baseDir: process.cwd(),
   preferTs,
+  logger: (message: string): void => {
+    logger.debug(message)
+  },
   migrations: {
     tableName: 'mikro_orm_migrations', // name of database table with log of executed transactions
     path: 'dist/src/migrations', // path to the folder with migrations

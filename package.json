@@ -30,10 +30,16 @@
     "lint-staged": "lint-staged --no-stash",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down --remove-orphans",
+    "migrate:create:initial": "MIKRO_ORM_PREFER_TS=true dotenvx run -f .env.local -- npx mikro-orm-esm migration:create --initial --config src/nest/storage/postgres/mikro-orm.postgres.config.ts",
+    "migrate:up": "dotenvx run -f .env.local -- npx mikro-orm-esm migration:up --config src/nest/storage/postgres/mikro-orm.postgres.config.ts",
+    "migrate:up:dev": "dotenvx run -f .env.dev -- npx mikro-orm migration:up --config dist/src/nest/storage/postgres/mikro-orm.postgres.config.js",
+    "migrate:up:prod": "dotenvx run -f .env.prod -- npx mikro-orm migration:up --config dist/src/nest/storage/postgres/mikro-orm.postgres.config.js",
     "start": "pnpm run docker:up && pnpm run migrate:up && dotenvx run -f .env.local -- nest start dist/src --watch",
     "start:debug": "pnpm run migrate:up && pnpm run docker:up && dotenvx run -f .env.local -- nest start dist/src --debug --watch",
     "start:dev": "dotenvx run -f .env.dev -- node dist/src/main.js",
     "start:prod": "dotenvx run -f .env.prod -- node dist/src/main.js",
+    "start:client": "dotenvx run -f .env.local.client -- node dist/src/client/cli/index.js",
+    "start:client:dev": "dotenvx run -f .env.dev.client -- node dist/src/client/cli/index.js",
     "test": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --runInBand --colors --detectOpenHandles --forceExit --verbose",
     "test:ci": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --runInBand --colors --detectOpenHandles --forceExit --ci --silent --verbose",
     "test:watch": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --watch",
@@ -41,12 +47,7 @@
     "test:debug": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --config ./test/jest.e2e.config.mjs --runInBand --colors --detectOpenHandles --forceExit --verbose",
     "test:e2e:ci": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --config ./test/jest.e2e.config.mjs --runInBand --colors --detectOpenHandles --forceExit --ci --silent --verbose",
-    "prepare": "husky",
-    "start:client": "dotenvx run -f .env.local.client -- node dist/src/client/cli/index.js",
-    "migrate:create:initial": "MIKRO_ORM_PREFER_TS=true dotenvx run -f .env.local -- npx mikro-orm-esm migration:create --initial --config src/nest/storage/postgres/mikro-orm.postgres.config.ts",
-    "migrate:up": "dotenvx run -f .env.local -- npx mikro-orm-esm migration:up --config src/nest/storage/postgres/mikro-orm.postgres.config.ts",
-    "migrate:up:dev": "dotenvx run -f .env.dev -- npx mikro-orm migration:up --config dist/src/nest/storage/postgres/mikro-orm.postgres.config.js",
-    "migrate:up:prod": "dotenvx run -f .env.prod -- npx mikro-orm migration:up --config dist/src/nest/storage/postgres/mikro-orm.postgres.config.js"
+    "prepare": "husky"
   },
   "dependencies": {
     "@aws-sdk/client-lambda": "^3.758.0",
@@ -77,6 +78,7 @@
     "husky": "^9.1.7",
     "libsodium-wrappers-sumo": "^0.7.15",
     "luxon": "^3.5.0",
+    "nest-winston": "^1.10.2",
     "p-defer": "^4.0.1",
     "p-timeout": "^6.1.4",
     "pino": "^9.6.0",
@@ -85,7 +87,9 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "4.8.1",
     "timeout-abort-controller": "^3.0.0",
-    "uint8arrays": "^5.1.0"
+    "uint8arrays": "^5.1.0",
+    "winston": "^3.17.0",
+    "winston-daily-rotate-file": "^5.0.0"
   },
   "devDependencies": {
     "@commander-js/extra-typings": "^13.1.0",

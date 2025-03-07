@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common'
-import { createLogger } from '../../app/logger/nest.logger.js'
+import { createLogger } from '../../app/logger/logger.js'
 import {
   BaseEntity,
   EntityManager,
