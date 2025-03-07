@@ -90,6 +90,7 @@
     "timeout-abort-controller": "^3.0.0",
     "uint8arrays": "^5.1.0",
     "winston": "^3.17.0",
+    "winston-aws-cloudwatch": "^3.0.0",
     "winston-daily-rotate-file": "^5.0.0"
   },
   "devDependencies": {

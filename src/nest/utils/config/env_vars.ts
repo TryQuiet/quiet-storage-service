@@ -6,6 +6,7 @@ export enum EnvVars {
   LOG_LEVELS = 'LOG_LEVELS',
   USE_WINSTON_LOGGER = 'USE_WINSTON_LOGGER',
   LOG_DIR = 'LOG_DIR',
+  CLOUDWATCH_LOGS_ENABLED = 'CLOUDWATCH_LOGS_ENABLED',
 
   // server settings
   PORT = 'PORT',

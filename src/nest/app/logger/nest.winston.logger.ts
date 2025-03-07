@@ -5,8 +5,15 @@ import type { CompoundError } from '../../types.js'
 import colors from 'ansi-colors'
 import { ConfigService } from '../../utils/config/config.service.js'
 import { EnvVars } from '../../utils/config/env_vars.js'
-import { DEFAULT_LOG_LEVELS } from './const.js'
+import {
+  CLOUDWATCH_LOG_GROUP,
+  CLOUDWATCH_LOG_STREAM_BASE_NAME,
+  DEFAULT_LOG_LEVELS,
+} from './const.js'
 import path from 'path'
+// @ts-expect-error no types for this package
+import CloudWatchTransport from 'winston-aws-cloudwatch'
+import { Environment } from '../../utils/config/types.js'
 
 export const createWinstonLogger = (
   context?: string,
@@ -38,43 +45,74 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
   }
 
   private initWinston(): Logger {
+    const ourTransports: winston.transport[] = [
+      new transports.DailyRotateFile({
+        // %DATE will be replaced by the current date
+        filename: path.join(this.logDir, `error_%DATE%.log`),
+        level: 'error',
+        format: format.combine(format.timestamp(), format.json()),
+        datePattern: 'YYYY-MM-DD',
+        zippedArchive: false, // don't want to zip our logs
+        maxFiles: '30d', // will keep log until they are older than 30 days
+      }),
+      // same for all levels
+      new transports.DailyRotateFile({
+        filename: path.join(this.logDir, `log_%DATE%.log`),
+        format: format.combine(format.timestamp(), format.json()),
+        datePattern: 'YYYY-MM-DD',
+        zippedArchive: false,
+        maxFiles: '30d',
+      }),
+      new transports.Console({
+        format: format.combine(
+          format.cli({ all: true }),
+          format.splat(),
+          format.timestamp(),
+          format.errors(),
+          format.printf(
+            info =>
+              // eslint-disable-next-line @typescript-eslint/restrict-template-expressions, @typescript-eslint/no-unsafe-return -- from example
+              `${colors.whiteBright.bold(info.timestamp as string).trim()} ${colors.magenta(info.context as string).trim()} ${colors.italic(info.level).trim()}: ${colors.bold(info.message as string).trim()} ${(info.params as any[]).map(param => param).join(' ')}`,
+          ),
+        ),
+      }),
+    ]
+
+    if (
+      ConfigService.instance.getBool(EnvVars.CLOUDWATCH_LOGS_ENABLED, false) ??
+      false
+    ) {
+      ourTransports.push(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is typing nonsense
+        new CloudWatchTransport({
+          logGroupName: CLOUDWATCH_LOG_GROUP,
+          logStreamName: `${CLOUDWATCH_LOG_STREAM_BASE_NAME}-${ConfigService.instance.getEnv() === Environment.Production ? 'prod' : 'dev'}`,
+          createLogGroup: true,
+          createLogStream: true,
+          submissionInterval: 2000,
+          submissionRetryCount: 1,
+          batchSize: 20,
+          awsConfig: {
+            accessKeyId: ConfigService.instance.getString(
+              EnvVars.AWS_ACCESS_KEY_ID,
+            ),
+            secretAccessKey: ConfigService.instance.getString(
+              EnvVars.AWS_SECRET_KEY,
+            ),
+            region: ConfigService.instance.getString(EnvVars.AWS_REGION),
+          },
+          formatLog: (item: { level: any; message: any; meta: unknown }) =>
+            `${item.level}: [${this.context}] ${item.message} ${JSON.stringify(item.meta)}`,
+        }) as winston.transport,
+      )
+    }
+
     return winston.createLogger({
       defaultMeta: {
         context: this.context,
       },
       level: 'silly',
-      transports: [
-        new transports.DailyRotateFile({
-          // %DATE will be replaced by the current date
-          filename: path.join(this.logDir, `error_%DATE%.log`),
-          level: 'error',
-          format: format.combine(format.timestamp(), format.json()),
-          datePattern: 'YYYY-MM-DD',
-          zippedArchive: false, // don't want to zip our logs
-          maxFiles: '30d', // will keep log until they are older than 30 days
-        }),
-        // same for all levels
-        new transports.DailyRotateFile({
-          filename: path.join(this.logDir, `log_%DATE%.log`),
-          format: format.combine(format.timestamp(), format.json()),
-          datePattern: 'YYYY-MM-DD',
-          zippedArchive: false,
-          maxFiles: '30d',
-        }),
-        new transports.Console({
-          format: format.combine(
-            format.cli({ all: true }),
-            format.splat(),
-            format.timestamp(),
-            format.errors(),
-            format.printf(
-              info =>
-                // eslint-disable-next-line @typescript-eslint/restrict-template-expressions, @typescript-eslint/no-unsafe-return -- from example
-                `${colors.whiteBright.bold(info.timestamp as string).trim()} ${colors.magenta(info.context as string).trim()} ${colors.italic(info.level).trim()}: ${colors.bold(info.message as string).trim()} ${(info.params as any[]).map(param => param).join(' ')}`,
-            ),
-          ),
-        }),
-      ],
+      transports: ourTransports,
     })
   }
 
