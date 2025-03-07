@@ -17,5 +17,12 @@ pnpm add pm2@latest -g
 
 # delete the app directory and stop the service, if running
 echo "Stopping QSS service and deleting existing directory"
-pm2 stop QSS
+sudo pm2 stop QSS
 rm -rf /home/ubuntu/qss
+
+# install fluentd
+root soft nofile 65536
+root hard nofile 65536
+
+curl -fsSL https://toolbelt.treasuredata.com/sh/install-ubuntu-jammy-fluent-package5-lts.sh | sudo sh
+sudo systemctl start fluentd.service
