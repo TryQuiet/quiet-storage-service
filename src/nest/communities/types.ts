@@ -3,7 +3,7 @@ export interface Community {
   name: string
   peerList: string[]
   psk: string
-  sigChain: Uint8Array | string
+  sigChain: string
 }
 
 export type CommunityUpdate = Omit<Partial<Community>, 'teamId'>

@@ -51,7 +51,7 @@ export class PostgresRepo<T extends BaseEntity> {
     }
   }
 
-  public async findOne(id: string): Promise<T | undefined> {
+  public async findOne(id: string): Promise<T | undefined | null> {
     try {
       this.logger.log(`Finding one with ID ${id}`)
       let result: T | undefined = undefined
@@ -63,7 +63,7 @@ export class PostgresRepo<T extends BaseEntity> {
       return result
     } catch (e) {
       this.logger.error(`Error while finding one with ID ${id}`, e)
-      return undefined
+      return null
     }
   }
 }

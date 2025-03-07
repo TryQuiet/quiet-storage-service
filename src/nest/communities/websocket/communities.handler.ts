@@ -18,7 +18,9 @@ import {
   type CreateCommunityResponse,
   type UpdateCommunity,
   type UpdateCommunityResponse,
-  UpdateCommunityStatus,
+  CommunityOperationStatus,
+  type GetCommunity,
+  type GetCommunityResponse,
 } from './types.js'
 
 const baseLogger = createLogger('Websocket:Event:Communities')
@@ -102,13 +104,13 @@ export function registerCommunitiesHandlers(
       if (!written) {
         response = {
           ts: DateTime.utc().toMillis(),
-          status: UpdateCommunityStatus.Error,
+          status: CommunityOperationStatus.Error,
           reason: 'Failed to write to storage',
         }
       } else {
         response = {
           ts: DateTime.utc().toMillis(),
-          status: UpdateCommunityStatus.Success,
+          status: CommunityOperationStatus.Success,
         }
       }
       const encryptedResponse = options.encryption.encrypt(
@@ -126,12 +128,63 @@ export function registerCommunitiesHandlers(
       ) {
         reason = e.message
       } else {
-        reason = `Error while creating community`
+        reason = `Error while updating community`
       }
 
       const response: UpdateCommunityResponse = {
         ts: DateTime.utc().toMillis(),
-        status: UpdateCommunityStatus.Error,
+        status: CommunityOperationStatus.Error,
+        reason,
+      }
+      callback(options.encryption.encrypt(response, options.sessionKey))
+    }
+  }
+
+  async function handleGetCommunity(
+    encryptedPayload: string,
+    callback: (payload: string) => void,
+  ): Promise<void> {
+    try {
+      const message = options.encryption.decrypt(
+        encryptedPayload,
+        options.sessionKey,
+      ) as GetCommunity
+      const community = await options.storage.getCommunity(message.payload.id)
+      let response: GetCommunityResponse | undefined = undefined
+      if (community == null) {
+        response = {
+          ts: DateTime.utc().toMillis(),
+          status: CommunityOperationStatus.NotFound,
+          reason: 'No community found in storage',
+        }
+      } else {
+        response = {
+          ts: DateTime.utc().toMillis(),
+          status: CommunityOperationStatus.Success,
+          payload: community,
+        }
+      }
+      const encryptedResponse = options.encryption.encrypt(
+        response,
+        options.sessionKey,
+      )
+      callback(encryptedResponse)
+    } catch (e) {
+      _logger.error(`Error while processing update community event`, e)
+      let reason: string | undefined = undefined
+      if (
+        e instanceof EncryptionBase64Error ||
+        e instanceof EncryptionError ||
+        e instanceof DecryptionError
+      ) {
+        reason = e.message
+      } else {
+        reason = `Error while getting community`
+      }
+
+      const response: GetCommunityResponse = {
+        ts: DateTime.utc().toMillis(),
+        status: CommunityOperationStatus.Error,
         reason,
       }
       callback(options.encryption.encrypt(response, options.sessionKey))
@@ -141,4 +194,5 @@ export function registerCommunitiesHandlers(
   // register event handlers
   options.socket.on(WebsocketEvents.CreateCommunity, handleCreateCommunity)
   options.socket.on(WebsocketEvents.UpdateCommunity, handleUpdateCommunity)
+  options.socket.on(WebsocketEvents.GetCommunity, handleGetCommunity)
 }

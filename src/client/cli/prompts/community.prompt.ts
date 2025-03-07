@@ -5,10 +5,12 @@ import {
   CreateCommunityStatus,
   type UpdateCommunity,
   type UpdateCommunityResponse,
-  UpdateCommunityStatus,
+  CommunityOperationStatus,
+  type GetCommunity,
+  type GetCommunityResponse,
 } from '../../../nest/communities/websocket/types.js'
 import { createLogger } from '../../../nest/app/logger/logger.js'
-import { isBase64 } from 'class-validator'
+import { isHexadecimal } from 'class-validator'
 import { DateTime } from 'luxon'
 import { WebsocketEvents } from '../../../nest/websocket/ws.types.js'
 import type { WebsocketClient } from '../../ws.client.js'
@@ -58,10 +60,10 @@ const createCommunity = async (
   }
 
   const sigChain = await input({
-    message: `Enter the sigchain for this community as a base64 string:`,
+    message: `Enter the sigchain for this community as a hex string:`,
     default: undefined,
     validate: (value: string | undefined) =>
-      value != null && value !== '' && isBase64(value),
+      value != null && value !== '' && isHexadecimal(value),
   })
 
   const community: Community = {
@@ -125,12 +127,12 @@ const updateCommunity = async (
   }
 
   const sigChain = await input({
-    message: `Enter a new sigchain for this community as a base64 string (optional):`,
+    message: `Enter a new sigchain for this community as a hex string (optional):`,
     default: isUint8Array(existingCommunity.sigChain)
       ? uint8ArrayToString(existingCommunity.sigChain)
       : existingCommunity.sigChain,
     validate: (value: string | undefined) =>
-      value == null || (value !== '' && isBase64(value)),
+      value == null || (value !== '' && isHexadecimal(value)),
   })
 
   const updates: CommunityUpdate = {
@@ -151,7 +153,7 @@ const updateCommunity = async (
     message,
     true,
   )
-  if (response!.status !== UpdateCommunityStatus.Success) {
+  if (response!.status !== CommunityOperationStatus.Success) {
     logger.error(
       `Failed to create a community with status ${response!.status}!`,
       response!.reason,
@@ -166,4 +168,36 @@ const updateCommunity = async (
   }
 }
 
-export { createCommunity, updateCommunity }
+const getCommunity = async (
+  client: WebsocketClient,
+  existingCommunity?: Community,
+): Promise<Community | undefined> => {
+  const teamId = await input({
+    message: `Enter the team ID of the community (ID on the sigchain):`,
+    default: existingCommunity?.teamId,
+    validate: (value: string | undefined) => value != null && value !== '',
+  })
+
+  const message: GetCommunity = {
+    ts: DateTime.utc().toMillis(),
+    payload: {
+      id: teamId,
+    },
+  }
+  const response = await client.sendMessage<GetCommunityResponse>(
+    WebsocketEvents.GetCommunity,
+    message,
+    true,
+  )
+  if (response!.status !== CommunityOperationStatus.Success) {
+    logger.error(
+      `Failed to get a community with ID ${teamId}!`,
+      response!.reason,
+    )
+    return undefined
+  }
+
+  return response?.payload
+}
+
+export { createCommunity, updateCommunity, getCommunity }

@@ -15,6 +15,6 @@ export class Community extends BaseEntity {
   @Property({ type: 'array' })
   peerList!: string[]
 
-  @Property({ type: 'bytea' })
-  sigChain!: Uint8Array | string
+  @Property({ type: 'bytea', columnType: 'bytea' })
+  sigChain!: Buffer // this is a hex string
 }

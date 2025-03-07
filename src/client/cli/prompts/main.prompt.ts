@@ -7,7 +7,11 @@ import { DateTime } from 'luxon'
 import { createLogger } from '../../../nest/app/logger/logger.js'
 import type { Pong } from '../../../nest/websocket/handlers/ping/types.js'
 import { confirm } from '@inquirer/prompts'
-import { createCommunity, updateCommunity } from './community.prompt.js'
+import {
+  createCommunity,
+  getCommunity,
+  updateCommunity,
+} from './community.prompt.js'
 import type { Community } from '../../../nest/communities/types.js'
 
 const logger = createLogger('Client:Main')
@@ -48,6 +52,11 @@ const mainLoop = async (
         name: 'Update community',
         value: 'updateCommunity',
         description: 'Update an existing community on the server',
+      },
+      {
+        name: 'Get community',
+        value: 'getCommunity',
+        description: 'Get a community by ID from the server',
       },
       {
         name: 'Disconnect',
@@ -91,6 +100,11 @@ const mainLoop = async (
             } else {
               community = await updateCommunity(client, community)
             }
+            break
+          }
+          case 'getCommunity': {
+            community = await getCommunity(client, community)
+            logger.log(JSON.stringify(community, null, 2))
             break
           }
           case 'disconnect': {

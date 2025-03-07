@@ -31,7 +31,7 @@ export interface UpdateCommunityPayload {
   updates: CommunityUpdate
 }
 
-export enum UpdateCommunityStatus {
+export enum CommunityOperationStatus {
   Error = 'error',
   Success = 'success',
   Unauthorized = 'unauthorized',
@@ -40,6 +40,22 @@ export enum UpdateCommunityStatus {
 
 export interface UpdateCommunityResponse {
   ts: number
-  status: UpdateCommunityStatus
+  status: CommunityOperationStatus
   reason?: string
+}
+
+export interface GetCommunity {
+  ts: number
+  payload: GetCommunityPayload
+}
+
+export interface GetCommunityPayload {
+  id: string
+}
+
+export interface GetCommunityResponse {
+  ts: number
+  status: CommunityOperationStatus
+  reason?: string
+  payload?: Community
 }

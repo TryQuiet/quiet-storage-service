@@ -6,6 +6,8 @@ import { Community as CommunityEntity } from './entities/community.entity.js'
 import { EntityData } from '@mikro-orm/core'
 import { PostgresClient } from '../../storage/postgres/postgres.client.js'
 import { PostgresRepo } from '../../storage/postgres/postgres.repo.js'
+import { MikroORM } from '@mikro-orm/postgresql'
+import * as uint8arrays from 'uint8arrays'
 
 @Injectable()
 export class CommunityStorageService implements OnModuleInit {
@@ -15,6 +17,7 @@ export class CommunityStorageService implements OnModuleInit {
   constructor(
     private readonly configService: ConfigService,
     private readonly postgresClient: PostgresClient,
+    private readonly orm: MikroORM,
   ) {
     this.repository = postgresClient.getRepository(CommunityEntity)
   }
@@ -49,13 +52,8 @@ export class CommunityStorageService implements OnModuleInit {
 
   public async getCommunity(
     teamId: string,
-    filterAttributes?: Array<keyof Community>,
-  ): Promise<Partial<Community> | undefined> {
+  ): Promise<Community | undefined | null> {
     this.logger.log(`Getting community with ID ${teamId}`)
-    if (filterAttributes != null) {
-      this.logger.log(`Filtering ${teamId} attributes:`, filterAttributes)
-    }
-
     const result = await this.repository.findOne(teamId)
     if (result == null) {
       this.logger.warn(`No community found in storage for ID ${teamId}`)
@@ -71,7 +69,7 @@ export class CommunityStorageService implements OnModuleInit {
       id: payload.teamId,
       psk: payload.psk,
       peerList: payload.peerList,
-      sigChain: payload.sigChain,
+      sigChain: Buffer.from(uint8arrays.fromString(payload.sigChain, 'hex')),
     })
     return entity
   }
@@ -83,18 +81,20 @@ export class CommunityStorageService implements OnModuleInit {
       name: payload.name,
       psk: payload.psk,
       peerList: payload.peerList,
-      sigChain: payload.sigChain,
+      sigChain:
+        payload.sigChain != null
+          ? Buffer.from(uint8arrays.fromString(payload.sigChain, 'hex'))
+          : undefined,
     }
   }
 
   private entityToPayload(entity: CommunityEntity): Community {
-    this.logger.log('ff', entity.sigChain)
     return {
       teamId: entity.id,
       name: entity.name,
       psk: entity.psk,
       peerList: entity.peerList,
-      sigChain: entity.sigChain.toString(),
+      sigChain: uint8arrays.toString(Uint8Array.from(entity.sigChain), 'hex'),
     }
   }
 

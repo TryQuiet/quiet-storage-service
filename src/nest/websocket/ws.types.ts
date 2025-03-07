@@ -18,6 +18,7 @@ export enum WebsocketEvents {
   Handshake = 'handshake',
   CreateCommunity = 'create-community',
   UpdateCommunity = 'update-community',
+  GetCommunity = 'get-community',
 }
 
 /**

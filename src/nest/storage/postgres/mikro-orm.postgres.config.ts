@@ -100,6 +100,7 @@ export default defineConfig({
   logger: (message: string): void => {
     logger.debug(message)
   },
+  debug: true,
   migrations: {
     tableName: 'mikro_orm_migrations', // name of database table with log of executed transactions
     path: 'dist/src/migrations', // path to the folder with migrations

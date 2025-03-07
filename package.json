@@ -31,6 +31,7 @@
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down --remove-orphans",
     "migrate:create:initial": "MIKRO_ORM_PREFER_TS=true dotenvx run -f .env.local -- npx mikro-orm-esm migration:create --initial --config src/nest/storage/postgres/mikro-orm.postgres.config.ts",
+    "migrate:create": "MIKRO_ORM_PREFER_TS=true dotenvx run -f .env.local -- npx mikro-orm-esm migration:create --config src/nest/storage/postgres/mikro-orm.postgres.config.ts",
     "migrate:up": "dotenvx run -f .env.local -- npx mikro-orm-esm migration:up --config src/nest/storage/postgres/mikro-orm.postgres.config.ts",
     "migrate:up:dev": "dotenvx run -f .env.dev -- npx mikro-orm migration:up --config dist/src/nest/storage/postgres/mikro-orm.postgres.config.js",
     "migrate:up:prod": "dotenvx run -f .env.prod -- npx mikro-orm migration:up --config dist/src/nest/storage/postgres/mikro-orm.postgres.config.js",
