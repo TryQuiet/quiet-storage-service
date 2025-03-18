@@ -4,51 +4,92 @@
   "description": "",
   "author": "",
   "private": true,
+  "type": "module",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TryQuiet/quiet-storage-service.git"
+  },
+  "main": "./dist/src/main.js",
+  "exports": "./dist/src/main.js",
+  "bin": {
+    "qss": "./dist/src/main.js"
+  },
   "scripts": {
     "build": "nest build",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "format": "prettier \"./**/*.ts\" --check",
+    "format:fix": "prettier \"./**/*.ts\" --write",
+    "lint": "eslint \"{src,test}/**/*.ts\" --stats --format=pretty",
+    "lint:fix": "eslint \"{src,test}/**/*.ts\" --stats --format=pretty --fix",
+    "format:lint": "pnpm run format && pnpm run lint",
+    "format:lint:fix": "pnpm run format:fix && pnpm run lint:fix",
+    "lint-staged": "lint-staged --no-stash",
+    "start:dev": "dotenvx run -f .env.dev -- nest start --watch",
+    "start:debug": "dotenvx run -f .env.dev -- nest start --debug --watch",
+    "start:dist:dev": "dotenvx run -f .env.dev -- nest start dist/src",
+    "start:dist:prod": "dotenvx run -f .env.prod -- nest start dist/src",
+    "test": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --runInBand --colors --detectOpenHandles --forceExit --verbose",
+    "test:ci": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --runInBand --colors --detectOpenHandles --forceExit --ci --silent --verbose",
+    "test:watch": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --watch",
+    "test:cov": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --coverage",
+    "test:debug": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+    "test:e2e": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --config ./test/jest.e2e.config.mjs --runInBand --colors --detectOpenHandles --forceExit --verbose",
+    "test:e2e:ci": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --config ./test/jest.e2e.config.mjs --runInBand --colors --detectOpenHandles --forceExit --ci --silent --verbose",
+    "prepare": "husky"
   },
   "dependencies": {
-    "@nestjs/common": "^10.0.0",
-    "@nestjs/core": "^10.0.0",
+    "@dotenvx/dotenvx": "^1.36.0",
+    "@nestjs/common": "^10.4.15",
+    "@nestjs/core": "^10.4.15",
     "@nestjs/jwt": "^10.2.0",
-    "@nestjs/platform-express": "^10.0.0",
+    "@nestjs/mapped-types": "*",
+    "@nestjs/platform-fastify": "^10.4.15",
+    "@nestjs/platform-socket.io": "^10.4.15",
+    "@nestjs/websockets": "^10.4.15",
+    "ansi-colors": "^4.1.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
-    "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.8.1"
+    "fastify": "^4.28.1",
+    "libsodium-wrappers-sumo": "^0.7.15",
+    "luxon": "^3.5.0",
+    "p-defer": "^4.0.1",
+    "p-timeout": "^6.1.4",
+    "pino": "^9.6.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "4.8.1",
+    "uint8arrays": "^5.1.0"
   },
   "devDependencies": {
-    "@nestjs/cli": "^10.0.0",
-    "@nestjs/schematics": "^10.0.0",
-    "@nestjs/testing": "^10.0.0",
-    "@types/express": "^4.17.17",
-    "@types/jest": "^29.5.2",
+    "@nestjs/cli": "^10.4.9",
+    "@nestjs/schematics": "^10.2.3",
+    "@nestjs/testing": "^10.4.15",
+    "@types/jest": "^29.5.14",
+    "@types/libsodium-wrappers-sumo": "^0.7.8",
+    "@types/luxon": "^3.4.2",
     "@types/node": "^20.3.1",
     "@types/supertest": "^2.0.12",
-    "@typescript-eslint/eslint-plugin": "^6.0.0",
-    "@typescript-eslint/parser": "^6.0.0",
-    "eslint": "^8.42.0",
-    "eslint-config-prettier": "^9.0.0",
-    "eslint-plugin-prettier": "^5.0.0",
-    "jest": "^29.5.0",
-    "prettier": "^3.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.24.1",
+    "@typescript-eslint/parser": "^8.24.1",
+    "esbuild": "^0.25.0",
+    "eslint": "^9.20.1",
+    "eslint-config-love": "^118.0.0",
+    "eslint-config-prettier": "^10.0.1",
+    "eslint-formatter-pretty": "^6.0.1",
+    "eslint-plugin-prettier": "^5.2.3",
+    "expect-more-jest": "^5.5.0",
+    "husky": "^9.1.7",
+    "jest": "^29.7.0",
+    "lint-staged": "^15.4.3",
+    "prettier": "^3.5.1",
+    "socket.io-mock": "1.3.2",
     "source-map-support": "^0.5.21",
     "supertest": "^6.3.3",
-    "ts-jest": "^29.1.0",
+    "ts-jest": "^29.2.5",
+    "ts-jest-resolver": "^2.0.1",
     "ts-loader": "^9.4.3",
-    "ts-node": "^10.9.1",
+    "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.1.3"
   },
@@ -58,15 +99,37 @@
       "json",
       "ts"
     ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
+    "modulePaths": [
+      "<rootDir>/src"
+    ],
+    "testRegex": "src/.*(\\.spec)\\.[jt]sx?$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "moduleNameMapper": {
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "src/**/*.!(module\\.)(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
-  }
+    "testEnvironment": "node",
+    "setupFilesAfterEnv": ["<rootDir>/test/jest.setup.ts"]
+  },
+  "volta": {
+    "node": "22.11.0",
+    "npm": "10.9.0",
+    "pnpm": "9.6.0"
+  },
+  "engines": {
+    "node": "22.11.0",
+    "npm": "10.9.0",
+    "pnpm": "9.6.0"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "pnpm run format:lint"
+    ]
+  },
+  "packageManager": "pnpm@9.6.0+sha1.65cd48c20dd329b7f455088b6dd17d4d5b6d02e3"
 }

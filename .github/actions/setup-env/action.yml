@@ -1,0 +1,22 @@
+name: 'Setup environment'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Node 22
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22.11.0
+        
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4 # pulls version from package.json -> "packageManager"
+
+    - name: "Install dependencies"
+      shell: bash
+      run: |
+        pnpm i
+
+    - name: "Build app"
+      shell: bash
+      run: |
+        pnpm run build

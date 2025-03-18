@@ -1,0 +1,19 @@
+name: Unit Tests
+
+on:
+  pull_request:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout Branch
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: "Setup environment"
+        uses: ./.github/actions/setup-env
+
+      - name: "Run unit tests"
+        shell: bash
+        run: pnpm run test:ci
