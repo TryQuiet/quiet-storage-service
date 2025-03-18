@@ -4,9 +4,15 @@ import actionSelect from '../components/actionSelect.js'
 import type { WebsocketClient } from '../../ws.client.js'
 import { WebsocketEvents } from '../../../nest/websocket/ws.types.js'
 import { DateTime } from 'luxon'
-import { createLogger } from '../../../nest/app/logger/nest.logger.js'
-import type { Pong } from '../../../nest/websocket/handlers/types.js'
+import { createLogger } from '../../../nest/app/logger/logger.js'
+import type { Pong } from '../../../nest/websocket/handlers/ping/types.js'
 import { confirm } from '@inquirer/prompts'
+import {
+  createCommunity,
+  getCommunity,
+  updateCommunity,
+} from './community.prompt.js'
+import type { Community } from '../../../nest/communities/types.js'
 
 const logger = createLogger('Client:Main')
 
@@ -25,6 +31,7 @@ const connectClientLoop = async (
 }
 
 const mainLoop = async (
+  community: Community | undefined,
   client: WebsocketClient,
   options: RuntimeOptions,
 ): Promise<boolean> => {
@@ -35,6 +42,21 @@ const mainLoop = async (
         name: 'Send ping',
         value: 'sendPing',
         description: 'Send ping message to server',
+      },
+      {
+        name: 'Create community',
+        value: 'createCommunity',
+        description: 'Create a new community on the server',
+      },
+      {
+        name: 'Update community',
+        value: 'updateCommunity',
+        description: 'Update an existing community on the server',
+      },
+      {
+        name: 'Get community',
+        value: 'getCommunity',
+        description: 'Get a community by ID from the server',
       },
       {
         name: 'Disconnect',
@@ -61,11 +83,28 @@ const mainLoop = async (
               { ts: DateTime.utc().toMillis() },
               true,
             )
-            if (!response.success) {
-              logger.error(`Unsuccessful ping!`, response.reason)
+            if (!response!.success) {
+              logger.error(`Unsuccessful ping!`, response!.reason)
             } else {
               logger.log(`Ping success!`)
             }
+            break
+          }
+          case 'createCommunity': {
+            community = await createCommunity(client)
+            break
+          }
+          case 'updateCommunity': {
+            if (community == null) {
+              logger.warn(`No community has been created!`)
+            } else {
+              community = await updateCommunity(client, community)
+            }
+            break
+          }
+          case 'getCommunity': {
+            community = await getCommunity(client, community)
+            logger.log(JSON.stringify(community, null, 2))
             break
           }
           case 'disconnect': {
@@ -93,7 +132,7 @@ const mainLoop = async (
 
 const main = async (options: RuntimeOptions): Promise<void> => {
   const client = await connectClientLoop(options)
-  await mainLoop(client, options)
+  await mainLoop(undefined, client, options)
   logger.log(`Goodbye!`)
 }
 

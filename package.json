@@ -1,6 +1,6 @@
 {
   "name": "quiet-storage-service",
-  "version": "0.0.1",
+  "version": "1.0.0-alpha.0",
   "description": "",
   "author": "",
   "private": true,
@@ -12,22 +12,34 @@
   },
   "main": "./dist/src/main.js",
   "exports": "./dist/src/main.js",
-  "bin": {
-    "qss": "./dist/src/main.js"
-  },
   "scripts": {
     "build": "nest build",
-    "format": "prettier \"./**/*.ts\" --check",
-    "format:fix": "prettier \"./**/*.ts\" --write",
+    "build:submodules": "pnpm run build:auth",
+    "build:auth": "cd ./3rd-party/auth && pnpm i && pnpm build",
+    "build:submodules:deployed": "pnpm run build:auth:deployed",
+    "build:auth:deployed": "cd ./3rd-party/auth && yes | pnpm i && pnpm build",
+    "bootstrap": "pnpm run build:submodules && pnpm i && pnpm run build",
+    "bootstrap:deployed": "pnpm run build:submodules:deployed && yes | pnpm i --frozen-lockfile --child-concurrency 10 --stream && pnpm run build && yes | pnpm i --frozen-lockfile --prod --child-concurrency 10 --stream",
+    "format": "prettier \"./(src|test)/**/*.ts\" --check",
+    "format:fix": "prettier \"./(src|test)/**/*.ts\" --write",
     "lint": "eslint \"{src,test}/**/*.ts\" --stats --format=pretty",
     "lint:fix": "eslint \"{src,test}/**/*.ts\" --stats --format=pretty --fix",
     "format:lint": "pnpm run format && pnpm run lint",
     "format:lint:fix": "pnpm run format:fix && pnpm run lint:fix",
     "lint-staged": "lint-staged --no-stash",
-    "start:dev": "dotenvx run -f .env.dev -- nest start --watch",
-    "start:debug": "dotenvx run -f .env.dev -- nest start --debug --watch",
-    "start:dist:dev": "dotenvx run -f .env.dev -- nest start dist/src",
-    "start:dist:prod": "dotenvx run -f .env.prod -- nest start dist/src",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down --remove-orphans",
+    "migrate:create:initial": "MIKRO_ORM_PREFER_TS=true dotenvx run -f .env.local -- npx mikro-orm-esm migration:create --initial --config src/nest/storage/postgres/mikro-orm.postgres.config.ts",
+    "migrate:create": "MIKRO_ORM_PREFER_TS=true dotenvx run -f .env.local -- npx mikro-orm-esm migration:create --config src/nest/storage/postgres/mikro-orm.postgres.config.ts",
+    "migrate:up": "dotenvx run -f .env.local -- npx mikro-orm-esm migration:up --config src/nest/storage/postgres/mikro-orm.postgres.config.ts",
+    "migrate:up:dev": "dotenvx run -f .env.dev -- npx mikro-orm migration:up --config dist/src/nest/storage/postgres/mikro-orm.postgres.config.js",
+    "migrate:up:prod": "dotenvx run -f .env.prod -- npx mikro-orm migration:up --config dist/src/nest/storage/postgres/mikro-orm.postgres.config.js",
+    "start": "pnpm run docker:up && pnpm run migrate:up && dotenvx run -f .env.local -- nest start dist/src --watch",
+    "start:debug": "pnpm run migrate:up && pnpm run docker:up && dotenvx run -f .env.local -- nest start dist/src --debug --watch",
+    "start:dev": "dotenvx run -f .env.dev -- node dist/src/main.js",
+    "start:prod": "dotenvx run -f .env.prod -- node dist/src/main.js",
+    "start:client": "dotenvx run -f .env.local.client -- node dist/src/client/cli/index.js",
+    "start:client:dev": "dotenvx run -f .env.dev.client -- node dist/src/client/cli/index.js",
     "test": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --runInBand --colors --detectOpenHandles --forceExit --verbose",
     "test:ci": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --runInBand --colors --detectOpenHandles --forceExit --ci --silent --verbose",
     "test:watch": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --watch",
@@ -35,24 +47,39 @@
     "test:debug": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --config ./test/jest.e2e.config.mjs --runInBand --colors --detectOpenHandles --forceExit --verbose",
     "test:e2e:ci": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --config ./test/jest.e2e.config.mjs --runInBand --colors --detectOpenHandles --forceExit --ci --silent --verbose",
-    "prepare": "husky",
-    "start:client": "dotenvx run -f .env.dev.client -- node dist/src/client/cli/index.js"
+    "prepare": "husky"
   },
   "dependencies": {
+    "@aws-sdk/client-lambda": "^3.758.0",
+    "@aws-sdk/client-secrets-manager": "^3.750.0",
+    "@aws-sdk/rds-signer": "^3.758.0",
     "@dotenvx/dotenvx": "^1.36.0",
+    "@localfirst/auth": "file:./3rd-party/auth/packages/auth/dist",
+    "@localfirst/crdx": "file:./3rd-party/auth/packages/crdx/dist",
+    "@mikro-orm/cli": "^6.4.7",
+    "@mikro-orm/core": "^6.4.7",
+    "@mikro-orm/migrations": "^6.4.7",
+    "@mikro-orm/nestjs": "^6.1.1",
+    "@mikro-orm/postgresql": "^6.4.7",
+    "@mikro-orm/reflection": "^6.4.7",
+    "@mikro-orm/seeder": "^6.4.7",
+    "@nestjs/cli": "^10.4.9",
     "@nestjs/common": "^10.4.15",
     "@nestjs/core": "^10.4.15",
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/mapped-types": "*",
     "@nestjs/platform-fastify": "^10.4.15",
     "@nestjs/platform-socket.io": "^10.4.15",
+    "@nestjs/terminus": "^11.0.0",
     "@nestjs/websockets": "^10.4.15",
     "ansi-colors": "^4.1.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "fastify": "^4.28.1",
+    "husky": "^9.1.7",
     "libsodium-wrappers-sumo": "^0.7.15",
     "luxon": "^3.5.0",
+    "nest-winston": "^1.10.2",
     "p-defer": "^4.0.1",
     "p-timeout": "^6.1.4",
     "pino": "^9.6.0",
@@ -60,14 +87,17 @@
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.1",
     "socket.io-client": "4.8.1",
-    "uint8arrays": "^5.1.0"
+    "timeout-abort-controller": "^3.0.0",
+    "uint8arrays": "^5.1.0",
+    "winston": "^3.17.0",
+    "winston-aws-cloudwatch": "^3.0.0",
+    "winston-daily-rotate-file": "^5.0.0"
   },
   "devDependencies": {
     "@commander-js/extra-typings": "^13.1.0",
     "@inquirer/core": "^10.1.7",
     "@inquirer/prompts": "^7.3.2",
     "@inquirer/type": "^3.0.4",
-    "@nestjs/cli": "^10.4.9",
     "@nestjs/schematics": "^10.2.3",
     "@nestjs/testing": "^10.4.15",
     "@types/inquirer": "^9.0.7",
@@ -80,7 +110,6 @@
     "@typescript-eslint/parser": "^8.24.1",
     "ansi-escapes": "^7.0.0",
     "chalk": "^5.4.1",
-    "esbuild": "^0.25.0",
     "eslint": "^9.20.1",
     "eslint-config-love": "^118.0.0",
     "eslint-config-prettier": "^10.0.1",
@@ -89,7 +118,6 @@
     "eslint-plugin-prettier": "^5.2.3",
     "expect-more-jest": "^5.5.0",
     "figures": "^6.1.0",
-    "husky": "^9.1.7",
     "jest": "^29.7.0",
     "lint-staged": "^15.4.3",
     "ora": "^8.2.0",
@@ -102,6 +130,7 @@
     "ts-loader": "^9.4.3",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.19.3",
     "typescript": "^5.1.3"
   },
   "jest": {
@@ -130,19 +159,19 @@
     ]
   },
   "volta": {
-    "node": "22.11.0",
-    "npm": "10.9.0",
-    "pnpm": "9.6.0"
+    "node": "22.14.0",
+    "npm": "10.9.2",
+    "pnpm": "10.6.0"
   },
   "engines": {
-    "node": "22.11.0",
-    "npm": "10.9.0",
-    "pnpm": "9.6.0"
+    "node": "22.14.0",
+    "npm": "10.9.2",
+    "pnpm": "10.6.0"
   },
   "lint-staged": {
     "*.ts": [
       "pnpm run format:lint"
     ]
   },
-  "packageManager": "pnpm@9.6.0+sha1.65cd48c20dd329b7f455088b6dd17d4d5b6d02e3"
+  "packageManager": "pnpm@10.6.0"
 }

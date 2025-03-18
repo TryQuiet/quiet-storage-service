@@ -5,16 +5,14 @@ import { WebsocketModule } from '../../../src/nest/websocket/ws.module.js'
 import { TestSockets } from '../../utils/types.js'
 import { WebsocketClientModule } from '../../../src/client/ws.client.module.js'
 import { WebsocketEvents } from '../../../src/nest/websocket/ws.types.js'
-import { Ping, Pong } from '../../../src/nest/websocket/handlers/types.js'
 import { DateTime } from 'luxon'
-import {
-  createLogger,
-  QuietNestLogger,
-} from '../../../src/nest/app/logger/nest.logger.js'
+import { createLogger } from '../../../src/nest/app/logger/logger.js'
+import { Ping, Pong } from '../../../src/nest/websocket/handlers/ping/types.js'
+import type { QuietLogger } from '../../../src/nest/app/logger/types.js'
 
 describe('Ping', () => {
   let sockets: TestSockets
-  let logger: QuietNestLogger
+  let logger: QuietLogger
 
   beforeEach(async () => {
     jest.clearAllMocks()

@@ -2,7 +2,7 @@ import chalk from 'chalk'
 import { DateTime } from 'luxon'
 import ora from 'ora'
 
-import { createLogger } from '../../../nest/app/logger/nest.logger.js'
+import { createLogger } from '../../../nest/app/logger/logger.js'
 
 const logger = createLogger('Client:Utils')
 

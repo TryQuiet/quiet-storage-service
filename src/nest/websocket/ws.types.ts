@@ -1,4 +1,13 @@
 import type { CryptoKX } from 'libsodium-wrappers-sumo'
+import type { Server, Socket } from 'socket.io'
+import type { WebsocketEncryptionService } from '../encryption/ws.enc.service.js'
+
+export interface BaseHandlerOptions {
+  socketServer: Server
+  socket: Socket
+  sessionKey: CryptoKX
+  encryption: WebsocketEncryptionService
+}
 
 /**
  * Quiet-specific websocket event types
@@ -7,6 +16,9 @@ export enum WebsocketEvents {
   Ping = 'ping',
   Pong = 'pong',
   Handshake = 'handshake',
+  CreateCommunity = 'create-community',
+  UpdateCommunity = 'update-community',
+  GetCommunity = 'get-community',
 }
 
 /**

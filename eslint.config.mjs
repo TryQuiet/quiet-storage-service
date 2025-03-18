@@ -36,6 +36,7 @@ export default [
     ignores: [
       "**/*.config.mjs", 
       "dist/*",
+      'src/migrations/*'
     ],
   }
 ];

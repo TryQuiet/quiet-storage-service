@@ -1,0 +1,59 @@
+name: AWS Deploy
+
+inputs:
+  version:
+    description: 'Semantic version string for this release (e.g. 4.0.0-alpha.0)'
+    required: true
+  code_deploy_group:
+    description: 'AWS CodeDeploy group name'
+    required: true
+  code_deploy_application:
+    description: 'AWS CodeDeploy application name'
+    required: true
+  aws_region:
+    description: 'AWS region containing EC2 instance(s)'
+    required: true
+  aws_access_key_id:
+    description: 'AWS access key ID for EC2 instance(s)'
+    required: true
+  aws_secret_access_key:
+    description: 'AWS secret access key for EC2 instance(s)'
+    required: true
+  s3_bucket:
+    description: 'S3 bucket that code is pushed to'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Build QSS
+      uses: ./.github/actions/setup-env
+
+    - name: Generate release archive name
+      shell: bash
+      run: echo "ZIP_FILE_NAME=${{ inputs.code_deploy_application }}_${{ inputs.version }}_${{ github.sha }}.zip" >> $GITHUB_ENV
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ inputs.aws_access_key_id }}
+        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
+        aws-region: ${{ inputs.aws_region }}
+
+    - name: Bundle code and push to S3
+      shell: bash
+      run: |
+        aws deploy push \
+          --application-name ${{ inputs.code_deploy_application }} \
+          --s3-location s3://${{ inputs.s3_bucket }}/$ZIP_FILE_NAME \
+          --no-ignore-hidden-files \
+          --color on
+          
+    - name: Deploy QSS to AWS
+      shell: bash
+      run: |
+        aws deploy create-deployment \
+          --application-name ${{ inputs.code_deploy_application }} \
+          --deployment-group-name ${{ inputs.code_deploy_group }} \
+          --s3-location bucket=${{ inputs.s3_bucket }},bundleType=zip,key=$ZIP_FILE_NAME \
+          --color on

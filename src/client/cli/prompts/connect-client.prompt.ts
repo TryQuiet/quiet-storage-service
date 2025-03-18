@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import { createLogger } from '../../../nest/app/logger/nest.logger.js'
+import { createLogger } from '../../../nest/app/logger/logger.js'
 import type { RuntimeOptions } from '../types.js'
 import { input, confirm } from '@inquirer/prompts'
 import { ConfigService } from '../../../nest/utils/config/config.service.js'
