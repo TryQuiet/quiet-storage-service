@@ -37,6 +37,7 @@ export function registerPingHandlers(
     encryptedPayload: string,
     callback: (payload: string) => void,
   ): void {
+    _logger.verbose(`Got a ping message`)
     try {
       const payload = encryption.decrypt(encryptedPayload, sessionKey) as Ping
       if (!Number.isInteger(payload.ts)) {
