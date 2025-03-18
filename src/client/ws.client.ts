@@ -88,7 +88,6 @@ export class WebsocketClient {
     payload: unknown,
     withAck = false,
   ): Promise<T> {
-    this.logger.debug(`Sending message`, event, payload, withAck)
     if (this.clientSocket == null || this.sessionKey == null) {
       throw new Error(`Must run createSocket first!`)
     }

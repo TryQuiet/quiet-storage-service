@@ -1,6 +1,5 @@
 import love from 'eslint-config-love'
 import prettier from 'eslint-config-prettier'
-import eslintComments from 'eslint-plugin-eslint-comments'
 
 export default [
   {
@@ -10,9 +9,6 @@ export default [
     ...prettier,
   },
   {
-      plugins: {
-        'eslint-comments': eslintComments
-      },
       rules: {
         '@typescript-eslint/no-magic-numbers': 'off',
         '@typescript-eslint/no-non-null-assertion': 'off',
@@ -20,17 +16,12 @@ export default [
         "@typescript-eslint/no-unsafe-type-assertion": "warn",
         'max-nested-callbacks': 'off',
         '@typescript-eslint/class-methods-use-this': 'off',
-        '@typescript-eslint/no-explicit-any': 'warn',
-        'eslint-comments/no-unused-disable': 'off',
-        'eslint-comments/no-unused-enable': 'off'
+        '@typescript-eslint/no-explicit-any': 'warn'
       },
       files: [
         "src/**/*.ts",
         "scripts/**/*.ts",
       ],
-      linterOptions: {
-        reportUnusedDisableDirectives: 'off',
-      },
   },
   {
     ignores: [
