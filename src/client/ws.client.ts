@@ -10,6 +10,7 @@ import {
 } from '../nest/websocket/ws.types.js'
 import { createLogger } from '../nest/app/logger/logger.js'
 import { HOSTNAME, LISTEN_PORT } from '../nest/app/const.js'
+import { DateTime } from 'luxon'
 
 @Injectable()
 export class WebsocketClient {
@@ -53,20 +54,23 @@ export class WebsocketClient {
     this.clientSocket.on(
       WebsocketEvents.Handshake,
       (handshake: HandshakeMessage, callback: (...args: unknown[]) => void) => {
-        if (handshake.status === HandshakeStatus.Error) {
-          throw new Error(`Error during handshake: ${handshake.reason}`)
+        if (handshake.payload.status === HandshakeStatus.Error) {
+          throw new Error(`Error during handshake: ${handshake.payload.reason}`)
         }
 
-        if (handshake.payload == null) {
+        if (handshake.payload.payload == null) {
           throw new Error(`Error during handshake: Payload was empty`)
         }
 
         this.sessionKey = this.encryption.generateSharedSessionKeyPair(
           this.keyPair!,
-          this.encryption.fromBase64(handshake.payload.publicKey),
+          this.encryption.fromBase64(handshake.payload.payload.publicKey),
           true,
         )
-        callback({ status: HandshakeStatus.Success })
+        callback({
+          ts: DateTime.utc().toMillis(),
+          payload: { status: HandshakeStatus.Success },
+        })
       },
     )
 

@@ -42,20 +42,37 @@ export enum NativeServerWebsocketEvents {
   Connection = 'connection',
 }
 
+export interface BaseWebsocketMessage<T extends object | undefined> {
+  ts: number
+  payload: T
+}
+
+export interface BaseStatusPayload<T extends object | undefined> {
+  status: string
+  reason?: string
+  payload?: T
+}
+
 export enum HandshakeStatus {
   Error = 'error',
   Active = 'active',
   Success = 'success',
 }
 
-export interface HandshakeMessage {
+export interface InnerHandshakePayload {
+  publicKey: string
+}
+export interface HandshakePayload
+  extends BaseStatusPayload<InnerHandshakePayload> {
   status: HandshakeStatus
   reason?: string
-  payload?: HandshakePayload
+  payload?: InnerHandshakePayload
 }
 
-export interface HandshakePayload {
-  publicKey: string
+export interface HandshakeMessage
+  extends BaseWebsocketMessage<HandshakePayload> {
+  ts: number
+  payload: HandshakePayload
 }
 
 export interface ActiveConnection {

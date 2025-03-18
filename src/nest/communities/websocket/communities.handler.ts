@@ -51,13 +51,17 @@ export function registerCommunitiesHandlers(
       if (!written) {
         response = {
           ts: DateTime.utc().toMillis(),
-          status: CreateCommunityStatus.Error,
-          reason: 'Failed to write to storage',
+          payload: {
+            status: CreateCommunityStatus.Error,
+            reason: 'Failed to write to storage',
+          },
         }
       } else {
         response = {
           ts: DateTime.utc().toMillis(),
-          status: CreateCommunityStatus.Success,
+          payload: {
+            status: CreateCommunityStatus.Success,
+          },
         }
       }
       const encryptedResponse = options.encryption.encrypt(
@@ -80,8 +84,10 @@ export function registerCommunitiesHandlers(
 
       const response: CreateCommunityResponse = {
         ts: DateTime.utc().toMillis(),
-        status: CreateCommunityStatus.Error,
-        reason,
+        payload: {
+          status: CreateCommunityStatus.Error,
+          reason,
+        },
       }
       callback(options.encryption.encrypt(response, options.sessionKey))
     }
@@ -104,13 +110,17 @@ export function registerCommunitiesHandlers(
       if (!written) {
         response = {
           ts: DateTime.utc().toMillis(),
-          status: CommunityOperationStatus.Error,
-          reason: 'Failed to write to storage',
+          payload: {
+            status: CommunityOperationStatus.Error,
+            reason: 'Failed to write to storage',
+          },
         }
       } else {
         response = {
           ts: DateTime.utc().toMillis(),
-          status: CommunityOperationStatus.Success,
+          payload: {
+            status: CommunityOperationStatus.Success,
+          },
         }
       }
       const encryptedResponse = options.encryption.encrypt(
@@ -133,8 +143,10 @@ export function registerCommunitiesHandlers(
 
       const response: UpdateCommunityResponse = {
         ts: DateTime.utc().toMillis(),
-        status: CommunityOperationStatus.Error,
-        reason,
+        payload: {
+          status: CommunityOperationStatus.Error,
+          reason,
+        },
       }
       callback(options.encryption.encrypt(response, options.sessionKey))
     }
@@ -154,14 +166,18 @@ export function registerCommunitiesHandlers(
       if (community == null) {
         response = {
           ts: DateTime.utc().toMillis(),
-          status: CommunityOperationStatus.NotFound,
-          reason: 'No community found in storage',
+          payload: {
+            status: CommunityOperationStatus.NotFound,
+            reason: 'No community found in storage',
+          },
         }
       } else {
         response = {
           ts: DateTime.utc().toMillis(),
-          status: CommunityOperationStatus.Success,
-          payload: community,
+          payload: {
+            status: CommunityOperationStatus.Success,
+            payload: community,
+          },
         }
       }
       const encryptedResponse = options.encryption.encrypt(
@@ -184,8 +200,10 @@ export function registerCommunitiesHandlers(
 
       const response: GetCommunityResponse = {
         ts: DateTime.utc().toMillis(),
-        status: CommunityOperationStatus.Error,
-        reason,
+        payload: {
+          status: CommunityOperationStatus.Error,
+          reason,
+        },
       }
       callback(options.encryption.encrypt(response, options.sessionKey))
     }

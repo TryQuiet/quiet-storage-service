@@ -24,6 +24,7 @@ import sodium, { CryptoKX } from 'libsodium-wrappers-sumo'
 import { createLogger } from '../app/logger/logger.js'
 import { registerCommunitiesHandlers } from '../communities/websocket/communities.handler.js'
 import { CommunityStorageService } from '../communities/storage/communities.storage.service.js'
+import { DateTime } from 'luxon'
 
 @WebSocketGateway({
   transports: ['websocket'],
@@ -122,8 +123,11 @@ export class WebsocketGateway
         `Client sent an invalid handshake message on connect; disconnecting`,
       )
       const response: HandshakeMessage = {
-        status: HandshakeStatus.Error,
-        reason: 'Missing public key',
+        ts: DateTime.utc().toMillis(),
+        payload: {
+          status: HandshakeStatus.Error,
+          reason: 'Missing public key',
+        },
       }
       client.emit(WebsocketEvents.Handshake, response)
       client.disconnect(true)
@@ -136,9 +140,13 @@ export class WebsocketGateway
       publicKey,
     )
     const response: HandshakeMessage = {
-      status: HandshakeStatus.Active,
+      ts: DateTime.utc().toMillis(),
       payload: {
-        publicKey: sodium.to_base64(serverKey.publicKey),
+        status: HandshakeStatus.Active,
+        reason: 'Missing public key',
+        payload: {
+          publicKey: sodium.to_base64(serverKey.publicKey),
+        },
       },
     }
 
@@ -147,10 +155,10 @@ export class WebsocketGateway
       const ack = (await client
         .timeout(5_000)
         .emitWithAck(WebsocketEvents.Handshake, response)) as HandshakeMessage
-      if (ack.status !== HandshakeStatus.Success) {
+      if (ack.payload.status !== HandshakeStatus.Success) {
         _logger.error(
           `Client returned an error on handshake response; disconnecting.  Reason:`,
-          ack.reason,
+          ack.payload.reason,
         )
         client.disconnect(true)
         return undefined
