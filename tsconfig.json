@@ -25,4 +25,7 @@
     "src", 
     "scripts",
   ],
+  "ts-node": {
+    "esm": true
+  }
 }
