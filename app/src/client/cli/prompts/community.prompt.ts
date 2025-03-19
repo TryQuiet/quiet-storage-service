@@ -1,0 +1,274 @@
+import { confirm, input } from '@inquirer/prompts'
+import {
+  type CreateCommunity,
+  type CreateCommunityResponse,
+  CreateCommunityStatus,
+  type UpdateCommunity,
+  type UpdateCommunityResponse,
+  CommunityOperationStatus,
+  type GetCommunity,
+  type GetCommunityResponse,
+} from '../../../nest/communities/websocket/types.js'
+import { createLogger } from '../../../nest/app/logger/logger.js'
+import { isBase64, isHexadecimal } from 'class-validator'
+import { DateTime } from 'luxon'
+import { WebsocketEvents } from '../../../nest/websocket/ws.types.js'
+import type { WebsocketClient } from '../../ws.client.js'
+import type {
+  Community,
+  CommunityUpdate,
+} from '../../../nest/communities/types.js'
+import { isUint8Array } from 'util/types'
+import * as uint8arrays from 'uint8arrays'
+import {
+  createDevice,
+  createTeam,
+  createUser,
+  type DeviceWithSecrets,
+  type Keyring,
+  loadTeam,
+  type LocalUserContext,
+  type Team,
+  type UserWithSecrets,
+} from '@localfirst/auth'
+import { randomUUID } from 'crypto'
+
+const logger = createLogger('Client:Community')
+
+const createCommunity = async (
+  client: WebsocketClient,
+): Promise<Community | undefined> => {
+  const teamName = await input({
+    message: `Enter the name of the community:`,
+    default: undefined,
+    validate: (value: string | undefined) => value != null && value !== '',
+  })
+
+  const createNewTeam = await confirm({
+    message: `Would you like to create a new sigchain for ${teamName}? (If no you must enter the sigchain data manually)`,
+    default: true,
+  })
+
+  let sigChain: string | undefined = undefined
+  let serializedSigchain: Team | undefined = undefined
+  let context: LocalUserContext | undefined = undefined
+  if (createNewTeam) {
+    const username = await input({
+      message: `Enter your username:`,
+      default: undefined,
+      validate: (value: string | undefined) => value != null && value !== '',
+    })
+    const user: UserWithSecrets = createUser(username) as UserWithSecrets
+    const device: DeviceWithSecrets = createDevice({
+      userId: user.userId,
+      deviceName: randomUUID(),
+    })
+    context = {
+      user,
+      device,
+    }
+    serializedSigchain = createTeam(teamName, context) as Team
+    sigChain = uint8arrays.toString(serializedSigchain.save(), 'hex')
+  } else {
+    sigChain = await input({
+      message: `Enter the sigchain for this community as a hex string:`,
+      default: undefined,
+      validate: (value: string | undefined) =>
+        value != null && value !== '' && isHexadecimal(value),
+    })
+
+    const base64Context = await input({
+      message: `Enter your local user context for this community as a base64 string:`,
+      validate: (value: string | undefined) =>
+        value != null && value !== '' && isBase64(value),
+    })
+    context = JSON.parse(
+      uint8arrays.toString(
+        uint8arrays.fromString(base64Context, 'base64'),
+        'utf8',
+      ),
+    ) as LocalUserContext
+
+    const base64TeamKeyring = await input({
+      message: `Enter team keyring for this community as a base64 string:`,
+      validate: (value: string | undefined) =>
+        value != null && value !== '' && isBase64(value),
+    })
+    const teamKeyring: Keyring = JSON.parse(
+      uint8arrays.toString(
+        uint8arrays.fromString(base64TeamKeyring, 'base64'),
+        'utf8',
+      ),
+    ) as Keyring
+    serializedSigchain = loadTeam(
+      uint8arrays.fromString(sigChain, 'hex'),
+      context,
+      teamKeyring,
+    ) as Team
+  }
+
+  const psk = await input({
+    message: `Enter the PSK of the community:`,
+    default: undefined,
+    validate: (value: string | undefined) => value != null && value !== '',
+  })
+
+  let keepAdding = true
+  const peerList: string[] = []
+  while (keepAdding) {
+    const peer = await input({
+      message: `Enter a peer address:`,
+      default: undefined,
+      validate: (value: string | undefined) => value != null && value !== '',
+    })
+    peerList.push(peer)
+    keepAdding = await confirm({
+      message: `Would you like to add another peer?`,
+      default: true,
+    })
+  }
+
+  const community: Community = {
+    teamId: serializedSigchain.id,
+    name: teamName,
+    psk,
+    peerList,
+    sigChain,
+  }
+  const message: CreateCommunity = {
+    ts: DateTime.utc().toMillis(),
+    payload: {
+      community,
+      teamKeyring: uint8arrays.toString(
+        uint8arrays.fromString(
+          JSON.stringify(serializedSigchain.teamKeyring()),
+          'utf8',
+        ),
+        'base64',
+      ),
+    },
+  }
+  const response = await client.sendMessage<CreateCommunityResponse>(
+    WebsocketEvents.CreateCommunity,
+    message,
+    true,
+  )
+  if (response!.payload.status !== CreateCommunityStatus.Success) {
+    logger.error(`Failed to create a community!`, response!.payload.reason)
+    return undefined
+  }
+
+  logger.log(`Successfully created a new community!`)
+  return community
+}
+
+const updateCommunity = async (
+  client: WebsocketClient,
+  existingCommunity: Community,
+): Promise<Community | undefined> => {
+  const name = await input({
+    message: `Enter a new community name (optional):`,
+    default: existingCommunity.name,
+    validate: (value: string | undefined) => value == null || value !== '',
+  })
+
+  const psk = await input({
+    message: `Enter a new PSK (optional):`,
+    default: existingCommunity.psk,
+    validate: (value: string | undefined) => value == null || value !== '',
+  })
+
+  const changePeerList = await confirm({
+    message: `Would you like to re-enter the peer list (optional)?`,
+    default: false,
+  })
+  let keepAdding = changePeerList
+  const peerList: string[] = []
+  while (keepAdding) {
+    const peer = await input({
+      message: `Enter a peer address:`,
+      default: undefined,
+      validate: (value: string | undefined) => value != null && value !== '',
+    })
+    peerList.push(peer)
+    keepAdding = await confirm({
+      message: `Would you like to add another peer?`,
+      default: true,
+    })
+  }
+
+  const sigChain = await input({
+    message: `Enter a new sigchain for this community as a hex string (optional):`,
+    default: isUint8Array(existingCommunity.sigChain)
+      ? uint8arrays.toString(existingCommunity.sigChain, 'hex')
+      : existingCommunity.sigChain,
+    validate: (value: string | undefined) =>
+      value == null || (value !== '' && isHexadecimal(value)),
+  })
+
+  const updates: CommunityUpdate = {
+    name,
+    psk,
+    peerList: peerList.length === 0 ? existingCommunity.peerList : peerList,
+    sigChain,
+  }
+  const message: UpdateCommunity = {
+    ts: DateTime.utc().toMillis(),
+    payload: {
+      teamId: existingCommunity.teamId,
+      updates,
+    },
+  }
+  const response = await client.sendMessage<UpdateCommunityResponse>(
+    WebsocketEvents.UpdateCommunity,
+    message,
+    true,
+  )
+  if (response!.payload.status !== CommunityOperationStatus.Success) {
+    logger.error(
+      `Failed to create a community with status ${response!.payload.status}!`,
+      response!.payload.reason,
+    )
+    return existingCommunity
+  }
+
+  logger.log(`Successfully created a new community!`)
+  return {
+    ...existingCommunity,
+    ...updates,
+  }
+}
+
+const getCommunity = async (
+  client: WebsocketClient,
+  existingCommunity?: Community,
+): Promise<Community | undefined> => {
+  const teamId = await input({
+    message: `Enter the team ID of the community (ID on the sigchain):`,
+    default: existingCommunity?.teamId,
+    validate: (value: string | undefined) => value != null && value !== '',
+  })
+
+  const message: GetCommunity = {
+    ts: DateTime.utc().toMillis(),
+    payload: {
+      id: teamId,
+    },
+  }
+  const response = await client.sendMessage<GetCommunityResponse>(
+    WebsocketEvents.GetCommunity,
+    message,
+    true,
+  )
+  if (response!.payload.status !== CommunityOperationStatus.Success) {
+    logger.error(
+      `Failed to get a community with ID ${teamId}!`,
+      response!.payload.reason,
+    )
+    return undefined
+  }
+
+  return response?.payload.payload
+}
+
+export { createCommunity, updateCommunity, getCommunity }

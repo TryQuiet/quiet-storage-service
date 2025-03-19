@@ -32,3 +32,9 @@ lerna-debug.log*
 
 /storage
 /bundle
+
+/app/node_modules/
+/app/dist/
+/app/volume
+/bootstrapper/node_modules/
+/auth-packages
