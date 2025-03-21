@@ -48,6 +48,12 @@ export class QuietNestLogger extends ConsoleLogger {
     super.log(message, ...this._parseParams(rest))
   }
 
+  public info(message: unknown, context?: string): void
+  public info(message: unknown, ...rest: [...any, string?]): void
+  public info(message: unknown, ...rest: unknown[]): void {
+    super.log(message, ...this._parseParams(rest))
+  }
+
   public warn(message: unknown, context?: string): void
   public warn(message: unknown, ...rest: [...any, string?]): void
   public warn(message: unknown, ...rest: unknown[]): void {

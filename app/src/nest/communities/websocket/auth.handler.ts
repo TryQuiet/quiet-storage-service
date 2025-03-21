@@ -1,0 +1,139 @@
+/**
+ * NOTE: This is a dummy WS handler to establish how we'll set them up and for adding websocket tests.  Socket.io
+ * has its own ping handler.
+ */
+
+import { WebsocketEvents } from '../../websocket/ws.types.js'
+import { DateTime } from 'luxon'
+import {
+  DecryptionError,
+  EncryptionBase64Error,
+  EncryptionError,
+} from '../../encryption/types.js'
+import { createLogger } from '../../app/logger/logger.js'
+import {
+  type AuthSyncMessage,
+  CommunityOperationStatus,
+  type GeneratePublicKeysMessage,
+  type GeneratePublicKeysResponse,
+  type CommunitiesHandlerOptions,
+} from './types.js'
+import * as uint8arrays from 'uint8arrays'
+import type { AuthConnection } from '../auth/auth.connection.js'
+import { type Keyset, redactKeys } from '@localfirst/crdx'
+import { AllowedServerKeyState } from '../types.js'
+
+const baseLogger = createLogger('Websocket:Event:Communities:Auth')
+
+/**
+ * Adds event handlers for community-related events
+ *
+ * @param socketServer Socket.io server instance
+ * @param socket Socket connection with client
+ */
+export function registerCommunitiesAuthHandlers(
+  options: CommunitiesHandlerOptions,
+): void {
+  const _logger = baseLogger.extend(options.socket.id)
+  _logger.debug(`Initializing communities auth WS event handlers`)
+
+  async function handleGeneratePublicKeys(
+    encryptedPayload: string,
+    callback: (payload: string) => void,
+  ): Promise<void> {
+    try {
+      const message = options.encryption.decrypt(
+        encryptedPayload,
+        options.sessionKey,
+        true,
+      ) as GeneratePublicKeysMessage
+      const keysetWithSecrets = await options.communitiesManager.getServerKeys(
+        message.payload.teamId,
+        AllowedServerKeyState.NotStored,
+      )
+      const response: GeneratePublicKeysResponse = {
+        ts: DateTime.utc().toMillis(),
+        payload: {
+          status: CommunityOperationStatus.Success,
+          payload: {
+            keys: redactKeys(keysetWithSecrets) as Keyset,
+            teamId: message.payload.teamId,
+          },
+        },
+      }
+      callback(options.encryption.encrypt(response, options.sessionKey))
+    } catch (e) {
+      _logger.error(`Error while processing get public keys event`, e)
+      let reason: string | undefined = undefined
+      if (
+        e instanceof EncryptionBase64Error ||
+        e instanceof EncryptionError ||
+        e instanceof DecryptionError
+      ) {
+        reason = e.message
+      } else {
+        reason = `Error while handling get public keys event`
+      }
+      const response: GeneratePublicKeysResponse = {
+        ts: DateTime.utc().toMillis(),
+        payload: {
+          status: CommunityOperationStatus.Error,
+          reason,
+        },
+      }
+      callback(options.encryption.encrypt(response, options.sessionKey))
+    }
+  }
+
+  function handleAuthSync(encryptedPayload: string): void {
+    let authConnection: AuthConnection | undefined = undefined
+    try {
+      const message = options.encryption.decrypt(
+        encryptedPayload,
+        options.sessionKey,
+        true,
+      ) as AuthSyncMessage
+      if (message.payload.payload == null) {
+        throw new Error(`Payload was nullish during auth sync!`)
+      }
+
+      const community = options.communitiesManager.get(
+        message.payload.payload.teamId,
+      )
+      if (community == null) {
+        throw new Error(`No community found`)
+      }
+
+      authConnection = community.authConnection
+      if (authConnection == null) {
+        throw new Error(`No auth connection was established for this community`)
+      }
+      authConnection.lfaConnection.deliver(
+        uint8arrays.fromString(message.payload.payload.message, 'base64'),
+      )
+    } catch (e) {
+      _logger.error(`Error while processing auth sync event`, e)
+      let reason: string | undefined = undefined
+      if (
+        e instanceof EncryptionBase64Error ||
+        e instanceof EncryptionError ||
+        e instanceof DecryptionError
+      ) {
+        reason = e.message
+      } else {
+        reason = `Error while handling auth sync`
+      }
+      authConnection?.lfaConnection.emit('localError', {
+        message: reason,
+        type: 'SocketHandlerError',
+      })
+    }
+  }
+
+  // register event handlers
+  options.socket.on(
+    WebsocketEvents.GeneratePublicKeys,
+    handleGeneratePublicKeys,
+  )
+  options.socket.on(WebsocketEvents.AuthSync, handleAuthSync)
+}

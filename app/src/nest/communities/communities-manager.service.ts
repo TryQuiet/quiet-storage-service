@@ -1,16 +1,19 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { CommunityStorageService } from './storage/communities.storage.service.js'
 import { createLogger } from '../app/logger/logger.js'
-import { Community, CreatedCommunity, ManagedCommunity } from './types.js'
+import {
+  AllowedServerKeyState,
+  Community,
+  CreatedCommunity,
+  ManagedCommunity,
+} from './types.js'
 import {
   Keyring,
   LocalServerContext,
-  ServerContext,
-  Team,
   createKeyset,
-  loadTeam,
   redactKeys,
   Keyset,
+  KeysetWithSecrets,
 } from '@localfirst/auth'
 import { ServerKeyManagerService } from '../encryption/server-key-manager.service.js'
 import {
@@ -22,6 +25,9 @@ import {
 import * as uint8arrays from 'uint8arrays'
 import { CompoundError } from '../types.js'
 import { HOSTNAME } from '../app/const.js'
+import { SigChain } from './auth/sigchain.js'
+import { AuthConnection } from './auth/auth.connection.js'
+import { CommunitiesHandlerOptions } from './websocket/types.js'
 
 @Injectable()
 export class CommunitiesManagerService {
@@ -34,9 +40,53 @@ export class CommunitiesManagerService {
     private readonly serverKeyManager: ServerKeyManagerService,
   ) {}
 
+  public get(teamId: string): ManagedCommunity | undefined {
+    return this.communities.get(teamId)
+  }
+
+  public async getServerKeys(
+    teamId: string,
+    allowedKeyState: AllowedServerKeyState,
+  ): Promise<KeysetWithSecrets> {
+    const existingKeyset = await this.serverKeyManager.retrieveKeyring(
+      teamId,
+      StoredKeyRingType.ServerKeyring,
+    )
+    if (existingKeyset != null) {
+      if (allowedKeyState === AllowedServerKeyState.NotStored) {
+        throw new Error(
+          `Keys for this team were already stored but allowed state was set to ${AllowedServerKeyState.NotStored}`,
+        )
+      }
+      return JSON.parse(
+        uint8arrays.toString(existingKeyset, 'utf8'),
+      ) as KeysetWithSecrets
+    }
+
+    if (allowedKeyState === AllowedServerKeyState.StoredOnly) {
+      throw new Error(
+        `Keys for this team were not stored locally or in the secrets manager but the allowed state was set to ${AllowedServerKeyState.StoredOnly}`,
+      )
+    }
+
+    this.logger.log(`Initializing new server keyset for ${teamId}`)
+    const serverKeysWithSecrets = createKeyset(
+      { type: 'SERVER', name: this.hostname },
+      this.serverKeyManager.generateRandomBytes(32, 'base64'),
+    )
+    await this.serverKeyManager.storeKeyring(
+      teamId,
+      uint8arrays.fromString(JSON.stringify(serverKeysWithSecrets), 'utf8'),
+      StoredKeyRingType.ServerKeyring,
+    )
+
+    return serverKeysWithSecrets
+  }
+
   public async create(
     community: Community,
     teamKeyring: string,
+    wsOptions: CommunitiesHandlerOptions,
   ): Promise<CreatedCommunity> {
     this.logger.log(`Adding new community for ID ${community.teamId}`)
     try {
@@ -52,18 +102,8 @@ export class CommunitiesManagerService {
           'utf8',
         ),
       ) as Keyring
-      this.logger.log(`Initializing server keyset`)
-      const serverKeysWithSecrets = createKeyset(
-        { type: 'SERVER', name: 'QSS' },
-        this.serverKeyManager.generateRandomBytes(32, 'base64'),
-      )
-      await this.serverKeyManager.encryptAndStoreKeyring(
-        community.teamId,
-        uint8arrays.fromString(JSON.stringify(serverKeysWithSecrets), 'utf8'),
-        StoredKeyRingType.ServerKeyring,
-      )
       this.logger.log(`Storing team keyset`)
-      await this.serverKeyManager.encryptAndStoreKeyring(
+      await this.serverKeyManager.storeKeyring(
         community.teamId,
         uint8arrays.fromString(teamKeyring, 'base64'),
         StoredKeyRingType.TeamKeyring,
@@ -75,6 +115,10 @@ export class CommunitiesManagerService {
       }
 
       this.logger.log(`Deserializing and joining team`)
+      const serverKeysWithSecrets = await this.getServerKeys(
+        community.teamId,
+        AllowedServerKeyState.StoredOnly,
+      )
       const rawSigchain = uint8arrays.fromString(community.sigChain, 'hex')
       const localServerContext: LocalServerContext = {
         server: {
@@ -82,21 +126,19 @@ export class CommunitiesManagerService {
           keys: serverKeysWithSecrets,
         },
       }
-      const deserializedTeam: Team = loadTeam(
+
+      const sigChain: SigChain = SigChain.create(
         rawSigchain,
         localServerContext,
         deserializedTeamKeyring,
-      ) as Team
-      const context: ServerContext = {
-        ...localServerContext,
-        team: deserializedTeam,
-      }
-
+      )
       this.communities.set(community.teamId, {
         teamId: community.teamId,
-        serverContext: context,
-        localServerContext,
+        sigChain,
+        wsOptions,
       })
+
+      this.startConnection(community.teamId, wsOptions)
 
       return {
         serverKeys: redactKeys(serverKeysWithSecrets) as Keyset,
@@ -116,5 +158,25 @@ export class CommunitiesManagerService {
       this.logger.error(reason, e)
       throw new CompoundError(reason, e as Error)
     }
+  }
+
+  public startConnection(
+    teamId: string,
+    wsOptions: CommunitiesHandlerOptions,
+  ): void {
+    const managedCommunity = this.communities.get(teamId)
+    if (managedCommunity == null) {
+      throw new Error(`No community found for this team ID: ${teamId}`)
+    }
+
+    const authConnection = new AuthConnection(
+      managedCommunity.sigChain,
+      wsOptions,
+    )
+    this.communities.set(teamId, {
+      ...managedCommunity,
+      authConnection,
+    })
+    authConnection.start()
   }
 }

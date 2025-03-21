@@ -46,19 +46,18 @@ export function registerCommunitiesHandlers(
       const message = options.encryption.decrypt(
         encryptedPayload,
         options.sessionKey,
+        true,
       ) as CreateCommunity
-      const createdCommunity = await options.communitiesManager.create(
+      await options.communitiesManager.create(
         message.payload.community,
         message.payload.teamKeyring,
+        options,
       )
       let response: CreateCommunityResponse | undefined = undefined
       response = {
         ts: DateTime.utc().toMillis(),
         payload: {
           status: CreateCommunityStatus.Success,
-          payload: {
-            serverKeys: createdCommunity.serverKeys,
-          },
         },
       }
       const encryptedResponse = options.encryption.encrypt(
@@ -98,6 +97,7 @@ export function registerCommunitiesHandlers(
       const message = options.encryption.decrypt(
         encryptedPayload,
         options.sessionKey,
+        true,
       ) as UpdateCommunity
       const written = await options.storage.updateCommunity(
         message.payload.teamId,
@@ -157,6 +157,7 @@ export function registerCommunitiesHandlers(
       const message = options.encryption.decrypt(
         encryptedPayload,
         options.sessionKey,
+        true,
       ) as GetCommunity
       const community = await options.storage.getCommunity(message.payload.id)
       let response: GetCommunityResponse | undefined = undefined

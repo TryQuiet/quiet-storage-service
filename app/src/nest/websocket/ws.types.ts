@@ -19,6 +19,8 @@ export enum WebsocketEvents {
   CreateCommunity = 'create-community',
   UpdateCommunity = 'update-community',
   GetCommunity = 'get-community',
+  GeneratePublicKeys = 'generate-public-keys',
+  AuthSync = 'auth-sync',
 }
 
 /**

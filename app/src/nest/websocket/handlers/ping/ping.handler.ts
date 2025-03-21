@@ -34,6 +34,7 @@ export function registerPingHandlers(options: PingHandlerOptions): void {
       const payload = options.encryption.decrypt(
         encryptedPayload,
         options.sessionKey,
+        true,
       ) as Ping
       if (!Number.isInteger(payload.ts)) {
         const pong: Pong = {

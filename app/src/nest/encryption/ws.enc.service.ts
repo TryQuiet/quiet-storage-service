@@ -139,7 +139,21 @@ export class WebsocketEncryptionService {
    * @throws {EncryptionBase64Error} If the string is not valid base64
    * @throws {DecryptionError} If the payload is not a valid encrypted payload using this session key
    */
-  public decrypt(encryptedPayload: string, sessionKey: CryptoKX): unknown {
+  public decrypt(
+    encryptedPayload: string,
+    sessionKey: CryptoKX,
+    parse: false,
+  ): Uint8Array
+  public decrypt(
+    encryptedPayload: string,
+    sessionKey: CryptoKX,
+    parse: true,
+  ): unknown
+  public decrypt(
+    encryptedPayload: string,
+    sessionKey: CryptoKX,
+    parse = true,
+  ): unknown {
     try {
       const encryptedPayloadBytes =
         this.sodiumHelper.fromBase64(encryptedPayload)
@@ -158,15 +172,20 @@ export class WebsocketEncryptionService {
       const cipherText = encryptedPayloadBytes.slice(
         this.sodiumHelper.sodium.crypto_secretbox_NONCEBYTES,
       )
-      const stringPayload = uint8ToString(
+      const serializedPayload =
         this.sodiumHelper.sodium.crypto_secretbox_open_easy(
           cipherText,
           nonce,
           sessionKey.sharedRx,
           'uint8array',
-        ),
-      )
-      return JSON.parse(stringPayload) as unknown
+        )
+
+      if (!parse) {
+        return serializedPayload
+      }
+
+      const deserializedPayload = uint8ToString(serializedPayload)
+      return JSON.parse(deserializedPayload) as unknown
     } catch (e) {
       if (e instanceof EncryptionBase64Error) {
         throw e

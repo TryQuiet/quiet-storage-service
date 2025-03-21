@@ -1,8 +1,13 @@
-import type {
-  Keyset,
-  LocalServerContext,
-  ServerContext,
-} from '@localfirst/auth'
+import type { Keyset } from '@localfirst/auth'
+import type { SigChain } from './auth/sigchain.js'
+import type { AuthConnection } from './auth/auth.connection.js'
+import type { CommunitiesHandlerOptions } from './websocket/types.js'
+
+export enum AllowedServerKeyState {
+  Any = 'Any',
+  StoredOnly = 'StoredOnly',
+  NotStored = 'NotStored',
+}
 
 export interface Community {
   teamId: string
@@ -21,6 +26,7 @@ export type CommunityUpdate = Omit<Partial<Community>, 'teamId'>
 
 export interface ManagedCommunity {
   teamId: string
-  serverContext: ServerContext
-  localServerContext: LocalServerContext
+  sigChain: SigChain
+  authConnection?: AuthConnection
+  wsOptions: CommunitiesHandlerOptions
 }

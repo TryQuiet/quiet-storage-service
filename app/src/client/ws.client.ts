@@ -127,7 +127,7 @@ export class WebsocketClient {
       throw new Error(`Must run createSocket first!`)
     }
 
-    return this.encryption.decrypt(encryptedPayload, this.sessionKey)
+    return this.encryption.decrypt(encryptedPayload, this.sessionKey, true)
   }
 
   public close(): void {

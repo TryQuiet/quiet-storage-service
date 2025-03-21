@@ -130,6 +130,14 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
     })
   }
 
+  public info(message: unknown, context?: string): void
+  public info(message: unknown, ...rest: [...any, string?]): void
+  public info(message: unknown, ...rest: unknown[]): void {
+    this.winstonLogger.info(message as string, {
+      params: this._parseParams(rest),
+    })
+  }
+
   public warn(message: unknown, context?: string): void
   public warn(message: unknown, ...rest: [...any, string?]): void
   public warn(message: unknown, ...rest: unknown[]): void {

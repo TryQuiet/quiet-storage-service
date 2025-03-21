@@ -10,6 +10,7 @@ import * as uint8arrays from 'uint8arrays'
 
 @Injectable()
 export class ServerKeyManagerService {
+  private readonly serverKeysets = new Map<string, Uint8Array>()
   private serverEncKey: Uint8Array | undefined = undefined
 
   private readonly logger = createLogger(ServerKeyManagerService.name)
@@ -20,7 +21,7 @@ export class ServerKeyManagerService {
     private readonly configService: ConfigService,
   ) {}
 
-  public async encryptAndStoreKeyring(
+  public async storeKeyring(
     id: string,
     keyring: Uint8Array,
     type: StoredKeyRingType,
@@ -28,7 +29,7 @@ export class ServerKeyManagerService {
     await this._initServerKeys()
 
     try {
-      const secretName = this._generateSecretName(id)
+      const secretName = this._generateSecretName(id, type)
       const nonce = this.generateRandomBytes(
         this.sodiumHelper.sodium.crypto_secretbox_NONCEBYTES,
       )
@@ -44,6 +45,7 @@ export class ServerKeyManagerService {
         type,
       }
       await this.awsSecretsService.put(secretName, JSON.stringify(secret))
+      this.serverKeysets.set(secretName, keyring)
     } catch (e) {
       throw new CompoundError(
         `Error while encrypting and storing keyring in AWS!`,
@@ -52,13 +54,17 @@ export class ServerKeyManagerService {
     }
   }
 
-  public async retrieveAndDecryptKeyring(
+  public async retrieveKeyring(
     id: string,
+    type: StoredKeyRingType,
   ): Promise<Uint8Array | undefined> {
     await this._initServerKeys()
+    const secretName = this._generateSecretName(id, type)
+    if (this.serverKeysets.has(secretName)) {
+      return this.serverKeysets.get(secretName)
+    }
 
     try {
-      const secretName = this._generateSecretName(id)
       const secret = await this.awsSecretsService.get(secretName)
       if (secret == null) {
         this.logger.warn(`No keyring stored for secret name ${secretName}`)
@@ -70,11 +76,14 @@ export class ServerKeyManagerService {
       }
 
       const storedKeyring: StoredKeyring = JSON.parse(secret) as StoredKeyring
-      return this.sodiumHelper.sodium.crypto_secretbox_open_easy(
-        storedKeyring.keyring,
-        this.sodiumHelper.fromBase64(storedKeyring.nonce),
-        this.serverEncKey!,
-      )
+      const decryptedKeyring =
+        this.sodiumHelper.sodium.crypto_secretbox_open_easy(
+          storedKeyring.keyring,
+          this.sodiumHelper.fromBase64(storedKeyring.nonce),
+          this.serverEncKey!,
+        )
+      this.serverKeysets.set(`${id}-${type}`, decryptedKeyring)
+      return decryptedKeyring
     } catch (e) {
       throw new CompoundError(
         `Error while retrieving and decrypting keyring from AWS!`,
@@ -133,7 +142,7 @@ export class ServerKeyManagerService {
     }
   }
 
-  private _generateSecretName(id: string): string {
-    return `qss!${this.configService.getEnvShort()}-te-${this.sodiumHelper.sodium.crypto_hash_sha512(id, 'base64')}`
+  private _generateSecretName(id: string, type: StoredKeyRingType): string {
+    return `qss!${this.configService.getEnvShort()}-te-${type}-${this.sodiumHelper.sodium.crypto_hash_sha512(`${id}-${type}`, 'base64')}`
   }
 }

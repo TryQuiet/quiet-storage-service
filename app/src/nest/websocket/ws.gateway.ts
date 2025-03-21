@@ -26,6 +26,8 @@ import { registerCommunitiesHandlers } from '../communities/websocket/communitie
 import { CommunityStorageService } from '../communities/storage/communities.storage.service.js'
 import { DateTime } from 'luxon'
 import { CommunitiesManagerService } from '../communities/communities-manager.service.js'
+import { CommunitiesHandlerOptions } from '../communities/websocket/types.js'
+import { registerCommunitiesAuthHandlers } from '../communities/websocket/auth.handler.js'
 
 @WebSocketGateway({
   transports: ['websocket'],
@@ -108,11 +110,14 @@ export class WebsocketGateway
     }
 
     registerPingHandlers(baseOptions)
-    registerCommunitiesHandlers({
+
+    const communitiesOptions: CommunitiesHandlerOptions = {
       ...baseOptions,
       storage: this.communityStorageService,
       communitiesManager: this.communitiesManager,
-    })
+    }
+    registerCommunitiesHandlers(communitiesOptions)
+    registerCommunitiesAuthHandlers(communitiesOptions)
   }
 
   private async _handleHandshake(
