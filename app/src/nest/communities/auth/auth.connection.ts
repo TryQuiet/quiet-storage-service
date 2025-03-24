@@ -16,7 +16,7 @@ import {
   type AuthSyncMessage,
   type CommunitiesHandlerOptions,
   CommunityOperationStatus,
-} from '../websocket/types.js'
+} from '../websocket/types/index.js'
 import type { QuietLogger } from '../../app/logger/types.js'
 
 export class AuthConnection {

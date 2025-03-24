@@ -26,7 +26,7 @@ import { registerCommunitiesHandlers } from '../communities/websocket/communitie
 import { CommunityStorageService } from '../communities/storage/communities.storage.service.js'
 import { DateTime } from 'luxon'
 import { CommunitiesManagerService } from '../communities/communities-manager.service.js'
-import { CommunitiesHandlerOptions } from '../communities/websocket/types.js'
+import { CommunitiesHandlerOptions } from '../communities/websocket/types/index.js'
 import { registerCommunitiesAuthHandlers } from '../communities/websocket/auth.handler.js'
 
 @WebSocketGateway({

@@ -17,7 +17,7 @@ import {
   type GeneratePublicKeysMessage,
   type GeneratePublicKeysResponse,
   type CommunitiesHandlerOptions,
-} from './types.js'
+} from './types/index.js'
 import * as uint8arrays from 'uint8arrays'
 import type { AuthConnection } from '../auth/auth.connection.js'
 import { type Keyset, redactKeys } from '@localfirst/crdx'

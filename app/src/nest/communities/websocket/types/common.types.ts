@@ -1,0 +1,21 @@
+import type { CommunityStorageService } from '../../storage/communities.storage.service.js'
+import type { CommunitiesManagerService } from '../../communities-manager.service.js'
+import type { AuthConnection } from '../../auth/auth.connection.js'
+import type { BaseHandlerOptions } from '../../../websocket/ws.types.js'
+
+export interface CommunitiesHandlerOptions extends BaseHandlerOptions {
+  storage: CommunityStorageService
+  communitiesManager: CommunitiesManagerService
+}
+
+export interface CommunitiesAuthHandlerOptions
+  extends CommunitiesHandlerOptions {
+  authConnection: AuthConnection
+}
+
+export enum CommunityOperationStatus {
+  Error = 'error',
+  Success = 'success',
+  Unauthorized = 'unauthorized',
+  NotFound = 'not found',
+}

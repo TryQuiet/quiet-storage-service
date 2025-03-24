@@ -21,7 +21,8 @@ import {
   CommunityOperationStatus,
   type GetCommunity,
   type GetCommunityResponse,
-} from './types.js'
+  type CommunitySignInMessage,
+} from './types/index.js'
 
 const baseLogger = createLogger('Websocket:Event:Communities')
 
@@ -82,6 +83,81 @@ export function registerCommunitiesHandlers(
         ts: DateTime.utc().toMillis(),
         payload: {
           status: CreateCommunityStatus.Error,
+          reason,
+        },
+      }
+      callback(options.encryption.encrypt(response, options.sessionKey))
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/require-await -- this is fine
+  async function handleSignInToCommunity(
+    encryptedPayload: string,
+    callback: (payload: string) => void,
+  ): Promise<void> {
+    _logger.debug(`Handling community sign-in event`)
+    try {
+      const message = options.encryption.decrypt(
+        encryptedPayload,
+        options.sessionKey,
+        true,
+      ) as CommunitySignInMessage
+      if (message.payload.payload == null) {
+        throw new Error(`Payload was nullish!`)
+      }
+      const { teamId } = message.payload.payload
+      if (!options.communitiesManager.has(teamId)) {
+        _logger.warn(
+          `Attempted sign-in to community ${teamId} but no community was initialized for that ID`,
+        )
+        const notFoundResponse: CommunitySignInMessage = {
+          ts: DateTime.utc().toMillis(),
+          payload: {
+            status: CommunityOperationStatus.NotFound,
+            reason: `No community found for ${teamId}`,
+          },
+        }
+        const encryptedResponse = options.encryption.encrypt(
+          notFoundResponse,
+          options.sessionKey,
+        )
+        callback(encryptedResponse)
+        return
+      }
+
+      _logger.debug(
+        `Found community for ID ${teamId}, initializing sync connection`,
+      )
+      options.communitiesManager.startConnection(teamId, options)
+
+      const response: CommunitySignInMessage = {
+        ts: DateTime.utc().toMillis(),
+        payload: {
+          status: CommunityOperationStatus.Success,
+        },
+      }
+      const encryptedResponse = options.encryption.encrypt(
+        response,
+        options.sessionKey,
+      )
+      callback(encryptedResponse)
+    } catch (e) {
+      _logger.error(`Error while processing community sign-in event`, e)
+      let reason: string | undefined = undefined
+      if (
+        e instanceof EncryptionBase64Error ||
+        e instanceof EncryptionError ||
+        e instanceof DecryptionError
+      ) {
+        reason = e.message
+      } else {
+        reason = `Error while signing in to community`
+      }
+
+      const response: CommunitySignInMessage = {
+        ts: DateTime.utc().toMillis(),
+        payload: {
+          status: CommunityOperationStatus.Error,
           reason,
         },
       }
@@ -211,4 +287,5 @@ export function registerCommunitiesHandlers(
   options.socket.on(WebsocketEvents.CreateCommunity, handleCreateCommunity)
   options.socket.on(WebsocketEvents.UpdateCommunity, handleUpdateCommunity)
   options.socket.on(WebsocketEvents.GetCommunity, handleGetCommunity)
+  options.socket.on(WebsocketEvents.SignInCommunity, handleSignInToCommunity)
 }

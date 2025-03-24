@@ -27,7 +27,7 @@ import { CompoundError } from '../types.js'
 import { HOSTNAME } from '../app/const.js'
 import { SigChain } from './auth/sigchain.js'
 import { AuthConnection } from './auth/auth.connection.js'
-import { CommunitiesHandlerOptions } from './websocket/types.js'
+import { CommunitiesHandlerOptions } from './websocket/types/index.js'
 
 @Injectable()
 export class CommunitiesManagerService {
@@ -42,6 +42,10 @@ export class CommunitiesManagerService {
 
   public get(teamId: string): ManagedCommunity | undefined {
     return this.communities.get(teamId)
+  }
+
+  public has(teamId: string): boolean {
+    return this.communities.has(teamId)
   }
 
   public async getServerKeys(

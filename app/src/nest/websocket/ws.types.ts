@@ -13,12 +13,17 @@ export interface BaseHandlerOptions {
  * Quiet-specific websocket event types
  */
 export enum WebsocketEvents {
+  // bullshit
   Ping = 'ping',
   Pong = 'pong',
+  // connection
   Handshake = 'handshake',
+  // communities
   CreateCommunity = 'create-community',
   UpdateCommunity = 'update-community',
   GetCommunity = 'get-community',
+  SignInCommunity = 'sign-in-community',
+  //// community auth
   GeneratePublicKeys = 'generate-public-keys',
   AuthSync = 'auth-sync',
 }
@@ -64,6 +69,7 @@ export enum HandshakeStatus {
 export interface InnerHandshakePayload {
   publicKey: string
 }
+
 export interface HandshakePayload
   extends BaseStatusPayload<InnerHandshakePayload> {
   status: HandshakeStatus

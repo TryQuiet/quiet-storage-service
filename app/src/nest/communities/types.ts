@@ -1,7 +1,7 @@
 import type { Keyset } from '@localfirst/auth'
 import type { SigChain } from './auth/sigchain.js'
 import type { AuthConnection } from './auth/auth.connection.js'
-import type { CommunitiesHandlerOptions } from './websocket/types.js'
+import type { CommunitiesHandlerOptions } from './websocket/types/index.js'
 
 export enum AllowedServerKeyState {
   Any = 'Any',
