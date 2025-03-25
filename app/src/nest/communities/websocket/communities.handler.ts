@@ -106,7 +106,7 @@ export function registerCommunitiesHandlers(
         throw new Error(`Payload was nullish!`)
       }
       const { teamId } = message.payload.payload
-      if (!options.communitiesManager.has(teamId)) {
+      if ((await options.communitiesManager.get(teamId, options)) == null) {
         _logger.warn(
           `Attempted sign-in to community ${teamId} but no community was initialized for that ID`,
         )

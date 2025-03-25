@@ -6,7 +6,6 @@ import { CompoundError } from '../types.js'
 import { StoredKeyring, StoredKeyRingType } from './types.js'
 import { ConfigService } from '../utils/config/config.service.js'
 import { SodiumHelper } from './sodium.helper.js'
-import * as uint8arrays from 'uint8arrays'
 
 @Injectable()
 export class ServerKeyManagerService {
@@ -25,7 +24,7 @@ export class ServerKeyManagerService {
     id: string,
     keyring: Uint8Array,
     type: StoredKeyRingType,
-  ): Promise<void> {
+  ): Promise<StoredKeyring> {
     await this._initServerKeys()
 
     try {
@@ -46,6 +45,8 @@ export class ServerKeyManagerService {
       }
       await this.awsSecretsService.put(secretName, JSON.stringify(secret))
       this.serverKeysets.set(secretName, keyring)
+
+      return secret
     } catch (e) {
       throw new CompoundError(
         `Error while encrypting and storing keyring in AWS!`,
@@ -76,9 +77,10 @@ export class ServerKeyManagerService {
       }
 
       const storedKeyring: StoredKeyring = JSON.parse(secret) as StoredKeyring
+      this.logger.info(secret)
       const decryptedKeyring =
         this.sodiumHelper.sodium.crypto_secretbox_open_easy(
-          storedKeyring.keyring,
+          this.sodiumHelper.fromBase64(storedKeyring.keyring),
           this.sodiumHelper.fromBase64(storedKeyring.nonce),
           this.serverEncKey!,
         )
@@ -106,11 +108,12 @@ export class ServerKeyManagerService {
   }
 
   private async _initServerKeys(): Promise<void> {
+    this.logger.log(`Checking if server encryption key is initialized`)
     if (this.serverEncKey != null) {
+      this.logger.log(`Already had the server encryption key locally`)
       return
     }
 
-    this.logger.log(`Checking if server encryption key is initialized`)
     let serverEncKey = await this.awsSecretsService.get(
       AWSSecretNames.ServerEncKey,
     )
@@ -119,12 +122,13 @@ export class ServerKeyManagerService {
       serverEncKey = this._generateEncryptionKey()
       await this.awsSecretsService.put(
         AWSSecretNames.ServerEncKey,
-        serverEncKey,
+        this.sodiumHelper.toBase64(serverEncKey),
       )
     } else {
+      this.logger.log(`Server encryption key found in secrets service`)
       serverEncKey =
         typeof serverEncKey === 'string'
-          ? uint8arrays.fromString(serverEncKey, 'base64')
+          ? this.sodiumHelper.fromBase64(serverEncKey)
           : serverEncKey
     }
     this.serverEncKey = serverEncKey

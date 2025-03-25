@@ -88,7 +88,7 @@ export class AuthConnection {
     })
 
     this.lfaConnection.on('change', payload => {
-      this.logger.log(`Auth state change`, payload)
+      this.logger.log(`Auth state change`)
     })
 
     // TODO: store updated sigchain on updates

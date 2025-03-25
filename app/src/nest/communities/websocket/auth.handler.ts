@@ -85,7 +85,7 @@ export function registerCommunitiesAuthHandlers(
     }
   }
 
-  function handleAuthSync(encryptedPayload: string): void {
+  async function handleAuthSync(encryptedPayload: string): Promise<void> {
     let authConnection: AuthConnection | undefined = undefined
     try {
       const message = options.encryption.decrypt(
@@ -97,8 +97,9 @@ export function registerCommunitiesAuthHandlers(
         throw new Error(`Payload was nullish during auth sync!`)
       }
 
-      const community = options.communitiesManager.get(
+      const community = await options.communitiesManager.get(
         message.payload.payload.teamId,
+        options,
       )
       if (community == null) {
         throw new Error(`No community found`)

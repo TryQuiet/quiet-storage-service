@@ -40,12 +40,54 @@ export class CommunitiesManagerService {
     private readonly serverKeyManager: ServerKeyManagerService,
   ) {}
 
-  public get(teamId: string): ManagedCommunity | undefined {
-    return this.communities.get(teamId)
-  }
+  public async get(
+    teamId: string,
+    wsOptions: CommunitiesHandlerOptions,
+  ): Promise<ManagedCommunity | undefined> {
+    if (this.communities.has(teamId)) {
+      return this.communities.get(teamId)
+    }
 
-  public has(teamId: string): boolean {
-    return this.communities.has(teamId)
+    const community = await this.storage.getCommunity(teamId)
+    if (community == null) {
+      return undefined
+    }
+
+    let serverKeys: KeysetWithSecrets | undefined = undefined
+    let teamKeys: Keyring | undefined = undefined
+    try {
+      serverKeys = await this.getServerKeys(
+        teamId,
+        AllowedServerKeyState.StoredOnly,
+      )
+      teamKeys = await this.getTeamKeys(teamId)
+    } catch (e) {
+      this.logger.error(
+        `Error occurred while pulling keys from secrets manager`,
+        e,
+      )
+      return undefined
+    }
+
+    const rawSigchain = uint8arrays.fromString(community.sigChain, 'hex')
+    const localServerContext: LocalServerContext = {
+      server: {
+        host: this.hostname,
+        keys: serverKeys,
+      },
+    }
+    const sigChain: SigChain = SigChain.create(
+      rawSigchain,
+      localServerContext,
+      teamKeys,
+    )
+    const managedCommunity: ManagedCommunity = {
+      teamId: community.teamId,
+      sigChain,
+      wsOptions,
+    }
+    this.communities.set(community.teamId, managedCommunity)
+    return managedCommunity
   }
 
   public async getServerKeys(
@@ -85,6 +127,19 @@ export class CommunitiesManagerService {
     )
 
     return serverKeysWithSecrets
+  }
+
+  public async getTeamKeys(teamId: string): Promise<Keyring> {
+    const teamKeys = await this.serverKeyManager.retrieveKeyring(
+      teamId,
+      StoredKeyRingType.TeamKeyring,
+    )
+
+    if (teamKeys == null) {
+      throw new Error(`Team keys for this team were not found`)
+    }
+
+    return JSON.parse(uint8arrays.toString(teamKeys, 'utf8')) as Keyring
   }
 
   public async create(
