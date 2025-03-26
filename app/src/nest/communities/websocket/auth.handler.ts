@@ -49,12 +49,12 @@ export function registerCommunitiesAuthHandlers(
       ) as GeneratePublicKeysMessage
       const keysetWithSecrets = await options.communitiesManager.getServerKeys(
         message.payload.teamId,
-        AllowedServerKeyState.NotStored,
+        AllowedServerKeyState.NOT_STORED,
       )
       const response: GeneratePublicKeysResponse = {
         ts: DateTime.utc().toMillis(),
         payload: {
-          status: CommunityOperationStatus.Success,
+          status: CommunityOperationStatus.SUCCESS,
           payload: {
             keys: redactKeys(keysetWithSecrets) as Keyset,
             teamId: message.payload.teamId,
@@ -77,7 +77,7 @@ export function registerCommunitiesAuthHandlers(
       const response: GeneratePublicKeysResponse = {
         ts: DateTime.utc().toMillis(),
         payload: {
-          status: CommunityOperationStatus.Error,
+          status: CommunityOperationStatus.ERROR,
           reason,
         },
       }

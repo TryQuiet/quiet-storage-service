@@ -21,6 +21,7 @@
     "format:lint": "pnpm run --filter app format:lint",
     "format:lint:fix": "pnpm run --filter app format:lint:fix",
     "lint-staged": "pnpm run --filter app lint-staged",
+    "migrate": "pnpm run --filter app migrate:create",
     "start": "pnpm run --filter app start",
     "start:dev": "pnpm run --filter app start:dev",
     "start:prod": "pnpm run --filter app start:prod",

@@ -5,6 +5,7 @@
 import * as auth from '@localfirst/auth'
 import { Injectable } from '@nestjs/common'
 import { createLogger } from '../../app/logger/logger.js'
+import * as uint8arrays from 'uint8arrays'
 
 const logger = createLogger('Auth:SigChain')
 
@@ -21,12 +22,6 @@ export class SigChain {
     teamKeyring: auth.Keyring,
   ): SigChain {
     logger.log(`Creating SigChain from serialized team`)
-    let teamKeys: auth.KeysetWithSecrets | undefined = undefined
-    for (const keyset of Object.values(teamKeyring)) {
-      if (teamKeys == null || keyset.generation > teamKeys.generation) {
-        teamKeys = keyset
-      }
-    }
     const deserializedTeam: auth.Team = this.lfa.loadTeam(
       serializedSigchain,
       localContext,
@@ -36,8 +31,15 @@ export class SigChain {
     return new SigChain(deserializedTeam, localContext)
   }
 
-  public serialize(): Uint8Array {
-    return this.team.save() // this doesn't actually do anything but create the new state to save
+  public serialize(hex?: false): Uint8Array
+  public serialize(hex: true): string
+  public serialize(hex = false): Uint8Array | string {
+    const bytes = this.team.save() // this doesn't actually do anything but create the new state to save
+    if (!hex) {
+      return bytes
+    }
+
+    return uint8arrays.toString(bytes, 'hex')
   }
 
   static get lfa(): typeof auth {

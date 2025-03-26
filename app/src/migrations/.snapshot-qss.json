@@ -28,22 +28,21 @@
         },
         "psk": {
           "name": "psk",
-          "type": "varchar(255)",
+          "type": "bytea",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": false,
-          "length": 255,
-          "mappedType": "string"
+          "mappedType": "blob"
         },
         "peer_list": {
           "name": "peer_list",
-          "type": "text[]",
+          "type": "bytea",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": false,
-          "mappedType": "array"
+          "mappedType": "blob"
         },
         "sig_chain": {
           "name": "sig_chain",

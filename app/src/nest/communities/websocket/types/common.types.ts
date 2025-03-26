@@ -14,8 +14,8 @@ export interface CommunitiesAuthHandlerOptions
 }
 
 export enum CommunityOperationStatus {
-  Error = 'error',
-  Success = 'success',
-  Unauthorized = 'unauthorized',
-  NotFound = 'not found',
+  ERROR = 'error',
+  SUCCESS = 'success',
+  UNAUTHORIZED = 'unauthorized',
+  NOT_FOUND = 'not found',
 }

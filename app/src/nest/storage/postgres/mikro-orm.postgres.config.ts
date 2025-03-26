@@ -27,10 +27,10 @@ const getRdsPassword = async (): Promise<string | undefined> => {
     let secretName: string | undefined = undefined
     switch (configService.getEnv()) {
       case Environment.Development:
-        secretName = AWSSecretNames.RDSCredentials_Dev
+        secretName = AWSSecretNames.RDS_CREDS_DEV
         break
       case Environment.Production:
-        secretName = AWSSecretNames.RDSCredentials_Prod
+        secretName = AWSSecretNames.RDS_CREDS_PROD
         break
       default:
         secretName = undefined

@@ -53,7 +53,7 @@ export class AuthConnection {
         const socketMessage: AuthSyncMessage = {
           ts: DateTime.utc().toMillis(),
           payload: {
-            status: CommunityOperationStatus.Success,
+            status: CommunityOperationStatus.SUCCESS,
             payload: {
               teamId: this.sigChain.team.id,
               message: uint8arrays.toString(message, 'base64'),
@@ -88,12 +88,22 @@ export class AuthConnection {
     })
 
     this.lfaConnection.on('change', payload => {
-      this.logger.log(`Auth state change`)
+      this.logger.verbose(`Auth state change`)
     })
 
     // TODO: store updated sigchain on updates
-    this.lfaConnection.on('updated', head => {
-      this.logger.log('Received sync message, team graph updated', head)
+    this.lfaConnection.on('updated', async head => {
+      this.logger.debug('Received sync message, team graph updated', head)
+      await this.wsOptions.communitiesManager.update(
+        this.sigChain.team.id,
+        { sigChain: this.sigChain.serialize(true) },
+        this.wsOptions,
+        false,
+      )
+    })
+
+    this.lfaConnection.on('message', payload => {
+      this.logger.debug(`LFA message`)
     })
 
     // Handle errors from local or remote sources.

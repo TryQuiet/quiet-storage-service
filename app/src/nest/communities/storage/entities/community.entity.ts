@@ -1,7 +1,7 @@
 import { BaseEntity, Entity, PrimaryKey, Property } from '@mikro-orm/core'
 import { TableNames } from '../../../storage/postgres/const.js'
 
-@Entity({ tableName: TableNames.Communities })
+@Entity({ tableName: TableNames.COMMUNITIES })
 export class Community extends BaseEntity {
   @PrimaryKey()
   id!: string
@@ -9,11 +9,11 @@ export class Community extends BaseEntity {
   @Property()
   name!: string
 
-  @Property()
-  psk!: string
+  @Property({ type: 'bytea', columnType: 'bytea' })
+  psk!: Buffer
 
-  @Property({ type: 'array' })
-  peerList!: string[]
+  @Property({ type: 'bytea', columnType: 'bytea' })
+  peerList!: Buffer
 
   @Property({ type: 'bytea', columnType: 'bytea' })
   sigChain!: Buffer // this is a hex string

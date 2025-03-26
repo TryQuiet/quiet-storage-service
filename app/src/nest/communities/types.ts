@@ -4,9 +4,9 @@ import type { AuthConnection } from './auth/auth.connection.js'
 import type { CommunitiesHandlerOptions } from './websocket/types/index.js'
 
 export enum AllowedServerKeyState {
-  Any = 'Any',
-  StoredOnly = 'StoredOnly',
-  NotStored = 'NotStored',
+  ANY = 'Any',
+  STORED_ONLY = 'StoredOnly',
+  NOT_STORED = 'NotStored',
 }
 
 export interface Community {
@@ -17,15 +17,28 @@ export interface Community {
   sigChain: string
 }
 
+export interface EncryptedCommunity {
+  teamId: string
+  name: string
+  peerList: string
+  psk: string
+  sigChain: string
+}
+
 export interface CreatedCommunity {
   community: Community
   serverKeys: Keyset
 }
 
 export type CommunityUpdate = Omit<Partial<Community>, 'teamId'>
+export type EncryptedCommunityUpdate = Omit<
+  Partial<EncryptedCommunity>,
+  'teamId'
+>
 
 export interface ManagedCommunity {
   teamId: string
+  community: Community
   sigChain: SigChain
   authConnection?: AuthConnection
   wsOptions: CommunitiesHandlerOptions

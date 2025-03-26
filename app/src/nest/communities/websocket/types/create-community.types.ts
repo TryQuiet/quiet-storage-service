@@ -15,8 +15,8 @@ export interface CreateCommunity {
 }
 
 export enum CreateCommunityStatus {
-  Error = 'error',
-  Success = 'success',
+  ERROR = 'error',
+  SUCCESS = 'success',
 }
 
 export interface CreateCommunityResponsePayload

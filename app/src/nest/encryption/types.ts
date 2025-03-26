@@ -1,8 +1,8 @@
 import { CompoundError } from '../types.js'
 
 export enum Base64ErrorDirection {
-  To = 'to',
-  From = 'from',
+  TO = 'to',
+  FROM = 'from',
 }
 
 export class EncryptionBase64Error<T extends Error> extends CompoundError<T> {
@@ -11,7 +11,7 @@ export class EncryptionBase64Error<T extends Error> extends CompoundError<T> {
   }
 
   private static chooseMessage(direction: Base64ErrorDirection): string {
-    if (direction === Base64ErrorDirection.To) {
+    if (direction === Base64ErrorDirection.TO) {
       return `Failed to convert encrypted bytes to base64`
     }
 
@@ -23,12 +23,15 @@ export class EncryptionError<T extends Error> extends CompoundError<T> {}
 export class DecryptionError<T extends Error> extends CompoundError<T> {}
 export class KeyGenError<T extends Error> extends CompoundError<T> {}
 
-export enum StoredKeyRingType {
-  ServerKeyring = 'SERVER_KEYRING',
-  TeamKeyring = 'TEAM_KEYRING',
-}
-export interface StoredKeyring {
-  keyring: string
+export interface EncryptedPayload {
   nonce: string
+  payload: string
+}
+
+export enum StoredKeyRingType {
+  SERVER_KEYRING = '139f',
+  TEAM_KEYRING = 'ab60',
+}
+export interface StoredKeyring extends EncryptedPayload {
   type: StoredKeyRingType
 }

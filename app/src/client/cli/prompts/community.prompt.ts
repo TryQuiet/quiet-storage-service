@@ -153,7 +153,7 @@ const createCommunity = async (
     message,
     true,
   )
-  if (response!.payload.status !== CreateCommunityStatus.Success) {
+  if (response!.payload.status !== CreateCommunityStatus.SUCCESS) {
     logger.error(`Failed to create a community!`, response!.payload.reason)
     return undefined
   }
@@ -224,7 +224,7 @@ const updateCommunity = async (
     message,
     true,
   )
-  if (response!.payload.status !== CommunityOperationStatus.Success) {
+  if (response!.payload.status !== CommunityOperationStatus.SUCCESS) {
     logger.error(
       `Failed to create a community with status ${response!.payload.status}!`,
       response!.payload.reason,
@@ -260,7 +260,7 @@ const getCommunity = async (
     message,
     true,
   )
-  if (response!.payload.status !== CommunityOperationStatus.Success) {
+  if (response!.payload.status !== CommunityOperationStatus.SUCCESS) {
     logger.error(
       `Failed to get a community with ID ${teamId}!`,
       response!.payload.reason,

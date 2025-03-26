@@ -6,10 +6,10 @@ export const DEFAULT_POSTGRES_USERNAME = 'postgres'
 export const DEFAULT_POSTGRES_PASSWORD = 'postgres'
 
 export enum TableNames {
-  Communities = 'communities',
+  COMMUNITIES = 'communities',
 }
 
 export enum PostgresSources {
-  Local = 'local',
+  LOCAL = 'local',
   RDS = 'rds',
 }

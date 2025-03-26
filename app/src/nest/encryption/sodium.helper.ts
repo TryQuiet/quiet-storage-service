@@ -36,7 +36,7 @@ export class SodiumHelper {
     try {
       return this.sodium.from_base64(base64Payload)
     } catch (e) {
-      throw new EncryptionBase64Error(Base64ErrorDirection.From, e as Error)
+      throw new EncryptionBase64Error(Base64ErrorDirection.FROM, e as Error)
     }
   }
 
@@ -51,7 +51,7 @@ export class SodiumHelper {
     try {
       return this.sodium.to_base64(bytes)
     } catch (e) {
-      throw new EncryptionBase64Error(Base64ErrorDirection.To, e as Error)
+      throw new EncryptionBase64Error(Base64ErrorDirection.TO, e as Error)
     }
   }
 }

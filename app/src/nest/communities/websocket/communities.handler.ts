@@ -58,7 +58,7 @@ export function registerCommunitiesHandlers(
       response = {
         ts: DateTime.utc().toMillis(),
         payload: {
-          status: CreateCommunityStatus.Success,
+          status: CreateCommunityStatus.SUCCESS,
         },
       }
       const encryptedResponse = options.encryption.encrypt(
@@ -82,7 +82,7 @@ export function registerCommunitiesHandlers(
       const response: CreateCommunityResponse = {
         ts: DateTime.utc().toMillis(),
         payload: {
-          status: CreateCommunityStatus.Error,
+          status: CreateCommunityStatus.ERROR,
           reason,
         },
       }
@@ -113,7 +113,7 @@ export function registerCommunitiesHandlers(
         const notFoundResponse: CommunitySignInMessage = {
           ts: DateTime.utc().toMillis(),
           payload: {
-            status: CommunityOperationStatus.NotFound,
+            status: CommunityOperationStatus.NOT_FOUND,
             reason: `No community found for ${teamId}`,
           },
         }
@@ -133,7 +133,7 @@ export function registerCommunitiesHandlers(
       const response: CommunitySignInMessage = {
         ts: DateTime.utc().toMillis(),
         payload: {
-          status: CommunityOperationStatus.Success,
+          status: CommunityOperationStatus.SUCCESS,
         },
       }
       const encryptedResponse = options.encryption.encrypt(
@@ -157,7 +157,7 @@ export function registerCommunitiesHandlers(
       const response: CommunitySignInMessage = {
         ts: DateTime.utc().toMillis(),
         payload: {
-          status: CommunityOperationStatus.Error,
+          status: CommunityOperationStatus.ERROR,
           reason,
         },
       }
@@ -175,26 +175,16 @@ export function registerCommunitiesHandlers(
         options.sessionKey,
         true,
       ) as UpdateCommunity
-      const written = await options.storage.updateCommunity(
+      await options.communitiesManager.update(
         message.payload.teamId,
         message.payload.updates,
+        options,
       )
-      let response: UpdateCommunityResponse | undefined = undefined
-      if (!written) {
-        response = {
-          ts: DateTime.utc().toMillis(),
-          payload: {
-            status: CommunityOperationStatus.Error,
-            reason: 'Failed to write to storage',
-          },
-        }
-      } else {
-        response = {
-          ts: DateTime.utc().toMillis(),
-          payload: {
-            status: CommunityOperationStatus.Success,
-          },
-        }
+      const response: UpdateCommunityResponse = {
+        ts: DateTime.utc().toMillis(),
+        payload: {
+          status: CommunityOperationStatus.SUCCESS,
+        },
       }
       const encryptedResponse = options.encryption.encrypt(
         response,
@@ -217,7 +207,7 @@ export function registerCommunitiesHandlers(
       const response: UpdateCommunityResponse = {
         ts: DateTime.utc().toMillis(),
         payload: {
-          status: CommunityOperationStatus.Error,
+          status: CommunityOperationStatus.ERROR,
           reason,
         },
       }
@@ -235,13 +225,16 @@ export function registerCommunitiesHandlers(
         options.sessionKey,
         true,
       ) as GetCommunity
-      const community = await options.storage.getCommunity(message.payload.id)
+      const managedCommunity = await options.communitiesManager.get(
+        message.payload.id,
+        options,
+      )
       let response: GetCommunityResponse | undefined = undefined
-      if (community == null) {
+      if (managedCommunity == null) {
         response = {
           ts: DateTime.utc().toMillis(),
           payload: {
-            status: CommunityOperationStatus.NotFound,
+            status: CommunityOperationStatus.NOT_FOUND,
             reason: 'No community found in storage',
           },
         }
@@ -249,8 +242,8 @@ export function registerCommunitiesHandlers(
         response = {
           ts: DateTime.utc().toMillis(),
           payload: {
-            status: CommunityOperationStatus.Success,
-            payload: community,
+            status: CommunityOperationStatus.SUCCESS,
+            payload: managedCommunity.community,
           },
         }
       }
@@ -275,7 +268,7 @@ export function registerCommunitiesHandlers(
       const response: GetCommunityResponse = {
         ts: DateTime.utc().toMillis(),
         payload: {
-          status: CommunityOperationStatus.Error,
+          status: CommunityOperationStatus.ERROR,
           reason,
         },
       }
