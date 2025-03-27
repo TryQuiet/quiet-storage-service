@@ -6,6 +6,7 @@ import {
   Server,
   Team,
 } from '@localfirst/auth'
+import { SigChain } from '../../src/nest/communities/auth/sigchain.js'
 
 export interface TestSockets {
   client: ClientSocket
@@ -17,4 +18,9 @@ export interface TestTeam {
   server: Server
   serverKeys: KeysetWithSecrets
   testUserContext: LocalUserContext
+}
+
+export interface SigChainWithTestTeam {
+  testTeam: TestTeam
+  sigchain: SigChain
 }

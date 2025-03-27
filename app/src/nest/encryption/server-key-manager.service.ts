@@ -30,6 +30,7 @@ export class ServerKeyManagerService {
 
     try {
       const secretName = this._generateSecretName(id, type)
+      this.logger.log(`Storing keyring`, secretName)
       const encPayload = await this.encrypt(keyring)
       const secret: StoredKeyring = {
         ...encPayload,

@@ -34,9 +34,6 @@ describe('CommunitesStorageService', () => {
 
   afterEach(async () => {
     await communitesStorageService?.clearRepository()
-  })
-
-  afterAll(async () => {
     await module?.close()
   })
 

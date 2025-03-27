@@ -67,6 +67,14 @@ export class RedisClient implements OnModuleInit {
     await this.client.set(key, putValue)
   }
 
+  public async flush(): Promise<void> {
+    if (this.client == null) {
+      throw new Error(`Redis is enabled but client is undefined!`)
+    }
+
+    await this.client.flushdb()
+  }
+
   public get initialized(): boolean {
     return this.client != null && this.client.status === 'ready'
   }

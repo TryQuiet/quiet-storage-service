@@ -104,16 +104,17 @@ export class CommunitiesManagerService {
   ): Promise<CreatedCommunity> {
     this.logger.log(`Adding new community for ID ${community.teamId}`)
     try {
+      const serializedTeamKeyring = uint8arrays.fromString(
+        teamKeyring,
+        'base64',
+      )
       const deserializedTeamKeyring: Keyring = JSON.parse(
-        uint8arrays.toString(
-          uint8arrays.fromString(teamKeyring, 'base64'),
-          'utf8',
-        ),
+        uint8arrays.toString(serializedTeamKeyring, 'utf8'),
       ) as Keyring
       this.logger.verbose(`Storing team keyset`)
       await this.serverKeyManager.storeKeyring(
         community.teamId,
-        uint8arrays.fromString(teamKeyring, 'base64'),
+        serializedTeamKeyring,
         StoredKeyRingType.TEAM_KEYRING,
       )
       this.logger.verbose(`Storing community metadata`)

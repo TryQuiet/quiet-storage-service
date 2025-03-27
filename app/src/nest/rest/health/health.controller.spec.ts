@@ -21,7 +21,7 @@ describe('HealthController', () => {
     controller = module.get<HealthController>(HealthController)
   })
 
-  afterAll(async () => {
+  afterEach(async () => {
     await module?.close()
   })
 

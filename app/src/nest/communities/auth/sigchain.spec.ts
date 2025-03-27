@@ -24,6 +24,10 @@ describe('SigChain', () => {
     testTeamUtils = new TeamTestUtils(serverKeyManager)
   })
 
+  afterEach(async () => {
+    await module?.close()
+  })
+
   it('should be defined', () => {
     expect(module).toBeDefined()
     expect(serverKeyManager).toBeDefined()
@@ -35,8 +39,7 @@ describe('SigChain', () => {
       throw new Error(`Didn't initialize team test utils!`)
     }
 
-    const testTeam: TestTeam =
-      (await testTeamUtils.createTestTeam()) as TestTeam
+    const testTeam: TestTeam = await testTeamUtils.createTestTeam()
     const sigchain = SigChain.create(
       testTeam.team.save(),
       { server: testTeam.server },
@@ -50,8 +53,7 @@ describe('SigChain', () => {
       throw new Error(`Didn't initialize team test utils!`)
     }
 
-    const testTeam: TestTeam =
-      (await testTeamUtils.createTestTeam()) as TestTeam
+    const testTeam: TestTeam = await testTeamUtils.createTestTeam()
     const sigchain = SigChain.create(
       testTeam.team.save(),
       { server: testTeam.server },
