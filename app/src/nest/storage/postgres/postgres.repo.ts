@@ -39,12 +39,12 @@ export class PostgresRepo<T extends BaseEntity> {
   public async update(id: string, updates: EntityData<T>): Promise<boolean> {
     try {
       this.logger.log(`Updating row by ID ${id}`)
-      await this.entityManager.transactional(async em => {
+      const result = await this.entityManager.transactional(async em => {
         const repo = em.getRepository(this.entityName)
         // @ts-expect-error this is just dumb generic nonsense
-        await repo.nativeUpdate({ id: { $eq: id } }, updates)
+        return await repo.nativeUpdate({ id: { $eq: id } }, updates)
       })
-      return true
+      return result > 0
     } catch (e) {
       this.logger.error(`Error while updating row for ID ${id}`, e)
       return false

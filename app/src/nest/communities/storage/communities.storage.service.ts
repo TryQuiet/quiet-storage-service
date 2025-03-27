@@ -42,8 +42,10 @@ export class CommunitiesStorageService implements OnModuleInit {
   ): Promise<boolean> {
     try {
       this.logger.log(`Updating community with ID ${teamId}`)
-      await this.repository.update(teamId, this.payloadToEntityData(payload))
-      return true
+      return await this.repository.update(
+        teamId,
+        this.payloadToEntityData(payload),
+      )
     } catch (e) {
       this.logger.error(`Error while writing community to storage`, e)
       return false
@@ -60,6 +62,11 @@ export class CommunitiesStorageService implements OnModuleInit {
       return undefined
     }
     return this.entityToPayload(result)
+  }
+
+  public async clearRepository(): Promise<void> {
+    this.logger.warn(`Clearing the communities respository!`)
+    await this.orm.getSchemaGenerator().clearDatabase()
   }
 
   private payloadToEntity(payload: EncryptedCommunity): CommunityEntity {
