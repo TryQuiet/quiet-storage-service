@@ -16,6 +16,7 @@ describe('HealthController', () => {
     module = await Test.createTestingModule({
       imports: [HealthModule, StorageModule, ConfigModule, TerminusModule],
     }).compile()
+    await module.init()
 
     controller = module.get<HealthController>(HealthController)
   })
