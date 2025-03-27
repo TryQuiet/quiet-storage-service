@@ -1,4 +1,3 @@
-import '@dotenvx/dotenvx/config' // load config from .env* file(s)
 import { EnvVars } from './env_vars.js'
 import { Injectable } from '@nestjs/common'
 import { Environment, EnvironmentShort } from './types.js'

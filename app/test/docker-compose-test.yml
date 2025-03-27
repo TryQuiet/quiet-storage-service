@@ -1,0 +1,26 @@
+services:
+  postgres-test:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: qss
+    ports:
+      - "5433:5432"
+      
+  redis-test:
+    image: "redis/redis-stack:latest"
+    ports:
+      - "6380:6379"
+      - "8002:8001"
+    volumes:
+      - redis_data_test:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  redis_data_test:
+    driver: local

@@ -38,3 +38,4 @@ lerna-debug.log*
 /app/volume
 /bootstrapper/node_modules/
 /auth-packages
+logs-test

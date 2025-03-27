@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { CommunityStorageService } from './storage/communities.storage.service.js'
+import { CommunitiesStorageService } from './storage/communities.storage.service.js'
 import { createLogger } from '../app/logger/logger.js'
 import {
   AllowedServerKeyState,
@@ -40,7 +40,7 @@ export class CommunitiesManagerService {
 
   constructor(
     @Inject(HOSTNAME) private readonly hostname: string,
-    private readonly storage: CommunityStorageService,
+    private readonly storage: CommunitiesStorageService,
     private readonly serverKeyManager: ServerKeyManagerService,
   ) {}
 

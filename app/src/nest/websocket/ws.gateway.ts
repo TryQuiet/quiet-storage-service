@@ -23,7 +23,7 @@ import { WebsocketEncryptionService } from '../encryption/ws.enc.service.js'
 import sodium, { CryptoKX } from 'libsodium-wrappers-sumo'
 import { createLogger } from '../app/logger/logger.js'
 import { registerCommunitiesHandlers } from '../communities/websocket/communities.handler.js'
-import { CommunityStorageService } from '../communities/storage/communities.storage.service.js'
+import { CommunitiesStorageService } from '../communities/storage/communities.storage.service.js'
 import { DateTime } from 'luxon'
 import { CommunitiesManagerService } from '../communities/communities-manager.service.js'
 import { CommunitiesHandlerOptions } from '../communities/websocket/types/index.js'
@@ -49,7 +49,7 @@ export class WebsocketGateway
 
   constructor(
     private readonly encryption: WebsocketEncryptionService,
-    private readonly communityStorageService: CommunityStorageService,
+    private readonly communityStorageService: CommunitiesStorageService,
     private readonly communitiesManager: CommunitiesManagerService,
   ) {
     this.connections = new Map()

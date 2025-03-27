@@ -10,7 +10,7 @@ import { MikroORM } from '@mikro-orm/postgresql'
 import * as uint8arrays from 'uint8arrays'
 
 @Injectable()
-export class CommunityStorageService implements OnModuleInit {
+export class CommunitiesStorageService implements OnModuleInit {
   private readonly logger = createLogger('Storage:Communities')
   private readonly repository: PostgresRepo<CommunityEntity>
 
@@ -23,7 +23,7 @@ export class CommunityStorageService implements OnModuleInit {
   }
 
   onModuleInit(): void {
-    this.logger.log(`${CommunityStorageService.name} initialized!`)
+    this.logger.log(`${CommunitiesStorageService.name} initialized!`)
   }
 
   public async addCommunity(payload: EncryptedCommunity): Promise<boolean> {

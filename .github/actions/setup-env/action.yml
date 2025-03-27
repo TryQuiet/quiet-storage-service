@@ -1,5 +1,11 @@
 name: Setup environment
 
+inputs:
+  install-docker:
+    description: "If true we will install the docker engine"
+    required: false
+    default: false
+
 runs:
   using: composite
   steps:
@@ -10,6 +16,10 @@ runs:
         
     - name: Install pnpm
       uses: pnpm/action-setup@v4 # pulls version from package.json -> "packageManager"
+
+    - name: Setup Docker
+      if: ${{ inputs.install-docker }}
+      uses: ./.github/actions/setup-docker
 
     - name: Build Submodules
       shell: bash

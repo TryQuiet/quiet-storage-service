@@ -6,7 +6,6 @@ import {
   type NestFastifyApplication,
 } from '@nestjs/platform-fastify'
 import { NestFastifyLogger } from '../../src/nest/app/logger/nest.fastify.logger.js'
-import { Logger } from '@nestjs/common'
 import { Server, Socket as ServerSocket } from 'socket.io'
 import { WebsocketGateway } from '../../src/nest/websocket/ws.gateway.js'
 import { TestSockets } from './types.js'

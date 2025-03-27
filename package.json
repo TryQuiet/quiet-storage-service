@@ -27,6 +27,7 @@
     "start:prod": "pnpm run --filter app start:prod",
     "start:client": "pnpm run --filter app start:client",
     "start:client:dev": "pnpm run --filter app start:client:dev",
+    "run:app": "pnpm run --filter app ",
     "prepare": "husky"
   },
   "devDependencies": {

@@ -87,7 +87,7 @@ const getReplicaConfigs = (): ConnectionOptions[] | undefined => {
 const preferTs = configService.getBool(EnvVars.MIKRO_ORM_PREFER_TS) ?? false
 
 export default defineConfig({
-  dbName: configService.getString(EnvVars.MIKRO_ORM_DB_NAME),
+  dbName: configService.getString(EnvVars.MIKRO_ORM_DB_NAME, 'qss'),
   host: configService.getString(EnvVars.MIKRO_ORM_HOST),
   port: configService.getInt(EnvVars.MIKRO_ORM_PORT),
   user: configService.getString(EnvVars.MIKRO_ORM_USER),
@@ -112,7 +112,6 @@ export default defineConfig({
   migrations: {
     tableName: 'mikro_orm_migrations', // name of database table with log of executed transactions
     path: 'dist/src/migrations', // path to the folder with migrations
-    pathTs: 'src/migrations', // path to the folder with TS migrations (if used, you should put path to compiled files in `path`)
     glob: '!(*.d).{js,ts}', // how to match migration files (all .js and .ts files, but not .d.ts)
     transactional: true, // wrap each migration in a transaction
     disableForeignKeys: true, // wrap statements with `set foreign_key_checks = 0` or equivalent
