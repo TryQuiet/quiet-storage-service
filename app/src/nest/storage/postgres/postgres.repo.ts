@@ -19,7 +19,7 @@ export class PostgresRepo<T extends BaseEntity> {
   public async add(entity: T, upsert = false): Promise<boolean> {
     const operation = upsert ? 'upserting' : 'adding'
     try {
-      this.logger.log(`${operation} row`, entity)
+      this.logger.verbose(`${operation} row`, entity)
       await this.entityManager.transactional(async em => {
         const repo = em.getRepository(this.entityName)
         if (!upsert) {
@@ -38,7 +38,7 @@ export class PostgresRepo<T extends BaseEntity> {
 
   public async update(id: string, updates: EntityData<T>): Promise<boolean> {
     try {
-      this.logger.log(`Updating row by ID ${id}`)
+      this.logger.verbose(`Updating row by ID ${id}`)
       const result = await this.entityManager.transactional(async em => {
         const repo = em.getRepository(this.entityName)
         // @ts-expect-error this is just dumb generic nonsense
@@ -53,7 +53,7 @@ export class PostgresRepo<T extends BaseEntity> {
 
   public async findOne(id: string): Promise<T | undefined | null> {
     try {
-      this.logger.log(`Finding one with ID ${id}`)
+      this.logger.verbose(`Finding one with ID ${id}`)
       let result: T | undefined = undefined
       await this.entityManager.transactional(async em => {
         const repo = em.getRepository(this.entityName)

@@ -1,4 +1,8 @@
-import { ConsoleLogger, type ConsoleLoggerOptions } from '@nestjs/common'
+import {
+  ConsoleLogger,
+  type LogLevel,
+  type ConsoleLoggerOptions,
+} from '@nestjs/common'
 import winston, { format, type Logger, transports } from 'winston'
 import 'winston-daily-rotate-file'
 import type { CompoundError } from '../../types.js'
@@ -8,23 +12,25 @@ import { EnvVars } from '../../utils/config/env_vars.js'
 import {
   CLOUDWATCH_LOG_GROUP,
   CLOUDWATCH_LOG_STREAM_BASE_NAME,
-  DEFAULT_LOG_LEVELS,
+  DEFAULT_LOG_LEVEL,
 } from './const.js'
 import path from 'path'
 // @ts-expect-error no types for this package
 import CloudWatchTransport from 'winston-aws-cloudwatch'
 import { Environment } from '../../utils/config/types.js'
+import _ from 'lodash'
 
 export const createWinstonLogger = (
   context?: string,
 ): QuietWinstonNestLogger => {
+  const logLevel = ConfigService.instance.getString(
+    EnvVars.LOG_LEVEL,
+    DEFAULT_LOG_LEVEL,
+  ) as LogLevel
   const logger = new QuietWinstonNestLogger(context, {
-    logLevels: ConfigService.instance.getList(
-      'string',
-      EnvVars.LOG_LEVELS,
-      DEFAULT_LOG_LEVELS,
-    ),
+    logLevels: [logLevel],
   })
+
   return logger
 }
 
@@ -111,7 +117,9 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
       defaultMeta: {
         context: this.context,
       },
-      level: 'silly',
+      level: QuietWinstonNestLogger._nestToWinstonLogLevel(
+        this.options.logLevels ?? [DEFAULT_LOG_LEVEL],
+      ),
       transports: ourTransports,
     })
   }
@@ -242,5 +250,39 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
     return (
       possibleError.stack ?? `${possibleError.name}: ${possibleError.message}`
     )
+  }
+
+  private static _nestToWinstonLogLevel(nestLogLevels: LogLevel[]): string {
+    const winstonLogLevels: number[] = []
+    for (const nestLevel of nestLogLevels) {
+      let winstonLevel: number | undefined = undefined
+      switch (nestLevel) {
+        case 'verbose':
+          winstonLevel = winston.config.cli.levels.verbose
+          break
+        case 'debug':
+          winstonLevel = winston.config.cli.levels.debug
+          break
+        case 'log':
+          winstonLevel = winston.config.cli.levels.info
+          break
+        case 'warn':
+          winstonLevel = winston.config.cli.levels.warn
+          break
+        case 'error':
+          winstonLevel = winston.config.cli.levels.error
+          break
+        case 'fatal':
+          winstonLevel = winston.config.cli.levels.error
+          break
+      }
+      winstonLogLevels.push(winstonLevel)
+    }
+    const maxLevel = Math.max(...winstonLogLevels)
+    const level = _.findKey(
+      winston.config.cli.levels,
+      (numericLevel: number) => numericLevel === maxLevel,
+    )
+    return level!
   }
 }
