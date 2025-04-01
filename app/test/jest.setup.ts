@@ -14,6 +14,10 @@ jest.setTimeout(30_000)
 
 const logger = createLogger(`Test:Setup`)
 
+beforeEach(() => {
+  logger.log(`###### ${expect.getState().currentTestName}`)
+})
+
 beforeAll(async () => {
   if (!ConfigService.getBool(EnvVars.IS_E2E, false)) {
     logger.warn(`Running unit-test only test setup`)

@@ -16,7 +16,7 @@ import { DateTime } from 'luxon'
 export class WebsocketClient {
   public clientSocket: ClientSocket | undefined = undefined
   private keyPair: KeyPair | undefined = undefined
-  private sessionKey: CryptoKX | undefined = undefined
+  public sessionKey: CryptoKX | undefined = undefined
 
   private readonly logger = createLogger(WebsocketClient.name)
 

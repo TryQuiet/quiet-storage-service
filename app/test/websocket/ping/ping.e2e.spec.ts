@@ -26,10 +26,6 @@ describe('Ping', () => {
     sockets = await TestUtils.connectClient()
   })
 
-  beforeEach(() => {
-    logger.log(`###### ${expect.getState().currentTestName}`)
-  })
-
   afterEach(async () => {
     // each test need to release the connection for next
     await TestUtils.close()
