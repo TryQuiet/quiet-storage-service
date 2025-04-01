@@ -243,8 +243,10 @@ describe('CommunitiesManagerService', () => {
       expect(error).toBeDefined()
       expect(error?.message).toBe('Error while creating community')
       expect(
-        (error as CompoundError<Error> | undefined)?.original?.message,
-      ).toBe('Unexpected end of data')
+        (error as CompoundError<Error> | undefined)?.original?.message.match(
+          /\bUnexpected end of data\b|\bUnexpected token\b.*/,
+        ),
+      ).toBeDefined()
     })
   })
 

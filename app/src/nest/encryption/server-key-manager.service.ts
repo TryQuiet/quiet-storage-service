@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, OnModuleDestroy } from '@nestjs/common'
 import { createLogger } from '../app/logger/logger.js'
 import { AWSSecretsService } from '../utils/aws/aws-secrets.service.js'
 import { AWSSecretNames } from '../utils/aws/const.js'
@@ -9,7 +9,7 @@ import { SodiumHelper } from './sodium.helper.js'
 import { EnvironmentShort } from '../utils/config/types.js'
 
 @Injectable()
-export class ServerKeyManagerService {
+export class ServerKeyManagerService implements OnModuleDestroy {
   private readonly serverKeysets = new Map<string, Uint8Array>()
   private serverEncKey: Uint8Array | undefined = undefined
 
@@ -18,7 +18,6 @@ export class ServerKeyManagerService {
   constructor(
     private readonly awsSecretsService: AWSSecretsService,
     public readonly sodiumHelper: SodiumHelper,
-    private readonly configService: ConfigService,
   ) {}
 
   public async storeKeyring(
@@ -129,6 +128,14 @@ export class ServerKeyManagerService {
     return this.sodiumHelper.sodium.randombytes_buf(byteLength, type as any)
   }
 
+  public async close(): Promise<void> {
+    await this.awsSecretsService.close()
+  }
+
+  public async onModuleDestroy(): Promise<void> {
+    await this.close()
+  }
+
   private async _initServerKeys(): Promise<void> {
     this.logger.verbose(`Checking if server encryption key is initialized`)
     if (this.serverEncKey != null) {
@@ -171,11 +178,11 @@ export class ServerKeyManagerService {
   }
 
   private _generateSecretName(id: string, type: StoredKeyRingType): string {
-    return `qss!${this.configService.getEnvShort()}-te-${type}-${this.sodiumHelper.sodium.crypto_hash_sha512(`${id}-${type}`, 'base64')}`
+    return `qss!${ConfigService.getEnvShort()}-te-${type}-${this.sodiumHelper.sodium.crypto_hash_sha512(`${id}-${type}`, 'base64')}`
   }
 
   private _getServerEncKeySecretName(): string {
-    switch (this.configService.getEnvShort()) {
+    switch (ConfigService.getEnvShort()) {
       case EnvironmentShort.Dev:
         return AWSSecretNames.SERVER_ENC_KEY_DEV
       case EnvironmentShort.Prod:

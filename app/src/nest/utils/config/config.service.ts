@@ -4,18 +4,11 @@ import { Environment, EnvironmentShort } from './types.js'
 
 @Injectable()
 export class ConfigService {
-  private static _instance: ConfigService | undefined = undefined
-
   private constructor() {
     // do nothing
   }
 
-  public static get instance(): ConfigService {
-    ConfigService._instance ??= new ConfigService()
-    return ConfigService._instance
-  }
-
-  public getEnv(): Environment {
+  public static getEnv(): Environment {
     const value = this.getString(EnvVars.ENV)
     if (value == null) {
       throw new Error(`ENV is not set!`)
@@ -38,7 +31,7 @@ export class ConfigService {
     }
   }
 
-  public getEnvShort(): EnvironmentShort {
+  public static getEnvShort(): EnvironmentShort {
     switch (this.getEnv()) {
       case Environment.Development:
         return EnvironmentShort.Dev
@@ -51,7 +44,7 @@ export class ConfigService {
     }
   }
 
-  public getString(
+  public static getString(
     key: string | EnvVars,
     defaultValue?: string,
   ): string | undefined {
@@ -62,7 +55,7 @@ export class ConfigService {
     return rawValue
   }
 
-  public getInt(
+  public static getInt(
     key: string | EnvVars,
     defaultValue?: number,
   ): number | undefined {
@@ -74,7 +67,7 @@ export class ConfigService {
     return parseInt(stringValue)
   }
 
-  public getBool(
+  public static getBool(
     key: string | EnvVars,
     defaultValue?: boolean,
   ): boolean | undefined {
@@ -86,7 +79,7 @@ export class ConfigService {
     return stringValue === 'true'
   }
 
-  public getList<T = string | number | boolean>(
+  public static getList<T = string | number | boolean>(
     type: 'string' | 'number' | 'boolean',
     key: string | EnvVars,
     defaultValue?: T[],

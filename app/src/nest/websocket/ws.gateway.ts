@@ -28,6 +28,7 @@ import { DateTime } from 'luxon'
 import { CommunitiesManagerService } from '../communities/communities-manager.service.js'
 import { CommunitiesHandlerOptions } from '../communities/websocket/types/index.js'
 import { registerCommunitiesAuthHandlers } from '../communities/websocket/auth.handler.js'
+import { OnModuleDestroy } from '@nestjs/common'
 
 @WebSocketGateway({
   transports: ['websocket'],
@@ -38,7 +39,11 @@ import { registerCommunitiesAuthHandlers } from '../communities/websocket/auth.h
   allowEIO3: true,
 })
 export class WebsocketGateway
-  implements OnGatewayInit, OnGatewayConnection<Socket>, OnGatewayDisconnect
+  implements
+    OnGatewayInit,
+    OnGatewayConnection<Socket>,
+    OnGatewayDisconnect,
+    OnModuleDestroy
 {
   private readonly logger = createLogger(WebsocketGateway.name)
   private readonly connections: Map<string, ActiveConnection>
@@ -57,6 +62,10 @@ export class WebsocketGateway
 
   afterInit(): void {
     // Do nothing for now
+  }
+
+  public async onModuleDestroy(): Promise<void> {
+    await this.io.close()
   }
 
   /**

@@ -1,7 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common'
 import { createLogger } from '../../app/logger/logger.js'
 import { EncryptedCommunity, EncryptedCommunityUpdate } from '../types.js'
-import { ConfigService } from '../../utils/config/config.service.js'
 import { Community as CommunityEntity } from './entities/community.entity.js'
 import { EntityData } from '@mikro-orm/core'
 import { PostgresClient } from '../../storage/postgres/postgres.client.js'
@@ -15,7 +14,6 @@ export class CommunitiesStorageService implements OnModuleInit {
   private readonly repository: PostgresRepo<CommunityEntity>
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly postgresClient: PostgresClient,
     private readonly orm: MikroORM,
   ) {

@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals'
 import { Test } from '@nestjs/testing'
-import { TestUtils } from '../../utils/test-utils.js'
+import { TestUtils } from '../../utils/test.utils.js'
 import { WebsocketModule } from '../../../src/nest/websocket/ws.module.js'
 import { TestSockets } from '../../utils/types.js'
 import { WebsocketClientModule } from '../../../src/client/ws.client.module.js'

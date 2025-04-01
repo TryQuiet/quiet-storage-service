@@ -12,12 +12,11 @@ import {
 import { NestFastifyLogger } from '../logger/nest.fastify.logger.js'
 import Fastify, { FastifyInstance } from 'fastify'
 import { FastifyAdapter } from '@nestjs/platform-fastify'
-import { ConfigModule } from '../../utils/config/config.module.js'
 import { ConfigService } from '../../utils/config/config.service.js'
 import { EnvVars } from '../../utils/config/env_vars.js'
 
 @Module({
-  imports: [ConfigModule],
+  imports: [],
   providers: [
     NestFastifyLogger,
     {
@@ -36,24 +35,20 @@ import { EnvVars } from '../../utils/config/env_vars.js'
     },
     {
       provide: LISTEN_PORT,
-      useFactory: (configService: ConfigService) =>
-        configService.getInt(EnvVars.PORT, DEFAULT_LISTEN_PORT),
-      inject: [ConfigService],
+      useFactory: () => ConfigService.getInt(EnvVars.PORT, DEFAULT_LISTEN_PORT),
     },
     {
       provide: HOSTNAME,
-      useFactory: (configService: ConfigService) =>
-        configService.getString(EnvVars.HOSTNAME, DEFAULT_HOSTNAME),
-      inject: [ConfigService],
+      useFactory: () =>
+        ConfigService.getString(EnvVars.HOSTNAME, DEFAULT_HOSTNAME),
     },
     {
       provide: LISTEN_HOSTNAME,
-      useFactory: (configService: ConfigService) =>
-        configService.getString(
+      useFactory: () =>
+        ConfigService.getString(
           EnvVars.LISTEN_HOSTNAME,
           DEFAULT_LISTEN_HOSTNAME,
         ),
-      inject: [ConfigService],
     },
   ],
   exports: [FASTIFY, FASTIFY_ADAPTER, LISTEN_PORT, HOSTNAME, LISTEN_HOSTNAME],

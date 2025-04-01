@@ -14,18 +14,14 @@ import { createLogger } from '../../app/logger/logger.js'
 import { RedisClient } from '../redis/redis.client.js'
 import type { RDSCredentials } from '../../utils/aws/types.js'
 
-const configService = ConfigService.instance
 const logger = createLogger('MikroORM')
 
 const getRdsPassword = async (): Promise<string | undefined> => {
-  const postgresSource = configService.getString(EnvVars.POSTGRES_SOURCE)
+  const postgresSource = ConfigService.getString(EnvVars.POSTGRES_SOURCE)
   if (postgresSource === PostgresSources.RDS) {
-    const awsSecretsService = new AWSSecretsService(
-      configService,
-      new RedisClient(configService),
-    )
+    const awsSecretsService = new AWSSecretsService(new RedisClient())
     let secretName: string | undefined = undefined
-    switch (configService.getEnv()) {
+    switch (ConfigService.getEnv()) {
       case Environment.Development:
         secretName = AWSSecretNames.RDS_CREDS_DEV
         break
@@ -59,8 +55,8 @@ const getRdsPassword = async (): Promise<string | undefined> => {
 }
 
 const getPassword = async (): Promise<string | undefined> => {
-  const postgresSource = configService.getString(EnvVars.POSTGRES_SOURCE)
-  let postgresPassword = configService.getString(EnvVars.MIKRO_ORM_PASSWORD)
+  const postgresSource = ConfigService.getString(EnvVars.POSTGRES_SOURCE)
+  let postgresPassword = ConfigService.getString(EnvVars.MIKRO_ORM_PASSWORD)
   if (postgresSource === PostgresSources.RDS) {
     postgresPassword = await getRdsPassword()
   }
@@ -68,7 +64,7 @@ const getPassword = async (): Promise<string | undefined> => {
 }
 
 const getReplicaConfigs = (): ConnectionOptions[] | undefined => {
-  const replicaHosts = configService.getList(
+  const replicaHosts = ConfigService.getList(
     'string',
     EnvVars.POSTGRES_READ_REPLICA_HOSTS,
   )
@@ -78,19 +74,19 @@ const getReplicaConfigs = (): ConnectionOptions[] | undefined => {
           // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- not sure why this complains
           ({
             host,
-            port: configService.getInt(EnvVars.MIKRO_ORM_PORT),
+            port: ConfigService.getInt(EnvVars.MIKRO_ORM_PORT),
           }) as ConnectionOptions,
       )
     : undefined
 }
 
-const preferTs = configService.getBool(EnvVars.MIKRO_ORM_PREFER_TS) ?? false
+const preferTs = ConfigService.getBool(EnvVars.MIKRO_ORM_PREFER_TS) ?? false
 
 export default defineConfig({
-  dbName: configService.getString(EnvVars.MIKRO_ORM_DB_NAME, 'qss'),
-  host: configService.getString(EnvVars.MIKRO_ORM_HOST),
-  port: configService.getInt(EnvVars.MIKRO_ORM_PORT),
-  user: configService.getString(EnvVars.MIKRO_ORM_USER),
+  dbName: ConfigService.getString(EnvVars.MIKRO_ORM_DB_NAME, 'qss'),
+  host: ConfigService.getString(EnvVars.MIKRO_ORM_HOST),
+  port: ConfigService.getInt(EnvVars.MIKRO_ORM_PORT),
+  user: ConfigService.getString(EnvVars.MIKRO_ORM_USER),
   password: await getPassword(),
   replicas: getReplicaConfigs(),
   connect: true,

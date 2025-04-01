@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common'
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { createLogger } from '../../app/logger/logger.js'
 import {
   BaseEntity,
@@ -10,7 +10,7 @@ import { PostgresRepo } from './postgres.repo.js'
 import { Community } from '../../communities/storage/entities/community.entity.js'
 
 @Injectable()
-export class PostgresClient implements OnModuleInit {
+export class PostgresClient implements OnModuleInit, OnModuleDestroy {
   private readonly repositories = new Map<EntityName<any>, PostgresRepo<any>>()
   private readonly logger = createLogger(`Storage:${PostgresClient.name}`)
 
@@ -52,7 +52,11 @@ export class PostgresClient implements OnModuleInit {
     return repo as PostgresRepo<T>
   }
 
-  public async close(): Promise<void> {
-    await this.orm.close()
+  public async close(force = false): Promise<void> {
+    await this.orm.close(force)
+  }
+
+  public async onModuleDestroy(): Promise<void> {
+    await this.close(true)
   }
 }

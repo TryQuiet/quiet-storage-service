@@ -20,10 +20,7 @@ import { DEFAULT_LOG_LEVEL } from './const.js'
 export const createDefaultLogger = (context?: string): QuietNestLogger => {
   const logger = new QuietNestLogger(context, {
     logLevels: [
-      ConfigService.instance.getString(
-        EnvVars.LOG_LEVEL,
-        DEFAULT_LOG_LEVEL,
-      ) as LogLevel,
+      ConfigService.getString(EnvVars.LOG_LEVEL, DEFAULT_LOG_LEVEL) as LogLevel,
     ],
   })
   return logger

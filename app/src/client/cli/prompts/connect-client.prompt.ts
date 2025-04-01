@@ -24,7 +24,7 @@ const connectClientPrompt = async (
     default:
       overrides?.hostname ??
       options.hostname ??
-      ConfigService.instance.getString(EnvVars.HOSTNAME, DEFAULT_HOSTNAME),
+      ConfigService.getString(EnvVars.HOSTNAME, DEFAULT_HOSTNAME),
     validate: (value: string) => value.length > 0,
   })
 
@@ -33,9 +33,7 @@ const connectClientPrompt = async (
     default:
       overrides?.port.toString() ??
       options.port ??
-      ConfigService.instance
-        .getInt(EnvVars.PORT, DEFAULT_LISTEN_PORT)!
-        .toString(),
+      ConfigService.getInt(EnvVars.PORT, DEFAULT_LISTEN_PORT)!.toString(),
     validate: (value: string) => Number(value) > 0,
   })
   const listenPort = Number(listenPortString)

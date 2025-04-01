@@ -25,20 +25,17 @@ export class AWSSecretsService {
 
   private readonly logger = createLogger(`Utils:${AWSSecretsService.name}`)
 
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly redisClient: RedisClient,
-  ) {
+  constructor(private readonly redisClient: RedisClient) {
     this.logger.log(`Creating ${AWSSecretsService.name}`)
-    this.awsRegion = this.configService.getString(EnvVars.AWS_REGION)
+    this.awsRegion = ConfigService.getString(EnvVars.AWS_REGION)
     if (
       [Environment.Development, Environment.Production].includes(
-        this.configService.getEnv(),
+        ConfigService.getEnv(),
       )
     ) {
       this.local = false
       this.logger.warn(
-        `Creating ${this.configService.getEnv()} ${AWSSecretsService.name}`,
+        `Creating ${ConfigService.getEnv()} ${AWSSecretsService.name}`,
       )
       if (this.awsRegion == null) {
         throw new Error(
@@ -107,6 +104,12 @@ export class AWSSecretsService {
     } catch (e) {
       this.logger.error('Error putting secret:', e)
       throw new CompoundError('Error putting secret into AWS', e as Error)
+    }
+  }
+
+  public async close(): Promise<void> {
+    if (this.redisClient.enabled) {
+      await this.redisClient.close()
     }
   }
 

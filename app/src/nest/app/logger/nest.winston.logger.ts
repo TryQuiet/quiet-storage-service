@@ -23,7 +23,7 @@ import _ from 'lodash'
 export const createWinstonLogger = (
   context?: string,
 ): QuietWinstonNestLogger => {
-  const logLevel = ConfigService.instance.getString(
+  const logLevel = ConfigService.getString(
     EnvVars.LOG_LEVEL,
     DEFAULT_LOG_LEVEL,
   ) as LogLevel
@@ -46,7 +46,7 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
         : super(context)
       : super()
     this.context = context
-    this.logDir = ConfigService.instance.getString(EnvVars.LOG_DIR, 'logs/')!
+    this.logDir = ConfigService.getString(EnvVars.LOG_DIR, 'logs/')!
     this.winstonLogger = this.initWinston()
   }
 
@@ -85,27 +85,23 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
     ]
 
     if (
-      ConfigService.instance.getBool(EnvVars.CLOUDWATCH_LOGS_ENABLED, false) ??
+      ConfigService.getBool(EnvVars.CLOUDWATCH_LOGS_ENABLED, false) ??
       false
     ) {
       ourTransports.push(
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is typing nonsense
         new CloudWatchTransport({
           logGroupName: CLOUDWATCH_LOG_GROUP,
-          logStreamName: `${CLOUDWATCH_LOG_STREAM_BASE_NAME}-${ConfigService.instance.getEnv() === Environment.Production ? 'prod' : 'dev'}`,
+          logStreamName: `${CLOUDWATCH_LOG_STREAM_BASE_NAME}-${ConfigService.getEnv() === Environment.Production ? 'prod' : 'dev'}`,
           createLogGroup: true,
           createLogStream: true,
           submissionInterval: 2000,
           submissionRetryCount: 1,
           batchSize: 20,
           awsConfig: {
-            accessKeyId: ConfigService.instance.getString(
-              EnvVars.AWS_ACCESS_KEY_ID,
-            ),
-            secretAccessKey: ConfigService.instance.getString(
-              EnvVars.AWS_SECRET_KEY,
-            ),
-            region: ConfigService.instance.getString(EnvVars.AWS_REGION),
+            accessKeyId: ConfigService.getString(EnvVars.AWS_ACCESS_KEY_ID),
+            secretAccessKey: ConfigService.getString(EnvVars.AWS_SECRET_KEY),
+            region: ConfigService.getString(EnvVars.AWS_REGION),
           },
           formatLog: (item: { level: any; message: any; meta: unknown }) =>
             `${item.level}: [${this.context}] ${item.message} ${JSON.stringify(item.meta)}`,

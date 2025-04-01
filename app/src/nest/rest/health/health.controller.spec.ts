@@ -3,7 +3,6 @@ import { HealthController } from './health.controller.js'
 import { HealthModule } from './health.module.js'
 import { type HealthCheckResult, TerminusModule } from '@nestjs/terminus'
 import { StorageModule } from '../../storage/storage.module.js'
-import { ConfigModule } from '../../utils/config/config.module.js'
 import _ from 'lodash'
 import { PostgresClient } from '../../storage/postgres/postgres.client.js'
 import type { ServiceUnavailableException } from '@nestjs/common'
@@ -14,7 +13,7 @@ describe('HealthController', () => {
 
   beforeEach(async () => {
     module = await Test.createTestingModule({
-      imports: [HealthModule, StorageModule, ConfigModule, TerminusModule],
+      imports: [HealthModule, StorageModule, TerminusModule],
     }).compile()
     await module.init()
 

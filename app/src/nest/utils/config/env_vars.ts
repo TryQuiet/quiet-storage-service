@@ -1,6 +1,7 @@
 export enum EnvVars {
   // general settings
   ENV = 'ENV',
+  IS_E2E = 'IS_E2E',
 
   // logger settings
   LOG_LEVEL = 'LOG_LEVEL',

@@ -7,10 +7,7 @@ export const createLogger = (
   context?: string,
   useWinston?: boolean,
 ): QuietLogger => {
-  if (
-    useWinston ??
-    ConfigService.instance.getBool('USE_WINSTON_LOGGER', true)!
-  ) {
+  if (useWinston ?? ConfigService.getBool('USE_WINSTON_LOGGER', true)!) {
     return createWinstonLogger(context)
   }
 

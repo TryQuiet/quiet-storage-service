@@ -2,7 +2,6 @@ import { Test, type TestingModule } from '@nestjs/testing'
 import { CommunitiesStorageService } from './communities.storage.service.js'
 import { CommunitiesModule } from '../communities.module.js'
 import { StorageModule } from '../../storage/storage.module.js'
-import { ConfigModule } from '../../utils/config/config.module.js'
 import type { EncryptedCommunity, EncryptedCommunityUpdate } from '../types.js'
 import { SodiumHelper } from '../../encryption/sodium.helper.js'
 import { EncryptionModule } from '../../encryption/enc.module.js'
@@ -17,12 +16,7 @@ describe('CommunitesStorageService', () => {
 
   beforeEach(async () => {
     module = await Test.createTestingModule({
-      imports: [
-        CommunitiesModule,
-        StorageModule,
-        ConfigModule,
-        EncryptionModule,
-      ],
+      imports: [CommunitiesModule, StorageModule, EncryptionModule],
     }).compile()
     await module.init()
 

@@ -28,6 +28,6 @@
   ],
   "ts-node": {
     "esm": true,
-    "transpileOnly": true
+    "transpileOnly": false
   }
 }
