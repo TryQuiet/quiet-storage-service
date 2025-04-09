@@ -38,7 +38,7 @@ services:
       - redis-qss-quiet
     build:
       context: ..
-      dockerfile: dockerfile
+      dockerfile: Dockerfile
     ports:
       - "3003:3003"
 
