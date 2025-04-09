@@ -13,6 +13,7 @@
   "scripts": {
     "bootstrap": "cd bootstrapper && pnpm --ignore-workspace run bootstrap-app",
     "install:deps": "pnpm i --shamefully-hoist",
+    "install:deps:frozen": "pnpm i --shamefully-hoist --frozen-lockfile",
     "build": "pnpm --stream -r build",
     "format": "pnpm run --filter app format",
     "format:fix": "pnpm run --filter app format:fix",
@@ -23,6 +24,7 @@
     "lint-staged": "pnpm run --filter app lint-staged",
     "migrate": "pnpm run --filter app migrate:create",
     "start": "pnpm run --filter app start",
+    "start:bare": "pnpm run --filter app start:bare",
     "start:dev": "pnpm run --filter app start:dev",
     "start:prod": "pnpm run --filter app start:prod",
     "start:client": "pnpm run --filter app start:client",

@@ -30,6 +30,7 @@
     "migrate:up:dev": "dotenvx run -f .env.dev -- npx mikro-orm migration:up --config dist/src/nest/storage/postgres/mikro-orm.postgres.config.js",
     "migrate:up:prod": "dotenvx run -f .env.prod -- npx mikro-orm migration:up --config dist/src/nest/storage/postgres/mikro-orm.postgres.config.js",
     "migrate:up:test": "dotenvx run -f .env.test -- npx mikro-orm-esm migration:up --config src/nest/storage/postgres/mikro-orm.postgres.config.ts",
+    "start:bare": "dotenvx run -f .env.local.docker -- nest start dist/src --watch",
     "start": "pnpm run docker:up && pnpm run migrate:up && dotenvx run -f .env.local -- nest start dist/src --watch",
     "start:debug": "pnpm run migrate:up && pnpm run docker:up && dotenvx run -f .env.local -- nest start dist/src --debug --watch",
     "start:dev": "dotenvx run -f .env.dev -- node dist/src/main.js",
