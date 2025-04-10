@@ -109,15 +109,17 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
       )
     }
 
-    return winston.createLogger({
+    const logger = winston.createLogger({
       defaultMeta: {
         context: this.context,
       },
       level: QuietWinstonNestLogger._nestToWinstonLogLevel(
         this.options.logLevels ?? [DEFAULT_LOG_LEVEL],
       ),
+      levels: winston.config.cli.levels,
       transports: ourTransports,
     })
+    return logger
   }
 
   public extend(context: string): QuietWinstonNestLogger {

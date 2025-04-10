@@ -102,7 +102,7 @@ export default defineConfig({
   baseDir: process.cwd(),
   preferTs,
   logger: (message: string): void => {
-    logger.debug(message)
+    logger.verbose(message)
   },
   debug: true,
   migrations: {
