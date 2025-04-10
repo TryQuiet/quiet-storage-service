@@ -70,7 +70,7 @@ describe('Communities', () => {
       storage,
       sessionKey,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is ok
-      socket: new MockedSocket() as Socket,
+      socket: new MockedSocket() as unknown as Socket,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- this doesn't get used anywhere in this code
       socketServer: {} as any,
     }
@@ -94,10 +94,10 @@ describe('Communities', () => {
     )
   })
 
-  afterAll(async () => {
-    // each test need to release the connection for next
-    await TestUtils.close()
-  })
+  // afterAll(async () => {
+  //   // each test need to release the connection for next
+  //   await TestUtils.close()
+  // })
 
   describe('Startup', () => {
     it('connect client', async () => {

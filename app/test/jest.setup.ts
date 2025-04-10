@@ -8,7 +8,6 @@ import { ConfigService } from '../src/nest/utils/config/config.service.js'
 import { EnvVars } from '../src/nest/utils/config/env_vars.js'
 import { createLogger } from '../src/nest/app/logger/logger.js'
 import mikroOrmPostgresConfig from '../src/nest/storage/postgres/mikro-orm.postgres.config.js'
-import { Migrator } from '@mikro-orm/migrations'
 
 jest.setTimeout(30_000)
 
@@ -24,11 +23,6 @@ beforeAll(async () => {
 
     logger.log(`Mocking ioredis`)
     jest.mock('ioredis', () => require('ioredis-mock'))
-
-    // logger.log(`Migrating postgres`)
-    // const orm = await MikroORM.init({ ...mikroOrmPostgresConfig, extensions: [...(mikroOrmPostgresConfig.extensions ?? []), Migrator]})
-    // orm.getMigrator().up()
-    // await orm.close()
   }
 })
 
