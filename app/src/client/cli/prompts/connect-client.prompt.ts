@@ -24,7 +24,7 @@ const connectClientPrompt = async (
     default:
       overrides?.hostname ??
       options.hostname ??
-      ConfigService.getString(EnvVars.HOSTNAME, DEFAULT_HOSTNAME),
+      ConfigService.getString(EnvVars.QSS_HOSTNAME, DEFAULT_HOSTNAME),
     validate: (value: string) => value.length > 0,
   })
 

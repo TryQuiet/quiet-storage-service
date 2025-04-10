@@ -17,7 +17,7 @@ program
   .option(
     '-h, --hostname <hostname>',
     'QSS server hostname',
-    ConfigService.getString(EnvVars.HOSTNAME, 'localhost'),
+    ConfigService.getString(EnvVars.QSS_HOSTNAME, 'localhost'),
   )
   .option(
     '-p, --port <listen port>',

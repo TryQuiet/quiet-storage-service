@@ -11,7 +11,7 @@ export enum EnvVars {
 
   // server settings
   PORT = 'PORT',
-  HOSTNAME = 'HOSTNAME',
+  QSS_HOSTNAME = 'QSS_HOSTNAME',
   LISTEN_HOSTNAME = 'LISTEN_HOSTNAME',
 
   // aws settings

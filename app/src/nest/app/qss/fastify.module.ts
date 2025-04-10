@@ -40,7 +40,7 @@ import { EnvVars } from '../../utils/config/env_vars.js'
     {
       provide: HOSTNAME,
       useFactory: () =>
-        ConfigService.getString(EnvVars.HOSTNAME, DEFAULT_HOSTNAME),
+        ConfigService.getString(EnvVars.QSS_HOSTNAME, DEFAULT_HOSTNAME),
     },
     {
       provide: LISTEN_HOSTNAME,
