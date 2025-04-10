@@ -1,3 +1,4 @@
+name: qss-quiet
 services:
   postgres-qss-quiet:
     image: postgres:latest

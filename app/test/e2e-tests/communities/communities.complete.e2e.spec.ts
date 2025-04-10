@@ -94,10 +94,10 @@ describe('Communities', () => {
     )
   })
 
-  // afterAll(async () => {
-  //   // each test need to release the connection for next
-  //   await TestUtils.close()
-  // })
+  afterAll(async () => {
+    // each test need to release the connection for next
+    await TestUtils.close()
+  })
 
   describe('Startup', () => {
     it('connect client', async () => {

@@ -17,15 +17,6 @@ beforeEach(() => {
   logger.log(`###### ${expect.getState().currentTestName}`)
 })
 
-beforeAll(async () => {
-  if (!ConfigService.getBool(EnvVars.IS_E2E, false)) {
-    logger.warn(`Running unit-test only test setup`)
-
-    logger.log(`Mocking ioredis`)
-    jest.mock('ioredis', () => require('ioredis-mock'))
-  }
-})
-
 afterAll(async () => {
   if (!ConfigService.getBool(EnvVars.IS_E2E, false)) {
     logger.warn(`Running unit-test only test teardown`)

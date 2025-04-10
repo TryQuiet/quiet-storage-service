@@ -1,3 +1,4 @@
+name: qss
 services:
   postgres-local:
     image: postgres:latest
