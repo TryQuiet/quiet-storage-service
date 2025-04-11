@@ -3,6 +3,7 @@ import { CommunitiesStorageService } from './storage/communities.storage.service
 import { createLogger } from '../app/logger/logger.js'
 import {
   AllowedServerKeyState,
+  AuthConnectionMap,
   Community,
   CommunityUpdate,
   CreatedCommunity,
@@ -32,6 +33,7 @@ import { HOSTNAME } from '../app/const.js'
 import { SigChain } from './auth/sigchain.js'
 import { AuthConnection } from './auth/auth.connection.js'
 import { CommunitiesHandlerOptions } from './websocket/types/index.js'
+import { NativeServerWebsocketEvents } from '../websocket/ws.types.js'
 
 @Injectable()
 export class CommunitiesManagerService {
@@ -98,6 +100,7 @@ export class CommunitiesManagerService {
   }
 
   public async create(
+    userId: string,
     community: Community,
     teamKeyring: string,
     wsOptions: CommunitiesHandlerOptions,
@@ -151,7 +154,7 @@ export class CommunitiesManagerService {
         wsOptions,
       })
 
-      this.startConnection(community.teamId, wsOptions)
+      this.startConnection(userId, community.teamId, wsOptions)
 
       return {
         serverKeys: redactKeys(serverKeysWithSecrets) as Keyset,
@@ -222,23 +225,41 @@ export class CommunitiesManagerService {
   }
 
   public startConnection(
+    userId: string,
     teamId: string,
     wsOptions: CommunitiesHandlerOptions,
   ): void {
+    this.logger.warn('user id', userId)
     const managedCommunity = this.communities.get(teamId)
     if (managedCommunity == null) {
       throw new Error(`No community found for this team ID: ${teamId}`)
     }
 
+    const authConnections: AuthConnectionMap =
+      managedCommunity.authConnections ?? (new Map() as AuthConnectionMap)
+    if (authConnections.get(userId) != null) {
+      this.logger.debug(
+        'Already had an auth connection for this user, reusing...',
+      )
+      return
+    }
+
     const authConnection = new AuthConnection(
+      userId,
       managedCommunity.sigChain,
       wsOptions,
     )
+    authConnections.set(userId, authConnection)
     this.communities.set(teamId, {
       ...managedCommunity,
-      authConnection,
+      authConnections,
     })
+
     authConnection.start()
+    wsOptions.socket.on(NativeServerWebsocketEvents.Disconnect, () => {
+      authConnection.stop()
+      this.communities.get(teamId)!.authConnections?.delete(userId)
+    })
   }
 
   public async getServerKeys(

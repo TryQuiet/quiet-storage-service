@@ -105,9 +105,13 @@ export function registerCommunitiesAuthHandlers(
         throw new Error(`No community found`)
       }
 
-      authConnection = community.authConnection
+      authConnection = community.authConnections?.get(
+        message.payload.payload.userId,
+      )
       if (authConnection == null) {
-        throw new Error(`No auth connection was established for this community`)
+        throw new Error(
+          `No auth connection was established for this user on this community`,
+        )
       }
       authConnection.lfaConnection.deliver(
         uint8arrays.fromString(message.payload.payload.message, 'base64'),

@@ -36,10 +36,12 @@ export type EncryptedCommunityUpdate = Omit<
   'teamId'
 >
 
+export type AuthConnectionMap = Map<string, AuthConnection>
+
 export interface ManagedCommunity {
   teamId: string
   community: Community
   sigChain: SigChain
-  authConnection?: AuthConnection
+  authConnections?: AuthConnectionMap
   wsOptions: CommunitiesHandlerOptions
 }

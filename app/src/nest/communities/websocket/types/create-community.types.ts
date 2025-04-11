@@ -7,6 +7,7 @@ import type { Community } from '../../types.js'
 export interface CreateCommunityPayload {
   community: Community
   teamKeyring: string
+  userId: string
 }
 
 export interface CreateCommunity {

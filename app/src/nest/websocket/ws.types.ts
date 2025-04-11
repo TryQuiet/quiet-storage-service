@@ -47,6 +47,7 @@ export enum NativeClientWebsocketEvents {
  */
 export enum NativeServerWebsocketEvents {
   Connection = 'connection',
+  Disconnect = 'disconnect',
 }
 
 export interface BaseWebsocketMessage<T extends object | undefined> {

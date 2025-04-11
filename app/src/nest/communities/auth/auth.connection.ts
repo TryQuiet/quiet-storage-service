@@ -29,6 +29,7 @@ export class AuthConnection {
     createLogger(`Localfirst:${context}`)
 
   constructor(
+    private readonly userId: string,
     private readonly sigChain: SigChain,
     private readonly wsOptions: CommunitiesHandlerOptions,
   ) {
@@ -55,6 +56,7 @@ export class AuthConnection {
           payload: {
             status: CommunityOperationStatus.SUCCESS,
             payload: {
+              userId: user.userId,
               teamId: this.sigChain.team.id,
               message: uint8arrays.toString(message, 'base64'),
             },
@@ -118,5 +120,10 @@ export class AuthConnection {
       `Auth connection established with Peer for ${(this.userContext.team as Team).id}`,
     )
     this.lfaConnection.start()
+  }
+
+  public stop(): void {
+    this.logger.debug('Closing connection with user')
+    this.lfaConnection.stop(true)
   }
 }

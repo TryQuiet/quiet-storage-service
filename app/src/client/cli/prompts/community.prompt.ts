@@ -138,6 +138,7 @@ const createCommunity = async (
   const message: CreateCommunity = {
     ts: DateTime.utc().toMillis(),
     payload: {
+      userId: context.user.userId,
       community,
       teamKeyring: uint8arrays.toString(
         uint8arrays.fromString(

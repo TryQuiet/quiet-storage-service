@@ -19,6 +19,7 @@ import {
   createUser,
   DeviceWithSecrets,
   LocalContext,
+  LocalUserContext,
   Server,
   Team,
   UserWithSecrets,
@@ -51,7 +52,7 @@ describe('Communities', () => {
   let encryption: WebsocketEncryptionService
   let community: Community
   let team: Team
-  let clientContext: LocalContext
+  let clientContext: LocalUserContext
   let serverKeys: Keyset | undefined = undefined
 
   const TEAM_NAME = 'test-team-name'
@@ -186,6 +187,7 @@ describe('Communities', () => {
       const message: CreateCommunity = {
         ts: DateTime.utc().toMillis(),
         payload: {
+          userId: clientContext.user.userId,
           community,
           teamKeyring: uint8arrays.toString(
             uint8arrays.fromString(JSON.stringify(team.teamKeyring()), 'utf8'),
@@ -216,7 +218,10 @@ describe('Communities', () => {
         generateWsOptions(TestUtils.client.sessionKey!),
       )
       expect(managedCommunity).toBeDefined()
-      expect(managedCommunity!.authConnection).toBeDefined()
+      expect(managedCommunity!.authConnections).toBeDefined()
+      expect(
+        managedCommunity!.authConnections?.get(clientContext.user.userId),
+      ).toBeDefined()
       expect(managedCommunity!.teamId).toBe(team.id)
     })
   })

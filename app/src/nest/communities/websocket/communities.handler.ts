@@ -50,6 +50,7 @@ export function registerCommunitiesHandlers(
         true,
       ) as CreateCommunity
       await options.communitiesManager.create(
+        message.payload.userId,
         message.payload.community,
         message.payload.teamKeyring,
         options,
@@ -105,7 +106,7 @@ export function registerCommunitiesHandlers(
       if (message.payload.payload == null) {
         throw new Error(`Payload was nullish!`)
       }
-      const { teamId } = message.payload.payload
+      const { teamId, userId } = message.payload.payload
       if ((await options.communitiesManager.get(teamId, options)) == null) {
         _logger.warn(
           `Attempted sign-in to community ${teamId} but no community was initialized for that ID`,
@@ -128,7 +129,7 @@ export function registerCommunitiesHandlers(
       _logger.debug(
         `Found community for ID ${teamId}, initializing sync connection`,
       )
-      options.communitiesManager.startConnection(teamId, options)
+      options.communitiesManager.startConnection(userId, teamId, options)
 
       const response: CommunitySignInMessage = {
         ts: DateTime.utc().toMillis(),

@@ -110,6 +110,7 @@ describe('CommunitiesManagerService', () => {
       }
       const b64Keyring = uint8arrays.toString(serializedTeamKeyring, 'base64')
       const createdCommunity = await manager!.create(
+        testTeam.testUserContext.user.userId,
         community,
         b64Keyring,
         wsOptions!,
@@ -138,6 +139,7 @@ describe('CommunitiesManagerService', () => {
       let error: Error | undefined = undefined
       try {
         createdCommunity = await manager!.create(
+          testTeam.testUserContext.user.userId,
           community,
           b64Keyring,
           wsOptions!,
@@ -187,6 +189,7 @@ describe('CommunitiesManagerService', () => {
       let error: Error | undefined = undefined
       try {
         createdCommunity = await manager!.create(
+          testTeam.testUserContext.user.userId,
           community,
           b64Keyring,
           wsOptions!,
@@ -232,6 +235,7 @@ describe('CommunitiesManagerService', () => {
       let error: Error | undefined = undefined
       try {
         createdCommunity = await manager!.create(
+          testTeam.testUserContext.user.userId,
           community,
           invalidKeyring,
           wsOptions!,

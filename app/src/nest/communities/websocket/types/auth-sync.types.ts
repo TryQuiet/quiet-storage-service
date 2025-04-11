@@ -5,6 +5,7 @@ import type {
 import type { CommunityOperationStatus } from './common.types.js'
 
 export interface AuthSyncMessageInnerPayload {
+  userId: string
   teamId: string
   message: string
 }
