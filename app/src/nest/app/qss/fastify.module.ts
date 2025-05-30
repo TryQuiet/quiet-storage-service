@@ -31,8 +31,8 @@ import { EnvVars } from '../../utils/config/env_vars.js'
     },
     {
       provide: FASTIFY_ADAPTER,
-      // @ts-expect-error Not sure why it disagrees with the typing here
       useFactory: (fastify: FastifyInstance): FastifyAdapter =>
+        // @ts-expect-error Not sure why it disagrees with the typing here
         new FastifyAdapter(fastify),
       inject: [FASTIFY],
     },
