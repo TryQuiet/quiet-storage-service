@@ -5,11 +5,6 @@
 
 import { WebsocketEvents } from '../../websocket/ws.types.js'
 import { DateTime } from 'luxon'
-import {
-  DecryptionError,
-  EncryptionBase64Error,
-  EncryptionError,
-} from '../../encryption/types.js'
 import { createLogger } from '../../app/logger/logger.js'
 import {
   type CommunitiesHandlerOptions,
@@ -39,16 +34,11 @@ export function registerCommunitiesHandlers(
   _logger.debug(`Initializing communities WS event handlers`)
 
   async function handleCreateCommunity(
-    encryptedPayload: string,
-    callback: (payload: string) => void,
+    message: CreateCommunity,
+    callback: (payload: CreateCommunityResponse) => void,
   ): Promise<void> {
     _logger.debug(`Handling community create event`)
     try {
-      const message = options.encryption.decrypt(
-        encryptedPayload,
-        options.sessionKey,
-        true,
-      ) as CreateCommunity
       await options.communitiesManager.create(
         message.payload.userId,
         message.payload.community,
@@ -62,52 +52,32 @@ export function registerCommunitiesHandlers(
           status: CreateCommunityStatus.SUCCESS,
         },
       }
-      const encryptedResponse = options.encryption.encrypt(
-        response,
-        options.sessionKey,
-      )
-      callback(encryptedResponse)
+      callback(response)
     } catch (e) {
       _logger.error(`Error while processing create community event`, e)
-      let reason: string | undefined = undefined
-      if (
-        e instanceof EncryptionBase64Error ||
-        e instanceof EncryptionError ||
-        e instanceof DecryptionError
-      ) {
-        reason = e.message
-      } else {
-        reason = `Error while creating community`
-      }
-
-      const response: CreateCommunityResponse = {
+      const errorResponse: CreateCommunityResponse = {
         ts: DateTime.utc().toMillis(),
         payload: {
           status: CreateCommunityStatus.ERROR,
-          reason,
+          reason: `Error while creating community`,
         },
       }
-      callback(options.encryption.encrypt(response, options.sessionKey))
+      callback(errorResponse)
     }
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await -- this is fine
   async function handleSignInToCommunity(
-    encryptedPayload: string,
-    callback: (payload: string) => void,
+    message: CommunitySignInMessage,
+    callback: (payload: CommunitySignInMessage) => void,
   ): Promise<void> {
     _logger.debug(`Handling community sign-in event`)
     try {
-      const message = options.encryption.decrypt(
-        encryptedPayload,
-        options.sessionKey,
-        true,
-      ) as CommunitySignInMessage
       if (message.payload.payload == null) {
         throw new Error(`Payload was nullish!`)
       }
       const { teamId, userId } = message.payload.payload
-      if ((await options.communitiesManager.get(teamId, options)) == null) {
+      if ((await options.communitiesManager.get(teamId)) == null) {
         _logger.warn(
           `Attempted sign-in to community ${teamId} but no community was initialized for that ID`,
         )
@@ -118,11 +88,7 @@ export function registerCommunitiesHandlers(
             reason: `No community found for ${teamId}`,
           },
         }
-        const encryptedResponse = options.encryption.encrypt(
-          notFoundResponse,
-          options.sessionKey,
-        )
-        callback(encryptedResponse)
+        callback(notFoundResponse)
         return
       }
 
@@ -137,49 +103,28 @@ export function registerCommunitiesHandlers(
           status: CommunityOperationStatus.SUCCESS,
         },
       }
-      const encryptedResponse = options.encryption.encrypt(
-        response,
-        options.sessionKey,
-      )
-      callback(encryptedResponse)
+      callback(response)
     } catch (e) {
       _logger.error(`Error while processing community sign-in event`, e)
-      let reason: string | undefined = undefined
-      if (
-        e instanceof EncryptionBase64Error ||
-        e instanceof EncryptionError ||
-        e instanceof DecryptionError
-      ) {
-        reason = e.message
-      } else {
-        reason = `Error while signing in to community`
-      }
-
-      const response: CommunitySignInMessage = {
+      const errorResponse: CommunitySignInMessage = {
         ts: DateTime.utc().toMillis(),
         payload: {
           status: CommunityOperationStatus.ERROR,
-          reason,
+          reason: `Error while signing in to community`,
         },
       }
-      callback(options.encryption.encrypt(response, options.sessionKey))
+      callback(errorResponse)
     }
   }
 
   async function handleUpdateCommunity(
-    encryptedPayload: string,
-    callback: (payload: string) => void,
+    message: UpdateCommunity,
+    callback: (payload: UpdateCommunityResponse) => void,
   ): Promise<void> {
     try {
-      const message = options.encryption.decrypt(
-        encryptedPayload,
-        options.sessionKey,
-        true,
-      ) as UpdateCommunity
       await options.communitiesManager.update(
         message.payload.teamId,
         message.payload.updates,
-        options,
       )
       const response: UpdateCommunityResponse = {
         ts: DateTime.utc().toMillis(),
@@ -187,48 +132,27 @@ export function registerCommunitiesHandlers(
           status: CommunityOperationStatus.SUCCESS,
         },
       }
-      const encryptedResponse = options.encryption.encrypt(
-        response,
-        options.sessionKey,
-      )
-      callback(encryptedResponse)
+      callback(response)
     } catch (e) {
       _logger.error(`Error while processing update community event`, e)
-      let reason: string | undefined = undefined
-      if (
-        e instanceof EncryptionBase64Error ||
-        e instanceof EncryptionError ||
-        e instanceof DecryptionError
-      ) {
-        reason = e.message
-      } else {
-        reason = `Error while updating community`
-      }
-
-      const response: UpdateCommunityResponse = {
+      const errorResponse: UpdateCommunityResponse = {
         ts: DateTime.utc().toMillis(),
         payload: {
           status: CommunityOperationStatus.ERROR,
-          reason,
+          reason: `Error while updating community`,
         },
       }
-      callback(options.encryption.encrypt(response, options.sessionKey))
+      callback(errorResponse)
     }
   }
 
   async function handleGetCommunity(
-    encryptedPayload: string,
-    callback: (payload: string) => void,
+    message: GetCommunity,
+    callback: (payload: GetCommunityResponse) => void,
   ): Promise<void> {
     try {
-      const message = options.encryption.decrypt(
-        encryptedPayload,
-        options.sessionKey,
-        true,
-      ) as GetCommunity
       const managedCommunity = await options.communitiesManager.get(
         message.payload.id,
-        options,
       )
       let response: GetCommunityResponse | undefined = undefined
       if (managedCommunity == null) {
@@ -248,32 +172,17 @@ export function registerCommunitiesHandlers(
           },
         }
       }
-      const encryptedResponse = options.encryption.encrypt(
-        response,
-        options.sessionKey,
-      )
-      callback(encryptedResponse)
+      callback(response)
     } catch (e) {
       _logger.error(`Error while processing update community event`, e)
-      let reason: string | undefined = undefined
-      if (
-        e instanceof EncryptionBase64Error ||
-        e instanceof EncryptionError ||
-        e instanceof DecryptionError
-      ) {
-        reason = e.message
-      } else {
-        reason = `Error while getting community`
-      }
-
-      const response: GetCommunityResponse = {
+      const errorResponse: GetCommunityResponse = {
         ts: DateTime.utc().toMillis(),
         payload: {
           status: CommunityOperationStatus.ERROR,
-          reason,
+          reason: `Error while getting community`,
         },
       }
-      callback(options.encryption.encrypt(response, options.sessionKey))
+      callback(errorResponse)
     }
   }
 

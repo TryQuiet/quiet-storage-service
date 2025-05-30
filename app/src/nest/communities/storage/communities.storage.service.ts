@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common'
 import { createLogger } from '../../app/logger/logger.js'
-import { EncryptedCommunity, EncryptedCommunityUpdate } from '../types.js'
+import { Community, CommunityUpdate } from '../types.js'
 import { Community as CommunityEntity } from './entities/community.entity.js'
 import { EntityData } from '@mikro-orm/core'
 import { PostgresClient } from '../../storage/postgres/postgres.client.js'
@@ -24,7 +24,7 @@ export class CommunitiesStorageService implements OnModuleInit {
     this.logger.log(`${CommunitiesStorageService.name} initialized!`)
   }
 
-  public async addCommunity(payload: EncryptedCommunity): Promise<boolean> {
+  public async addCommunity(payload: Community): Promise<boolean> {
     try {
       this.logger.log(`Adding new community with ID ${payload.teamId}`)
       return await this.repository.add(this.payloadToEntity(payload))
@@ -36,7 +36,7 @@ export class CommunitiesStorageService implements OnModuleInit {
 
   public async updateCommunity(
     teamId: string,
-    payload: EncryptedCommunityUpdate,
+    payload: CommunityUpdate,
   ): Promise<boolean> {
     try {
       this.logger.log(`Updating community with ID ${teamId}`)
@@ -52,7 +52,7 @@ export class CommunitiesStorageService implements OnModuleInit {
 
   public async getCommunity(
     teamId: string,
-  ): Promise<EncryptedCommunity | undefined | null> {
+  ): Promise<Community | undefined | null> {
     this.logger.log(`Getting community with ID ${teamId}`)
     const result = await this.repository.findOne(teamId)
     if (result == null) {
@@ -67,31 +67,19 @@ export class CommunitiesStorageService implements OnModuleInit {
     await this.orm.getSchemaGenerator().clearDatabase()
   }
 
-  private payloadToEntity(payload: EncryptedCommunity): CommunityEntity {
+  private payloadToEntity(payload: Community): CommunityEntity {
     const entity = new CommunityEntity()
     entity.assign({
-      name: payload.name,
       id: payload.teamId,
-      psk: Buffer.from(uint8arrays.fromString(payload.psk, 'hex')),
-      peerList: Buffer.from(uint8arrays.fromString(payload.peerList, 'hex')),
       sigChain: Buffer.from(uint8arrays.fromString(payload.sigChain, 'hex')),
     })
     return entity
   }
 
   private payloadToEntityData(
-    payload: EncryptedCommunityUpdate,
+    payload: CommunityUpdate,
   ): EntityData<CommunityEntity> {
     const entityData: EntityData<CommunityEntity> = {
-      name: payload.name,
-      psk:
-        payload.psk != null
-          ? Buffer.from(uint8arrays.fromString(payload.psk, 'hex'))
-          : undefined,
-      peerList:
-        payload.peerList != null
-          ? Buffer.from(uint8arrays.fromString(payload.peerList, 'hex'))
-          : undefined,
       sigChain:
         payload.sigChain != null
           ? Buffer.from(uint8arrays.fromString(payload.sigChain, 'hex'))
@@ -102,12 +90,9 @@ export class CommunitiesStorageService implements OnModuleInit {
     )
   }
 
-  private entityToPayload(entity: CommunityEntity): EncryptedCommunity {
+  private entityToPayload(entity: CommunityEntity): Community {
     return {
       teamId: entity.id,
-      name: entity.name,
-      psk: uint8arrays.toString(Uint8Array.from(entity.psk), 'hex'),
-      peerList: uint8arrays.toString(Uint8Array.from(entity.peerList), 'hex'),
       sigChain: uint8arrays.toString(Uint8Array.from(entity.sigChain), 'hex'),
     }
   }

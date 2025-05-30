@@ -16,34 +16,6 @@
           "length": 255,
           "mappedType": "string"
         },
-        "name": {
-          "name": "name",
-          "type": "varchar(255)",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": false,
-          "length": 255,
-          "mappedType": "string"
-        },
-        "psk": {
-          "name": "psk",
-          "type": "bytea",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": false,
-          "mappedType": "blob"
-        },
-        "peer_list": {
-          "name": "peer_list",
-          "type": "bytea",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": false,
-          "mappedType": "blob"
-        },
         "sig_chain": {
           "name": "sig_chain",
           "type": "bytea",

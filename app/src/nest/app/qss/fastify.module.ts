@@ -21,7 +21,9 @@ import { EnvVars } from '../../utils/config/env_vars.js'
     NestFastifyLogger,
     {
       provide: FASTIFY,
-      useFactory: (fastifyLogger: NestFastifyLogger) =>
+      useFactory: (
+        fastifyLogger: NestFastifyLogger,
+      ): ReturnType<typeof Fastify> =>
         Fastify({
           logger: fastifyLogger,
         }),
@@ -30,21 +32,23 @@ import { EnvVars } from '../../utils/config/env_vars.js'
     {
       provide: FASTIFY_ADAPTER,
       // @ts-expect-error Not sure why it disagrees with the typing here
-      useFactory: (fastify: FastifyInstance) => new FastifyAdapter(fastify),
+      useFactory: (fastify: FastifyInstance): FastifyAdapter =>
+        new FastifyAdapter(fastify),
       inject: [FASTIFY],
     },
     {
       provide: LISTEN_PORT,
-      useFactory: () => ConfigService.getInt(EnvVars.PORT, DEFAULT_LISTEN_PORT),
+      useFactory: (): number | undefined =>
+        ConfigService.getInt(EnvVars.PORT, DEFAULT_LISTEN_PORT),
     },
     {
       provide: HOSTNAME,
-      useFactory: () =>
+      useFactory: (): string | undefined =>
         ConfigService.getString(EnvVars.QSS_HOSTNAME, DEFAULT_HOSTNAME),
     },
     {
       provide: LISTEN_HOSTNAME,
-      useFactory: () =>
+      useFactory: (): string | undefined =>
         ConfigService.getString(
           EnvVars.LISTEN_HOSTNAME,
           DEFAULT_LISTEN_HOSTNAME,

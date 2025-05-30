@@ -40,15 +40,6 @@ describe('CommunitesStorageService', () => {
   it('should write a community to postgres', async () => {
     const community: EncryptedCommunity = {
       teamId: 'foobar',
-      name: 'foobar',
-      psk: uint8arrays.toString(
-        sodiumHelper!.sodium.randombytes_buf(32),
-        'hex',
-      ),
-      peerList: uint8arrays.toString(
-        sodiumHelper!.sodium.randombytes_buf(32),
-        'hex',
-      ),
       sigChain: uint8arrays.toString(
         sodiumHelper!.sodium.randombytes_buf(256),
         'hex',
@@ -61,15 +52,6 @@ describe('CommunitesStorageService', () => {
     const teamId = 'foobar'
     const community: EncryptedCommunity = {
       teamId,
-      name: 'foobar',
-      psk: uint8arrays.toString(
-        sodiumHelper!.sodium.randombytes_buf(32),
-        'hex',
-      ),
-      peerList: uint8arrays.toString(
-        sodiumHelper!.sodium.randombytes_buf(32),
-        'hex',
-      ),
       sigChain: uint8arrays.toString(
         sodiumHelper!.sodium.randombytes_buf(256),
         'hex',
@@ -78,15 +60,6 @@ describe('CommunitesStorageService', () => {
     expect(await communitesStorageService?.addCommunity(community)).toBe(true)
     const communityWithDupeId: EncryptedCommunity = {
       teamId,
-      name: 'anotherone',
-      psk: uint8arrays.toString(
-        sodiumHelper!.sodium.randombytes_buf(32),
-        'hex',
-      ),
-      peerList: uint8arrays.toString(
-        sodiumHelper!.sodium.randombytes_buf(32),
-        'hex',
-      ),
       sigChain: uint8arrays.toString(
         sodiumHelper!.sodium.randombytes_buf(256),
         'hex',
@@ -100,15 +73,6 @@ describe('CommunitesStorageService', () => {
   it('should write and then get a community from postgres', async () => {
     const community: EncryptedCommunity = {
       teamId: 'foobar',
-      name: 'foobar',
-      psk: uint8arrays.toString(
-        sodiumHelper!.sodium.randombytes_buf(32),
-        'hex',
-      ),
-      peerList: uint8arrays.toString(
-        sodiumHelper!.sodium.randombytes_buf(32),
-        'hex',
-      ),
       sigChain: uint8arrays.toString(
         sodiumHelper!.sodium.randombytes_buf(256),
         'hex',
@@ -126,15 +90,6 @@ describe('CommunitesStorageService', () => {
   it('should write and then update a community on postgres', async () => {
     const community: EncryptedCommunity = {
       teamId: 'foobar',
-      name: 'foobar',
-      psk: uint8arrays.toString(
-        sodiumHelper!.sodium.randombytes_buf(32),
-        'hex',
-      ),
-      peerList: uint8arrays.toString(
-        sodiumHelper!.sodium.randombytes_buf(32),
-        'hex',
-      ),
       sigChain: uint8arrays.toString(
         sodiumHelper!.sodium.randombytes_buf(256),
         'hex',
@@ -142,7 +97,10 @@ describe('CommunitesStorageService', () => {
     }
     expect(await communitesStorageService?.addCommunity(community)).toBe(true)
     const updates: EncryptedCommunityUpdate = {
-      name: 'barbaz',
+      sigChain: uint8arrays.toString(
+        sodiumHelper!.sodium.randombytes_buf(256),
+        'hex',
+      ),
     }
     expect(
       await communitesStorageService?.updateCommunity(
@@ -154,7 +112,10 @@ describe('CommunitesStorageService', () => {
 
   it("should fail to update a community on postgres when community doesn't exist", async () => {
     const updates: EncryptedCommunityUpdate = {
-      name: 'barbaz',
+      sigChain: uint8arrays.toString(
+        sodiumHelper!.sodium.randombytes_buf(256),
+        'hex',
+      ),
     }
     expect(
       await communitesStorageService?.updateCommunity('foobar', updates),

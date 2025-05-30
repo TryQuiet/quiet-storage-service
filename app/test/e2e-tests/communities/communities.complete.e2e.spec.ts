@@ -5,12 +5,10 @@ import { TestSockets } from '../../utils/types.js'
 import { WebsocketEvents } from '../../../src/nest/websocket/ws.types.js'
 import { DateTime } from 'luxon'
 import { createLogger } from '../../../src/nest/app/logger/logger.js'
-import { Ping, Pong } from '../../../src/nest/websocket/handlers/ping/types.js'
 import { AppModule } from '../../../src/nest/app/app.module.js'
 import { CommunitiesManagerService } from '../../../src/nest/communities/communities-manager.service.js'
 import {
   GeneratePublicKeysMessage,
-  GeneratePublicKeysMessagePayload,
   GeneratePublicKeysResponse,
 } from '../../../src/nest/communities/websocket/types/gen-pub-keys.types.js'
 import {
@@ -18,7 +16,6 @@ import {
   createTeam,
   createUser,
   DeviceWithSecrets,
-  LocalContext,
   LocalUserContext,
   Server,
   Team,
@@ -28,28 +25,19 @@ import { Community } from '../../../src/nest/communities/types.js'
 import { SodiumHelper } from '../../../src/nest/encryption/sodium.helper.js'
 import * as uint8arrays from 'uint8arrays'
 import { Keyset } from '@localfirst/crdx'
-import {
-  CommunitiesHandlerOptions,
-  CommunityOperationStatus,
-} from '../../../src/nest/communities/websocket/types/common.types.js'
+import { CommunityOperationStatus } from '../../../src/nest/communities/websocket/types/common.types.js'
 import {
   CreateCommunity,
   CreateCommunityResponse,
   CreateCommunityStatus,
 } from '../../../src/nest/communities/websocket/types/create-community.types.js'
 import { CommunitiesStorageService } from '../../../src/nest/communities/storage/communities.storage.service.js'
-// @ts-ignore
-import MockedSocket from 'socket.io-mock'
-import { WebsocketEncryptionService } from '../../../src/nest/encryption/ws.enc.service.js'
-import { Socket } from 'socket.io'
-import { CryptoKX } from 'libsodium-wrappers-sumo'
 
 describe('Communities', () => {
   let sockets: TestSockets
   let communitiesManagerService: CommunitiesManagerService
   let sodiumHelper: SodiumHelper
   let storage: CommunitiesStorageService
-  let encryption: WebsocketEncryptionService
   let community: Community
   let team: Team
   let clientContext: LocalUserContext
@@ -61,21 +49,6 @@ describe('Communities', () => {
   const SERVER_NAME = 'localhost'
 
   const logger = createLogger('E2E:Websocket:Communities:Complete')
-
-  const generateWsOptions = (
-    sessionKey: CryptoKX,
-  ): CommunitiesHandlerOptions => {
-    return {
-      communitiesManager: communitiesManagerService,
-      encryption,
-      storage,
-      sessionKey,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is ok
-      socket: new MockedSocket() as unknown as Socket,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- this doesn't get used anywhere in this code
-      socketServer: {} as any,
-    }
-  }
 
   beforeAll(async () => {
     const testingModule = await Test.createTestingModule({
@@ -89,9 +62,6 @@ describe('Communities', () => {
     sodiumHelper = testingModule.get<SodiumHelper>(SodiumHelper)
     storage = testingModule.get<CommunitiesStorageService>(
       CommunitiesStorageService,
-    )
-    encryption = testingModule.get<WebsocketEncryptionService>(
-      WebsocketEncryptionService,
     )
   })
 
@@ -171,10 +141,7 @@ describe('Communities', () => {
       }
       team.addServer(server)
       community = {
-        name: TEAM_NAME,
         teamId: team.id,
-        psk: sodiumHelper.toBase64(sodiumHelper.sodium.randombytes_buf(32)),
-        peerList: ['foo', 'bar'],
         sigChain: uint8arrays.toString(team.save(), 'hex'),
       }
     })
@@ -213,10 +180,7 @@ describe('Communities', () => {
     })
 
     it('should validate that the community exists on qss', async () => {
-      const managedCommunity = await communitiesManagerService.get(
-        team.id,
-        generateWsOptions(TestUtils.client.sessionKey!),
-      )
+      const managedCommunity = await communitiesManagerService.get(team.id)
       expect(managedCommunity).toBeDefined()
       expect(managedCommunity!.authConnections).toBeDefined()
       expect(

@@ -10,7 +10,6 @@ import { Server, Socket as ServerSocket } from 'socket.io'
 import { WebsocketGateway } from '../../src/nest/websocket/ws.gateway.js'
 import { TestSockets } from './types.js'
 import { WebsocketClient } from '../../src/client/ws.client.js'
-import { WebsocketEncryptionService } from '../../src/nest/encryption/ws.enc.service.js'
 import { createLogger } from '../../src/nest/app/logger/logger.js'
 import { LISTEN_PORT } from '../../src/nest/app/const.js'
 
@@ -18,7 +17,6 @@ export class TestUtils {
   public static client: WebsocketClient
   public static serverSocket: ServerSocket
   public static server: Server
-  public static encryption: WebsocketEncryptionService
   private static module: TestingModule
   private static adapter: FastifyAdapter
   private static app: INestApplication
@@ -38,9 +36,6 @@ export class TestUtils {
       {
         logger: createLogger('Test'),
       },
-    )
-    this.encryption = this.app.get<WebsocketEncryptionService>(
-      WebsocketEncryptionService,
     )
     this.client = this.app.get<WebsocketClient>(WebsocketClient)
     this.logger.log(`Starting server`)

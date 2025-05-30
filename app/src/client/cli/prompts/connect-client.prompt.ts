@@ -10,8 +10,6 @@ import {
 } from '../../../nest/app/const.js'
 import { promiseWithSpinner } from '../utils/utils.js'
 import { WebsocketClient } from '../../ws.client.js'
-import { WebsocketEncryptionService } from '../../../nest/encryption/ws.enc.service.js'
-import { SodiumHelper } from '../../../nest/encryption/sodium.helper.js'
 
 const logger = createLogger('Client:Connect')
 
@@ -39,7 +37,7 @@ const connectClientPrompt = async (
   const listenPort = Number(listenPortString)
 
   const shouldConnectClient = await confirm({
-    message: `Would you like to connect client to ${hostname}${listenPort}?`,
+    message: `Would you like to connect client to ${hostname}:${listenPort}?`,
     default: true,
   })
 
@@ -48,10 +46,7 @@ const connectClientPrompt = async (
     return undefined
   }
 
-  const sodiumHelper = new SodiumHelper()
-  await sodiumHelper.onModuleInit()
-  const encryption = new WebsocketEncryptionService(sodiumHelper)
-  const client = new WebsocketClient(listenPort, hostname, encryption)
+  const client = new WebsocketClient(listenPort, hostname)
 
   const result = await promiseWithSpinner(
     async () => await client.createSocket(),

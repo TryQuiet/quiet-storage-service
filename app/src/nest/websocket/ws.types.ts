@@ -1,12 +1,8 @@
-import type { CryptoKX } from 'libsodium-wrappers-sumo'
 import type { Server, Socket } from 'socket.io'
-import type { WebsocketEncryptionService } from '../encryption/ws.enc.service.js'
 
 export interface BaseHandlerOptions {
   socketServer: Server
   socket: Socket
-  sessionKey: CryptoKX
-  encryption: WebsocketEncryptionService
 }
 
 /**
@@ -16,8 +12,6 @@ export enum WebsocketEvents {
   // bullshit
   Ping = 'ping',
   Pong = 'pong',
-  // connection
-  Handshake = 'handshake',
   // communities
   CreateCommunity = 'create-community',
   UpdateCommunity = 'update-community',
@@ -59,31 +53,4 @@ export interface BaseStatusPayload<T extends object | undefined> {
   status: string
   reason?: string
   payload?: T
-}
-
-export enum HandshakeStatus {
-  Error = 'error',
-  Active = 'active',
-  Success = 'success',
-}
-
-export interface InnerHandshakePayload {
-  publicKey: string
-}
-
-export interface HandshakePayload
-  extends BaseStatusPayload<InnerHandshakePayload> {
-  status: HandshakeStatus
-  reason?: string
-  payload?: InnerHandshakePayload
-}
-
-export interface HandshakeMessage
-  extends BaseWebsocketMessage<HandshakePayload> {
-  ts: number
-  payload: HandshakePayload
-}
-
-export interface ActiveConnection {
-  sessionKey: CryptoKX
 }

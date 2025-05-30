@@ -2,10 +2,7 @@ import type { RuntimeOptions } from '../types.js'
 import { connectClient } from './connect-client.prompt.js'
 import actionSelect from '../components/actionSelect.js'
 import type { WebsocketClient } from '../../ws.client.js'
-import { WebsocketEvents } from '../../../nest/websocket/ws.types.js'
-import { DateTime } from 'luxon'
 import { createLogger } from '../../../nest/app/logger/logger.js'
-import type { Pong } from '../../../nest/websocket/handlers/ping/types.js'
 import { confirm } from '@inquirer/prompts'
 import {
   createCommunity,
@@ -38,11 +35,6 @@ const mainLoop = async (
   let exit = false
   while (!exit) {
     const defaultChoices = [
-      {
-        name: 'Send ping',
-        value: 'sendPing',
-        description: 'Send ping message to server',
-      },
       {
         name: 'Create community',
         value: 'createCommunity',
@@ -77,19 +69,6 @@ const mainLoop = async (
       case 'select':
       case undefined: // catches enter/return key
         switch (answer.answer) {
-          case 'sendPing': {
-            const response = await client.sendMessage<Pong>(
-              WebsocketEvents.Ping,
-              { ts: DateTime.utc().toMillis() },
-              true,
-            )
-            if (!response!.success) {
-              logger.error(`Unsuccessful ping!`, response!.reason)
-            } else {
-              logger.log(`Ping success!`)
-            }
-            break
-          }
           case 'createCommunity': {
             community = await createCommunity(client)
             break

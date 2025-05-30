@@ -6,15 +6,6 @@ export class Community extends BaseEntity {
   @PrimaryKey()
   id!: string
 
-  @Property()
-  name!: string
-
-  @Property({ type: 'bytea', columnType: 'bytea' })
-  psk!: Buffer
-
-  @Property({ type: 'bytea', columnType: 'bytea' })
-  peerList!: Buffer
-
   @Property({ type: 'bytea', columnType: 'bytea' })
   sigChain!: Buffer // this is a hex string
 }

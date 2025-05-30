@@ -1,7 +1,6 @@
 import type { Keyset } from '@localfirst/auth'
 import type { SigChain } from './auth/sigchain.js'
 import type { AuthConnection } from './auth/auth.connection.js'
-import type { CommunitiesHandlerOptions } from './websocket/types/index.js'
 
 export enum AllowedServerKeyState {
   ANY = 'Any',
@@ -11,17 +10,11 @@ export enum AllowedServerKeyState {
 
 export interface Community {
   teamId: string
-  name: string
-  peerList: string[]
-  psk: string
   sigChain: string
 }
 
 export interface EncryptedCommunity {
   teamId: string
-  name: string
-  peerList: string
-  psk: string
   sigChain: string
 }
 
@@ -43,5 +36,4 @@ export interface ManagedCommunity {
   community: Community
   sigChain: SigChain
   authConnections?: AuthConnectionMap
-  wsOptions: CommunitiesHandlerOptions
 }

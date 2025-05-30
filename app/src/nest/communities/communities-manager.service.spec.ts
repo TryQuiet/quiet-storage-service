@@ -16,7 +16,6 @@ import * as uint8arrays from 'uint8arrays'
 import type { CommunitiesHandlerOptions } from './websocket/types/common.types.js'
 import _ from 'lodash'
 import { StoredKeyRingType } from '../encryption/types.js'
-import { WebsocketEncryptionService } from '../encryption/ws.enc.service.js'
 import { CommunitiesStorageService } from './storage/communities.storage.service.js'
 // @ts-expect-error -- no types
 import MockedSocket from 'socket.io-mock'
@@ -47,20 +46,10 @@ describe('CommunitiesManagerService', () => {
     )
     storage = module.get<CommunitiesStorageService>(CommunitiesStorageService)
     redis = module.get<RedisClient>(RedisClient)
-    const encryption = module.get<WebsocketEncryptionService>(
-      WebsocketEncryptionService,
-    )
     testTeamUtils = new TeamTestUtils(serverKeyManager)
-    const sessionKey = encryption.generateSharedSessionKeyPair(
-      encryption.generateKeyPair(),
-      encryption.generateKeyPair().publicKey,
-      false,
-    )
     wsOptions = {
       communitiesManager: manager,
-      encryption,
       storage,
-      sessionKey,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is ok
       socket: new MockedSocket() as Socket,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- this doesn't get used anywhere in this code
@@ -100,12 +89,6 @@ describe('CommunitiesManagerService', () => {
       )
       const community: Community = {
         teamId: testTeam.team.id,
-        name: testTeam.team.teamName,
-        psk: uint8arrays.toString(
-          serverKeyManager!.generateRandomBytes(32),
-          'base64',
-        ),
-        peerList: ['foo', 'bar'],
         sigChain: uint8arrays.toString(testTeam.team.save(), 'hex'),
       }
       const b64Keyring = uint8arrays.toString(serializedTeamKeyring, 'base64')
@@ -126,12 +109,6 @@ describe('CommunitiesManagerService', () => {
       )
       const community: Community = {
         teamId: testTeam.team.id,
-        name: testTeam.team.teamName,
-        psk: uint8arrays.toString(
-          serverKeyManager!.generateRandomBytes(32),
-          'base64',
-        ),
-        peerList: ['foo', 'bar'],
         sigChain: uint8arrays.toString(testTeam.team.save(), 'hex'),
       }
       const b64Keyring = uint8arrays.toString(serializedTeamKeyring, 'base64')
@@ -176,12 +153,6 @@ describe('CommunitiesManagerService', () => {
       )
       const community: Community = {
         teamId: testTeam.team.id,
-        name: testTeam.team.teamName,
-        psk: uint8arrays.toString(
-          serverKeyManager!.generateRandomBytes(32),
-          'base64',
-        ),
-        peerList: ['foo', 'bar'],
         sigChain: uint8arrays.toString(testTeam.team.save(), 'base64'),
       }
       const b64Keyring = uint8arrays.toString(serializedTeamKeyring, 'base64')
@@ -222,12 +193,6 @@ describe('CommunitiesManagerService', () => {
       )
       const community: Community = {
         teamId: testTeam.team.id,
-        name: testTeam.team.teamName,
-        psk: uint8arrays.toString(
-          serverKeyManager!.generateRandomBytes(32),
-          'base64',
-        ),
-        peerList: ['foo', 'bar'],
         sigChain: uint8arrays.toString(testTeam.team.save(), 'hex'),
       }
       const invalidKeyring = uint8arrays.toString(serializedTeamKeyring, 'hex')

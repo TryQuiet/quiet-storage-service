@@ -107,32 +107,8 @@ const createCommunity = async (
     ) as Team
   }
 
-  const psk = await input({
-    message: `Enter the PSK of the community:`,
-    default: undefined,
-    validate: (value: string | undefined) => value != null && value !== '',
-  })
-
-  let keepAdding = true
-  const peerList: string[] = []
-  while (keepAdding) {
-    const peer = await input({
-      message: `Enter a peer address:`,
-      default: undefined,
-      validate: (value: string | undefined) => value != null && value !== '',
-    })
-    peerList.push(peer)
-    keepAdding = await confirm({
-      message: `Would you like to add another peer?`,
-      default: true,
-    })
-  }
-
   const community: Community = {
     teamId: serializedSigchain.id,
-    name: teamName,
-    psk,
-    peerList,
     sigChain,
   }
   const message: CreateCommunity = {
@@ -167,37 +143,6 @@ const updateCommunity = async (
   client: WebsocketClient,
   existingCommunity: Community,
 ): Promise<Community | undefined> => {
-  const name = await input({
-    message: `Enter a new community name (optional):`,
-    default: existingCommunity.name,
-    validate: (value: string | undefined) => value == null || value !== '',
-  })
-
-  const psk = await input({
-    message: `Enter a new PSK (optional):`,
-    default: existingCommunity.psk,
-    validate: (value: string | undefined) => value == null || value !== '',
-  })
-
-  const changePeerList = await confirm({
-    message: `Would you like to re-enter the peer list (optional)?`,
-    default: false,
-  })
-  let keepAdding = changePeerList
-  const peerList: string[] = []
-  while (keepAdding) {
-    const peer = await input({
-      message: `Enter a peer address:`,
-      default: undefined,
-      validate: (value: string | undefined) => value != null && value !== '',
-    })
-    peerList.push(peer)
-    keepAdding = await confirm({
-      message: `Would you like to add another peer?`,
-      default: true,
-    })
-  }
-
   const sigChain = await input({
     message: `Enter a new sigchain for this community as a hex string (optional):`,
     default: isUint8Array(existingCommunity.sigChain)
@@ -208,9 +153,6 @@ const updateCommunity = async (
   })
 
   const updates: CommunityUpdate = {
-    name,
-    psk,
-    peerList: peerList.length === 0 ? existingCommunity.peerList : peerList,
     sigChain,
   }
   const message: UpdateCommunity = {

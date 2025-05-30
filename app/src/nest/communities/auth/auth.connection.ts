@@ -14,10 +14,10 @@ import { DateTime } from 'luxon'
 import * as uint8arrays from 'uint8arrays'
 import {
   type AuthSyncMessage,
-  type CommunitiesHandlerOptions,
   CommunityOperationStatus,
 } from '../websocket/types/index.js'
 import type { QuietLogger } from '../../app/logger/types.js'
+import type { AuthConnectionOptions } from './types.js'
 
 export class AuthConnection {
   public readonly lfaConnection: LFAConnection
@@ -31,7 +31,7 @@ export class AuthConnection {
   constructor(
     private readonly userId: string,
     private readonly sigChain: SigChain,
-    private readonly wsOptions: CommunitiesHandlerOptions,
+    private readonly options: AuthConnectionOptions,
   ) {
     const user: UserWithSecrets = castServer.toUser(
       this.sigChain.context.server,
@@ -62,14 +62,7 @@ export class AuthConnection {
             },
           },
         }
-        const encryptedSocketMessage = this.wsOptions.encryption.encrypt(
-          socketMessage,
-          this.wsOptions.sessionKey,
-        )
-        this.wsOptions.socket.emit(
-          WebsocketEvents.AuthSync,
-          encryptedSocketMessage,
-        )
+        this.options.socket.emit(WebsocketEvents.AuthSync, socketMessage)
       },
       createLogger: this.createLfaLogger,
     })
@@ -96,10 +89,9 @@ export class AuthConnection {
     // TODO: store updated sigchain on updates
     this.lfaConnection.on('updated', async head => {
       this.logger.debug('Received sync message, team graph updated', head)
-      await this.wsOptions.communitiesManager.update(
+      await this.options.communitiesManager.update(
         this.sigChain.team.id,
         { sigChain: this.sigChain.serialize(true) },
-        this.wsOptions,
         false,
       )
     })
