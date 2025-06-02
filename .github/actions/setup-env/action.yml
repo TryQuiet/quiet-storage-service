@@ -14,9 +14,11 @@ runs:
       with:
         node-version: 22.14.0
 
-    - name: Setup Docker
+    - name: Set up Docker
+      uses: docker/setup-docker-action@v4
       if: ${{ inputs.install-docker == true || inputs.install-docker == 'true' }}
-      uses: ./.github/actions/setup-docker
+      with:
+        version: version=28.1.1
         
     - name: Install pnpm
       uses: pnpm/action-setup@v4 # pulls version from package.json -> "packageManager"
