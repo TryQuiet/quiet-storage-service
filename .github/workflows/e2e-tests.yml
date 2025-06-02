@@ -18,4 +18,4 @@ jobs:
 
       - name: "Run E2E tests"
         shell: bash
-        run: pnpm run test:e2e:ci
+        run: pnpm run run:app test:e2e:ci

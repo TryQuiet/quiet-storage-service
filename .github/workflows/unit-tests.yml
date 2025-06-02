@@ -20,4 +20,4 @@ jobs:
 
       - name: "Run unit tests"
         shell: bash
-        run: pnpm run test:ci
+        run: pnpm run run:app test:ci
