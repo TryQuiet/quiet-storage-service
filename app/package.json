@@ -43,6 +43,7 @@
     "docker:up:test": "docker compose -f test/docker-compose-test.yml up -d",
     "docker:down:test": "docker compose -f test/docker-compose-test.yml down",
     "spinup:tests": "pnpm run -w bootstrap && pnpm run docker:up:test && pnpm run migrate:up:test",
+    "spinup:tests:ci": "pnpm run docker:up:test && pnpm run migrate:up:test",
     "spindown:tests": "pnpm run docker:down:test",
     "test": "pnpm run spinup:tests && NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --config ./test/jest.unit.config.ts --runInBand --colors --detectOpenHandles --forceExit --verbose",
     "test:ci": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --config ./test/jest.unit.config.ts --runInBand --colors --detectOpenHandles --forceExit --ci --silent --verbose",
@@ -50,7 +51,7 @@
     "test:cov": "pnpm run spinup:tests && NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --config ./test/jest.unit.config.ts --coverage",
     "test:debug": "pnpm run spinup:tests && NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- node --inspect-brk -r  tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --config ./test/jest.unit.config.ts --runInBand",
     "test:e2e": "pnpm run spinup:tests && IS_E2E=true NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --config ./test/jest.e2e.config.ts --runInBand --colors --detectOpenHandles --forceExit --verbose",
-    "test:e2e:ci": "pnpm run spinup:tests && IS_E2E=true NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --config ./test/jest.e2e.config.ts --runInBand --colors --detectOpenHandles --forceExit --ci --silent --verbose",
+    "test:e2e:ci": "IS_E2E=true NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" dotenvx run -f .env.test -- jest --config ./test/jest.e2e.config.ts --runInBand --colors --detectOpenHandles --forceExit --ci --silent --verbose",
     "prepare": "husky"
   },
   "dependencies": {
