@@ -11,7 +11,7 @@ COPY package.json pnpm-lock.yaml ./
 COPY . .
 
 FROM base AS builder
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm run bootstrap -v
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm run bootstrap -v -r 
 
 EXPOSE 3000
 CMD ["pnpm", "run", "start:bare"]
