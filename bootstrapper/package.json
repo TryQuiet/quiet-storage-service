@@ -11,7 +11,7 @@
     "url": "git+https://github.com/TryQuiet/quiet-storage-service.git"
   },
   "scripts": {
-    "install:deps": "pnpm i --dir --ignore-workspace",
+    "install:deps": "pnpm i --dir --ignore-workspace --force",
     "bootstrap-app": "pnpm run install:deps && node ./bootstrap.mjs"
   },
   "devDependencies": {
