@@ -15,8 +15,6 @@ jobs:
 
       - name: "Setup environment"
         uses: ./.github/actions/setup-env
-        with:
-          install-docker: true
 
       - name: "Run E2E tests"
         shell: bash
