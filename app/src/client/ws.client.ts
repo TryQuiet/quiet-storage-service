@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common'
-import type { CryptoKX, KeyPair } from 'libsodium-wrappers-sumo'
 import { connect, type Socket as ClientSocket } from 'socket.io-client'
 import { sleep } from '../nest/utils/sleep.js'
 import { WebsocketEvents } from '../nest/websocket/ws.types.js'
@@ -9,8 +8,6 @@ import { HOSTNAME, LISTEN_PORT } from '../nest/app/const.js'
 @Injectable()
 export class WebsocketClient {
   public clientSocket: ClientSocket | undefined = undefined
-  private readonly keyPair: KeyPair | undefined = undefined
-  public sessionKey: CryptoKX | undefined = undefined
   private readonly uri: string | undefined = undefined
 
   private readonly logger = createLogger(WebsocketClient.name)
@@ -37,7 +34,7 @@ export class WebsocketClient {
   }
 
   private async _waitForConnect(): Promise<void> {
-    if (this.clientSocket == null || this.keyPair == null) {
+    if (this.clientSocket == null) {
       throw new Error(`Must run createSocket first!`)
     }
 
@@ -60,7 +57,7 @@ export class WebsocketClient {
     withAck = false,
   ): Promise<T | undefined> {
     this.logger.debug(`Sending message`, event)
-    if (this.clientSocket == null || this.sessionKey == null) {
+    if (this.clientSocket == null) {
       throw new Error(`Must run createSocket first!`)
     }
 
