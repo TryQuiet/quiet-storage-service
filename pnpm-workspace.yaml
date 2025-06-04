@@ -1,3 +1,6 @@
 packages:
   - app
   - auth-packages/lfa/*
+overrides:
+  "vite": "5.4.19"
+  "esbuild": "0.25.5"
