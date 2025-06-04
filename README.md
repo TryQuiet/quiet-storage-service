@@ -149,3 +149,7 @@ $ pnpm run format:lint
 # run prettier and eslint with auto-fix
 $ pnpm run format:lint:fix
 ```
+
+## Random Guidance
+
+- To override package versions that are imported by other dependencies (e.g. overriding a package version imported by LFA) you must put the overrides in the `pnpm-workspace.yaml` file and not `package.json` (for more details see [the PNPM docs](https://pnpm.io/settings#dependency-resolution))
