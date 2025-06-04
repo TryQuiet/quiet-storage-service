@@ -1,3 +1,6 @@
+/**
+ * Sodium encryption helper service
+ */
 import { Injectable } from '@nestjs/common'
 import _sodium from 'libsodium-wrappers-sumo'
 import { createLogger } from '../app/logger/logger.js'
@@ -5,6 +8,9 @@ import { Base64ErrorDirection, EncryptionBase64Error } from './types.js'
 
 @Injectable()
 export class SodiumHelper {
+  /**
+   * Sodium instance
+   */
   public localSodium: typeof _sodium | undefined = undefined
 
   private readonly logger = createLogger(SodiumHelper.name)
@@ -17,6 +23,9 @@ export class SodiumHelper {
     this.localSodium = _sodium
   }
 
+  /**
+   * Get the initialized sodium instance
+   */
   public get sodium(): typeof _sodium {
     if (this.localSodium == null) {
       throw new Error(`Libsodium not initialized!`)

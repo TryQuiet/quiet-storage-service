@@ -27,6 +27,9 @@ export class QSSService {
     private readonly postgresClient: PostgresClient,
   ) {}
 
+  /**
+   * Create and initialize the Nest app
+   */
   public async init(): Promise<void> {
     this.logger.log(`Initializing QSS`)
     this.app = await NestFactory.create<NestFastifyApplication>(
@@ -43,6 +46,9 @@ export class QSSService {
     await this.app.init()
   }
 
+  /**
+   * Start listening on the server
+   */
   public async start(): Promise<void> {
     if (this.app == null) {
       throw new Error(`Must initialize app before starting!`)
@@ -59,6 +65,9 @@ export class QSSService {
     })
   }
 
+  /**
+   * Shutdown the application and close the database connection
+   */
   public async close(): Promise<void> {
     if (this.app == null) {
       this.logger.warn(`App wasn't initialized, can't close!`)

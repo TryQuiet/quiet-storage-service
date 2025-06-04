@@ -1,3 +1,7 @@
+/**
+ * LFA auth sync connection wrapper
+ */
+
 import type { SigChain } from './sigchain.js'
 import {
   castServer,
@@ -20,22 +24,40 @@ import type { QuietLogger } from '../../app/logger/types.js'
 import type { AuthConnectionOptions } from './types.js'
 
 export class AuthConnection {
+  /**
+   * Auth sync connection
+   */
   public readonly lfaConnection: LFAConnection
+  /**
+   * Member context cast from Server
+   */
   public userContext: MemberContext
+  /**
+   * User context cast from Server
+   */
   public localUserContext: LocalUserContext
 
+  /**
+   * Generate a new logger for this auth sync connection
+   *
+   * @param loggingContext Context of this logger
+   * @returns New logger instance for a given LFA connection
+   */
+  private readonly createLfaLogger = (loggingContext: string): QuietLogger =>
+    createLogger(`Localfirst:${loggingContext}`)
+
   private readonly logger = createLogger(`Communities:Auth:Connection`)
-  private readonly createLfaLogger = (context: string): QuietLogger =>
-    createLogger(`Localfirst:${context}`)
 
   constructor(
     private readonly userId: string,
     private readonly sigChain: SigChain,
     private readonly options: AuthConnectionOptions,
   ) {
+    // convert the Server data on the chain to a User object
     const user: UserWithSecrets = castServer.toUser(
       this.sigChain.context.server,
     ) as UserWithSecrets
+    // convert the Server data on the chain to a Device object
     const device: DeviceWithSecrets = castServer.toDevice(
       this.sigChain.context.server,
     ) as DeviceWithSecrets
@@ -48,6 +70,7 @@ export class AuthConnection {
       user,
       device,
     }
+    // create a new LFA auth sync connection that routes auth sync messages through an existing websocket connection
     this.lfaConnection = new LFAConnection({
       context: this.userContext,
       sendMessage: (message: Uint8Array) => {
@@ -68,6 +91,9 @@ export class AuthConnection {
     })
   }
 
+  /**
+   * Start the auth sync connection and handle connection events
+   */
   public start(): void {
     // Set up auth connection event handlers.
     this.lfaConnection.on('connected', () => {
@@ -78,26 +104,17 @@ export class AuthConnection {
       this.lfaConnection.emit('sync', { team, user })
     })
 
+    // handle disconnects
     this.lfaConnection.on('disconnected', event => {
       this.logger.log(`LFA Disconnected!`, event)
     })
 
-    this.lfaConnection.on('change', payload => {
-      this.logger.verbose(`Auth state change`)
-    })
-
-    // TODO: store updated sigchain on updates
+    // handle chain updates
     this.lfaConnection.on('updated', async head => {
       this.logger.debug('Received sync message, team graph updated', head)
-      await this.options.communitiesManager.update(
-        this.sigChain.team.id,
-        { sigChain: this.sigChain.serialize(true) },
-        false,
-      )
-    })
-
-    this.lfaConnection.on('message', payload => {
-      this.logger.debug(`LFA message`)
+      await this.options.communitiesManager.update(this.sigChain.team.id, {
+        sigChain: this.sigChain.serialize(true),
+      })
     })
 
     // Handle errors from local or remote sources.
@@ -114,6 +131,9 @@ export class AuthConnection {
     this.lfaConnection.start()
   }
 
+  /**
+   * Stop the auth sync connection
+   */
   public stop(): void {
     this.logger.debug('Closing connection with user')
     this.lfaConnection.stop(true)

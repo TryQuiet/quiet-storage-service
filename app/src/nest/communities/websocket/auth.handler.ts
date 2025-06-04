@@ -1,6 +1,5 @@
 /**
- * NOTE: This is a dummy WS handler to establish how we'll set them up and for adding websocket tests.  Socket.io
- * has its own ping handler.
+ * Auth websocket event handlers
  */
 
 import { WebsocketEvents } from '../../websocket/ws.types.js'
@@ -21,10 +20,9 @@ import { AllowedServerKeyState } from '../types.js'
 const baseLogger = createLogger('Websocket:Event:Communities:Auth')
 
 /**
- * Adds event handlers for community-related events
+ * Adds event handlers for auth-related events
  *
- * @param socketServer Socket.io server instance
- * @param socket Socket connection with client
+ * @param options Websocket handler options
  */
 export function registerCommunitiesAuthHandlers(
   options: CommunitiesHandlerOptions,
@@ -32,11 +30,18 @@ export function registerCommunitiesAuthHandlers(
   const _logger = baseLogger.extend(options.socket.id)
   _logger.debug(`Initializing communities auth WS event handlers`)
 
+  /**
+   * Generate new server keys for this community and return redacted keys to the user
+   *
+   * @param message Public key generation message
+   * @param callback Callback for returning response
+   */
   async function handleGeneratePublicKeys(
     message: GeneratePublicKeysMessage,
     callback: (payload: GeneratePublicKeysResponse) => void,
   ): Promise<void> {
     try {
+      // generate the keys for this community and return to the user
       const keysetWithSecrets = await options.communitiesManager.getServerKeys(
         message.payload.teamId,
         AllowedServerKeyState.NOT_STORED,
@@ -65,6 +70,11 @@ export function registerCommunitiesAuthHandlers(
     }
   }
 
+  /**
+   * Handle incoming auth sync message and pass along to the auth sync connection
+   *
+   * @param message Auth sync message
+   */
   async function handleAuthSync(message: AuthSyncMessage): Promise<void> {
     let authConnection: AuthConnection | undefined = undefined
     try {
@@ -72,6 +82,7 @@ export function registerCommunitiesAuthHandlers(
         throw new Error(`Payload was nullish during auth sync!`)
       }
 
+      // get the managed community by ID and return an error if not found
       const community = await options.communitiesManager.get(
         message.payload.payload.teamId,
       )
@@ -79,6 +90,7 @@ export function registerCommunitiesAuthHandlers(
         throw new Error(`No community found`)
       }
 
+      // get the existing auth connection for this user and return an error if not found
       authConnection = community.authConnections?.get(
         message.payload.payload.userId,
       )
@@ -87,6 +99,7 @@ export function registerCommunitiesAuthHandlers(
           `No auth connection was established for this user on this community`,
         )
       }
+      // push the sync message onto the auth sync connection
       authConnection.lfaConnection.deliver(
         uint8arrays.fromString(message.payload.payload.message, 'base64'),
       )
@@ -99,7 +112,7 @@ export function registerCommunitiesAuthHandlers(
     }
   }
 
-  // register event handlers
+  // register event handlers on this socket
   options.socket.on(
     WebsocketEvents.GeneratePublicKeys,
     handleGeneratePublicKeys,

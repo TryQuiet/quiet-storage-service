@@ -1,6 +1,5 @@
 /**
- * NOTE: This is a dummy WS handler to establish how we'll set them up and for adding websocket tests.  Socket.io
- * has its own ping handler.
+ * Communities websocket event handlers
  */
 
 import { WebsocketEvents } from '../../websocket/ws.types.js'
@@ -11,8 +10,6 @@ import {
   CreateCommunityStatus,
   type CreateCommunity,
   type CreateCommunityResponse,
-  type UpdateCommunity,
-  type UpdateCommunityResponse,
   CommunityOperationStatus,
   type GetCommunity,
   type GetCommunityResponse,
@@ -24,8 +21,7 @@ const baseLogger = createLogger('Websocket:Event:Communities')
 /**
  * Adds event handlers for community-related events
  *
- * @param socketServer Socket.io server instance
- * @param socket Socket connection with client
+ * @param options Websocket handler options
  */
 export function registerCommunitiesHandlers(
   options: CommunitiesHandlerOptions,
@@ -33,18 +29,27 @@ export function registerCommunitiesHandlers(
   const _logger = baseLogger.extend(options.socket.id)
   _logger.debug(`Initializing communities WS event handlers`)
 
+  /**
+   * Create and store a community
+   *
+   * @param message Create community message
+   * @param callback Callback for sending response
+   */
   async function handleCreateCommunity(
     message: CreateCommunity,
     callback: (payload: CreateCommunityResponse) => void,
   ): Promise<void> {
     _logger.debug(`Handling community create event`)
     try {
+      // Create the community and start syncing the sigchain with this user
       await options.communitiesManager.create(
         message.payload.userId,
         message.payload.community,
         message.payload.teamKeyring,
-        options,
+        options.socket,
       )
+
+      // form and return a success response to the user
       let response: CreateCommunityResponse | undefined = undefined
       response = {
         ts: DateTime.utc().toMillis(),
@@ -66,7 +71,12 @@ export function registerCommunitiesHandlers(
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await -- this is fine
+  /**
+   * Start the sign in process for this user and start auth sync connection
+   *
+   * @param message Community sign in message
+   * @param callback Callback for sending response
+   */
   async function handleSignInToCommunity(
     message: CommunitySignInMessage,
     callback: (payload: CommunitySignInMessage) => void,
@@ -77,6 +87,7 @@ export function registerCommunitiesHandlers(
         throw new Error(`Payload was nullish!`)
       }
       const { teamId, userId } = message.payload.payload
+      // get the community and return an error response if not found
       if ((await options.communitiesManager.get(teamId)) == null) {
         _logger.warn(
           `Attempted sign-in to community ${teamId} but no community was initialized for that ID`,
@@ -92,10 +103,15 @@ export function registerCommunitiesHandlers(
         return
       }
 
+      // start the auth sync connection and return a success response
       _logger.debug(
         `Found community for ID ${teamId}, initializing sync connection`,
       )
-      options.communitiesManager.startConnection(userId, teamId, options)
+      options.communitiesManager.startAuthSyncConnection(
+        userId,
+        teamId,
+        options,
+      )
 
       const response: CommunitySignInMessage = {
         ts: DateTime.utc().toMillis(),
@@ -117,40 +133,18 @@ export function registerCommunitiesHandlers(
     }
   }
 
-  async function handleUpdateCommunity(
-    message: UpdateCommunity,
-    callback: (payload: UpdateCommunityResponse) => void,
-  ): Promise<void> {
-    try {
-      await options.communitiesManager.update(
-        message.payload.teamId,
-        message.payload.updates,
-      )
-      const response: UpdateCommunityResponse = {
-        ts: DateTime.utc().toMillis(),
-        payload: {
-          status: CommunityOperationStatus.SUCCESS,
-        },
-      }
-      callback(response)
-    } catch (e) {
-      _logger.error(`Error while processing update community event`, e)
-      const errorResponse: UpdateCommunityResponse = {
-        ts: DateTime.utc().toMillis(),
-        payload: {
-          status: CommunityOperationStatus.ERROR,
-          reason: `Error while updating community`,
-        },
-      }
-      callback(errorResponse)
-    }
-  }
-
+  /**
+   * Get a community by ID and return to the user
+   *
+   * @param message Get community message
+   * @param callback Callback for returning response
+   */
   async function handleGetCommunity(
     message: GetCommunity,
     callback: (payload: GetCommunityResponse) => void,
   ): Promise<void> {
     try {
+      // get the community and return a success or error response based on result
       const managedCommunity = await options.communitiesManager.get(
         message.payload.id,
       )
@@ -168,7 +162,10 @@ export function registerCommunitiesHandlers(
           ts: DateTime.utc().toMillis(),
           payload: {
             status: CommunityOperationStatus.SUCCESS,
-            payload: managedCommunity.community,
+            payload: {
+              sigChain: managedCommunity.sigChain.serialize(true),
+              teamId: managedCommunity.teamId,
+            },
           },
         }
       }
@@ -186,9 +183,8 @@ export function registerCommunitiesHandlers(
     }
   }
 
-  // register event handlers
+  // register event handlers on this socket
   options.socket.on(WebsocketEvents.CreateCommunity, handleCreateCommunity)
-  options.socket.on(WebsocketEvents.UpdateCommunity, handleUpdateCommunity)
   options.socket.on(WebsocketEvents.GetCommunity, handleGetCommunity)
   options.socket.on(WebsocketEvents.SignInCommunity, handleSignInToCommunity)
 }

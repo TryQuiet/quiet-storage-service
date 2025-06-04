@@ -14,7 +14,6 @@ export enum WebsocketEvents {
   Pong = 'pong',
   // communities
   CreateCommunity = 'create-community',
-  UpdateCommunity = 'update-community',
   GetCommunity = 'get-community',
   SignInCommunity = 'sign-in-community',
   //// community auth

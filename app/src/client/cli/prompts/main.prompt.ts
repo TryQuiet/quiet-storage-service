@@ -4,11 +4,7 @@ import actionSelect from '../components/actionSelect.js'
 import type { WebsocketClient } from '../../ws.client.js'
 import { createLogger } from '../../../nest/app/logger/logger.js'
 import { confirm } from '@inquirer/prompts'
-import {
-  createCommunity,
-  getCommunity,
-  updateCommunity,
-} from './community.prompt.js'
+import { createCommunity, getCommunity } from './community.prompt.js'
 import type { Community } from '../../../nest/communities/types.js'
 
 const logger = createLogger('Client:Main')
@@ -41,11 +37,6 @@ const mainLoop = async (
         description: 'Create a new community on the server',
       },
       {
-        name: 'Update community',
-        value: 'updateCommunity',
-        description: 'Update an existing community on the server',
-      },
-      {
         name: 'Get community',
         value: 'getCommunity',
         description: 'Get a community by ID from the server',
@@ -71,14 +62,6 @@ const mainLoop = async (
         switch (answer.answer) {
           case 'createCommunity': {
             community = await createCommunity(client)
-            break
-          }
-          case 'updateCommunity': {
-            if (community == null) {
-              logger.warn(`No community has been created!`)
-            } else {
-              community = await updateCommunity(client, community)
-            }
             break
           }
           case 'getCommunity': {

@@ -1,3 +1,6 @@
+/**
+ * Enum of known environment variables
+ */
 export enum EnvVars {
   // general settings
   ENV = 'ENV',

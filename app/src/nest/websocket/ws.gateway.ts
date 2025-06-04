@@ -20,6 +20,9 @@ import { CommunitiesManagerService } from '../communities/communities-manager.se
 import { CommunitiesHandlerOptions } from '../communities/websocket/types/index.js'
 import { registerCommunitiesAuthHandlers } from '../communities/websocket/auth.handler.js'
 
+/**
+ * Websocket gateway configuration
+ */
 @WebSocketGateway({
   cors: {
     origin: '*',
@@ -51,6 +54,9 @@ export class WebsocketGateway
     // do nothing for now
   }
 
+  /**
+   * Close the websocket server when shutting down the server
+   */
   public async onModuleDestroy(): Promise<void> {
     await this.io.close()
   }
@@ -70,6 +76,7 @@ export class WebsocketGateway
     )
     _logger.debug(`Number of connected clients: ${sockets.size}`)
 
+    // register all websocket event handlers on this socket
     this._registerEventHandlers(client)
   }
 

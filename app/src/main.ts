@@ -8,6 +8,9 @@ import { createLogger } from './nest/app/logger/logger.js'
 
 const logger = createLogger('Main')
 
+/**
+ * Initialize the QSS Nest app and start the server
+ */
 async function bootstrap(): Promise<void> {
   logger.log(`Bootstrapping QSS`)
   // This is a bit janky because it means we end up creating a temporary app context

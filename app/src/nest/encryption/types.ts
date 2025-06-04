@@ -28,6 +28,9 @@ export interface EncryptedPayload {
   payload: string
 }
 
+/**
+ * Random strings assigned to keyring secret names
+ */
 export enum StoredKeyRingType {
   SERVER_KEYRING = '139f',
   TEAM_KEYRING = 'ab60',

@@ -1,3 +1,7 @@
+/**
+ * Client for interfacing with Postgres
+ */
+
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { createLogger } from '../../app/logger/logger.js'
 import {
@@ -11,13 +15,18 @@ import { Community } from '../../communities/storage/entities/community.entity.j
 
 @Injectable()
 export class PostgresClient implements OnModuleInit, OnModuleDestroy {
+  /**
+   * Map of DB entities to repository instances
+   */
   private readonly repositories = new Map<EntityName<any>, PostgresRepo<any>>()
+
   private readonly logger = createLogger(`Storage:${PostgresClient.name}`)
 
   constructor(
     private readonly orm: MikroORM,
     private readonly entityManager: EntityManager,
   ) {
+    // load our repository map
     this.repositories.set(
       Community,
       new PostgresRepo(Community, this.entityManager),
@@ -29,6 +38,11 @@ export class PostgresClient implements OnModuleInit, OnModuleDestroy {
     this.logger.log('Postgres client initialized!')
   }
 
+  /**
+   * Connect the client to our Postgres DB
+   *
+   * @returns void
+   */
   public async connect(): Promise<void> {
     this.logger.log(`Connecting postgres client`, this.orm.config.get('host'))
     if (await this.orm.isConnected()) {
@@ -39,6 +53,12 @@ export class PostgresClient implements OnModuleInit, OnModuleDestroy {
     await this.orm.connect()
   }
 
+  /**
+   * Get an existing repository for a given DB entity
+   *
+   * @param entityName DB entity that this repository handles
+   * @returns Postgres repository instance for this entity
+   */
   public getRepository<T extends BaseEntity>(
     entityName: EntityName<T>,
   ): PostgresRepo<T> {
@@ -52,6 +72,11 @@ export class PostgresClient implements OnModuleInit, OnModuleDestroy {
     return repo as PostgresRepo<T>
   }
 
+  /**
+   * Close the DB client connection
+   *
+   * @param force Force closing the connection
+   */
   public async close(force = false): Promise<void> {
     await this.orm.close(force)
   }

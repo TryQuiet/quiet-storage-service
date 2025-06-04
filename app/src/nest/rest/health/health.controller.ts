@@ -1,3 +1,6 @@
+/**
+ * REST controller for health check requests
+ */
 import { Controller, Get } from '@nestjs/common'
 import {
   HealthCheckService,
@@ -9,6 +12,7 @@ import {
 } from '@nestjs/terminus'
 import { createLogger } from '../../app/logger/logger.js'
 
+// associate with the /health path prefix
 @Controller('health')
 export class HealthController {
   private readonly logger = createLogger(HealthController.name)
@@ -18,12 +22,22 @@ export class HealthController {
     private readonly postgresHealth: MikroOrmHealthIndicator,
   ) {}
 
+  /**
+   * Check health of this QSS instance
+   *
+   * @returns Health check data
+   */
   @Get()
   @HealthCheck()
   public async check(): Promise<HealthCheckResult> {
     return await this.health.check([this.postgresCheck()])
   }
 
+  /**
+   * Check postgres connection health
+   *
+   * @returns Postgres health data
+   */
   private postgresCheck(): HealthIndicatorFunction {
     const check = async (): Promise<HealthIndicatorResult<'postgres'>> => {
       try {

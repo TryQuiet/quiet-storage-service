@@ -24,7 +24,7 @@ $ volta install npm@10.9.0
 Once `node` and `npm` are installed via Volta you can install `pnpm`
 
 ```bash
-$ volta install pnpm@10.6.0
+$ volta install pnpm@10.9.0
 ```
 
 #### Docker
@@ -53,6 +53,14 @@ $ pnpm run bootstrap
 
 This will build all submodules, install dependencies and build the application.
 
+## Running commands on the app package.json
+
+Many commands are mapped onto the root `package.json` but for any other pnpm commands you can run them via
+
+```bash
+$ pnpm run run:app <command>
+```
+
 ## Running the app
 
 ```bash
@@ -73,6 +81,18 @@ $ pnpm run start:prod
 
 _NOTE: Running with `start` and `start:debug` will spin up dockerized dependencies (e.g. postgres) and run database migrations_
 
+## Running the app in docker
+
+```bash
+# spin up complete docker environment
+$ pnpm run run:app docker:up:test
+
+# spin down complete docker environment
+$ pnpm run run:app docker:down:test
+```
+
+_NOTE: Running this spins up services in a different container from the one used in pnpm run start and is used for Quiet E2E tests._
+
 ## Running the client
 
 ```bash
@@ -87,23 +107,23 @@ $ pnpm run start:client:dev
 
 ```bash
 # create a new migration
-$ pnpm run migrate:create
+$ pnpm run migrate
 
 # migrate database with existing migrations
-$ pnpm run migrate:up
+$ pnpm run run:app migrate:up
 ```
 
 ## Test
 
 ```bash
 # unit tests
-$ pnpm run test
+$ pnpm run run:app test
 
 # e2e tests
-$ pnpm run test:e2e
+$ pnpm run run:app test:e2e
 
 # test coverage
-$ pnpm run test:cov
+$ pnpm run run:app test:cov
 ```
 
 ## Linting and Formatting

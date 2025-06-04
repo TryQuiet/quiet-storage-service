@@ -96,7 +96,7 @@ describe('CommunitiesManagerService', () => {
         testTeam.testUserContext.user.userId,
         community,
         b64Keyring,
-        wsOptions!,
+        wsOptions!.socket,
       )
       expect(_.isEqual(createdCommunity.community, community)).toBe(true)
     })
@@ -119,7 +119,7 @@ describe('CommunitiesManagerService', () => {
           testTeam.testUserContext.user.userId,
           community,
           b64Keyring,
-          wsOptions!,
+          wsOptions!.socket,
         )
       } catch (e) {
         error = e as Error
@@ -163,7 +163,7 @@ describe('CommunitiesManagerService', () => {
           testTeam.testUserContext.user.userId,
           community,
           b64Keyring,
-          wsOptions!,
+          wsOptions!.socket,
         )
       } catch (e) {
         error = e as Error
@@ -203,7 +203,7 @@ describe('CommunitiesManagerService', () => {
           testTeam.testUserContext.user.userId,
           community,
           invalidKeyring,
-          wsOptions!,
+          wsOptions!.socket,
         )
       } catch (e) {
         error = e as Error

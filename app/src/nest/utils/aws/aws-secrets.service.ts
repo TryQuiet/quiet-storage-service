@@ -1,3 +1,6 @@
+/**
+ * AWS secrets manager wrapper service
+ */
 import {
   SecretsManagerClient,
   GetSecretValueCommand,
@@ -19,15 +22,28 @@ import { RedisClient } from '../../storage/redis/redis.client.js'
 
 @Injectable()
 export class AWSSecretsService {
+  /**
+   * AWS region string we are connecting to
+   */
   private readonly awsRegion: string | undefined
+  /**
+   * True if we are initializing this service in a local environment
+   */
   private readonly local: boolean
+  /**
+   * Configuration for connecting to the AWS secrets manager
+   */
   private readonly clientConfig: SecretsManagerClientConfig | undefined
 
   private readonly logger = createLogger(`Utils:${AWSSecretsService.name}`)
 
+  /**
+   * @param redisClient Redis client for local instances
+   */
   constructor(private readonly redisClient: RedisClient) {
     this.logger.log(`Creating ${AWSSecretsService.name}`)
     this.awsRegion = ConfigService.getString(EnvVars.AWS_REGION)
+    // check if we are configured for a non-local environment
     if (
       [Environment.Development, Environment.Production].includes(
         ConfigService.getEnv(),
@@ -57,14 +73,22 @@ export class AWSSecretsService {
     }
   }
 
+  /**
+   * Get a secret by name from the AWS secrets manager
+   *
+   * @param secretName Secret to retrieve
+   * @returns Retrieved encrypted secret value
+   */
   public async get(
     secretName: string,
   ): Promise<string | Uint8Array | undefined | null> {
     try {
+      // if local fetch the secret from Redis and return
       if (this.local) {
         return await this.redisClient.get(secretName)
       }
 
+      // generate the AWS secrets manager command and fetch
       const commandInput: GetSecretValueCommandInput = {
         SecretId: secretName,
       }
@@ -78,16 +102,24 @@ export class AWSSecretsService {
     }
   }
 
+  /**
+   * Insert a secret by name into the AWS secrets manager
+   *
+   * @param secretName Secret name we are inserting
+   * @param secret Encrypted secret to insert
+   */
   public async put(
     secretName: string,
     secret: string | Uint8Array,
   ): Promise<void> {
     try {
+      // if local add the secret to Redis and return
       if (this.local) {
         await this.redisClient.set(secretName, secret)
         return
       }
 
+      // generate the AWS secrets command and insert the secret
       const commandInput: PutSecretValueCommandInput = {
         SecretId: secretName,
       }
@@ -107,12 +139,21 @@ export class AWSSecretsService {
     }
   }
 
+  /**
+   * Close the Redis client, if applicable
+   */
   public async close(): Promise<void> {
     if (this.redisClient.enabled) {
       await this.redisClient.close()
     }
   }
 
+  /**
+   * Execute a command in the AWS secrets manager and return result
+   *
+   * @param command AWS secrets manager command object
+   * @returns Result of command
+   */
   private async executeCommandAws(command: any): Promise<ServiceOutputTypes> {
     if (this.clientConfig == null) {
       throw new Error(`Must configure a client config to use the AWS SDK`)

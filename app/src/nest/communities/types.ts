@@ -3,9 +3,9 @@ import type { SigChain } from './auth/sigchain.js'
 import type { AuthConnection } from './auth/auth.connection.js'
 
 export enum AllowedServerKeyState {
-  ANY = 'Any',
-  STORED_ONLY = 'StoredOnly',
-  NOT_STORED = 'NotStored',
+  ANY = 'Any', // keys can be new or old
+  STORED_ONLY = 'StoredOnly', // keys must already exist
+  NOT_STORED = 'NotStored', // keys must not already exist
 }
 
 export interface Community {
@@ -33,7 +33,6 @@ export type AuthConnectionMap = Map<string, AuthConnection>
 
 export interface ManagedCommunity {
   teamId: string
-  community: Community
   sigChain: SigChain
   authConnections?: AuthConnectionMap
 }

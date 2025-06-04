@@ -1,3 +1,6 @@
+/**
+ * Environment configuration wrapper service
+ */
 import { EnvVars } from './env_vars.js'
 import { Injectable } from '@nestjs/common'
 import { Environment, EnvironmentShort } from './types.js'

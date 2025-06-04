@@ -1,3 +1,7 @@
+/**
+ * Communities storage abstraction layer
+ */
+
 import { Injectable, OnModuleInit } from '@nestjs/common'
 import { createLogger } from '../../app/logger/logger.js'
 import { Community, CommunityUpdate } from '../types.js'
@@ -10,8 +14,12 @@ import * as uint8arrays from 'uint8arrays'
 
 @Injectable()
 export class CommunitiesStorageService implements OnModuleInit {
-  private readonly logger = createLogger('Storage:Communities')
+  /**
+   * Postgres repository
+   */
   private readonly repository: PostgresRepo<CommunityEntity>
+
+  private readonly logger = createLogger('Storage:Communities')
 
   constructor(
     private readonly postgresClient: PostgresClient,
@@ -50,6 +58,22 @@ export class CommunitiesStorageService implements OnModuleInit {
     }
   }
 
+  public async updateAndFindCommunity(
+    teamId: string,
+    payload: CommunityUpdate,
+  ): Promise<Community | undefined | null> {
+    this.logger.log(`Updating and getting community with ID ${teamId}`)
+    const result = await this.repository.updateAndFindOne(
+      teamId,
+      this.payloadToEntityData(payload),
+    )
+    if (result == null) {
+      this.logger.warn(`No community found in storage for ID ${teamId}`)
+      return undefined
+    }
+    return this.entityToPayload(result)
+  }
+
   public async getCommunity(
     teamId: string,
   ): Promise<Community | undefined | null> {
@@ -60,6 +84,17 @@ export class CommunitiesStorageService implements OnModuleInit {
       return undefined
     }
     return this.entityToPayload(result)
+  }
+
+  public async hasCommunity(teamId: string): Promise<boolean> {
+    this.logger.log(`Checking for community with ID ${teamId}`)
+    const result = await this.repository.has(teamId)
+    if (result == null) {
+      throw new Error(
+        `Failed to determine if community with ID ${teamId} exists in storage`,
+      )
+    }
+    return result
   }
 
   public async clearRepository(): Promise<void> {
