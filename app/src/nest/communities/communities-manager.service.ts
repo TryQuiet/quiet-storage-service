@@ -161,28 +161,21 @@ export class CommunitiesManagerService {
    * @param updates Fields to update
    * @returns Managed community
    */
-  public async update(
-    teamId: string,
-    updates: CommunityUpdate,
-  ): Promise<ManagedCommunity> {
+  public async update(teamId: string, updates: CommunityUpdate): Promise<void> {
     this.logger.log(`Updating community for ID ${teamId}`)
     try {
       this.logger.log(`Storing updated community metadata`)
-      const updatedCommunity = await this.storage.updateAndFindCommunity(
-        teamId,
-        updates,
-      )
-      if (updatedCommunity == null) {
+      const updated = await this.storage.updateCommunity(teamId, updates)
+      if (!updated) {
         throw new Error(`Failed to update stored community!`)
       }
-      const managedCommunity = await this._processCommunityToManagedCommunity(
-        teamId,
-        updatedCommunity,
-      )
-      if (managedCommunity == null) {
-        throw new Error(`Failed to generate managed community!`)
-      }
-      return managedCommunity
+      // const managedCommunity = await this._processCommunityToManagedCommunity(
+      //   teamId,
+      //   updatedCommunity,
+      // )
+      // if (managedCommunity == null) {
+      //   throw new Error(`Failed to generate managed community!`)
+      // }
     } catch (e) {
       const reason = `Error while updating community`
       this.logger.error(`Error while updating community`, e)
