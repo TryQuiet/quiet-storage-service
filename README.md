@@ -47,6 +47,14 @@ $ colima start
 
 ### Dependencies and building the app
 
+First, initialize git submodules:
+
+```bash
+$ git submodule update --init --recursive
+```
+
+Then install dependencies and build:
+
 ```bash
 $ pnpm run bootstrap
 ```
