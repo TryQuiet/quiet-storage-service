@@ -12,12 +12,12 @@ import {
 import { Server, Socket } from 'socket.io'
 import { OnModuleDestroy } from '@nestjs/common'
 
-import { BaseHandlerOptions } from './ws.types.js'
+import { BaseHandlerConfig } from './ws.types.js'
 import { createLogger } from '../app/logger/logger.js'
 import { registerCommunitiesHandlers } from '../communities/websocket/communities.handler.js'
 import { CommunitiesStorageService } from '../communities/storage/communities.storage.service.js'
 import { CommunitiesManagerService } from '../communities/communities-manager.service.js'
-import { CommunitiesHandlerOptions } from '../communities/websocket/types/index.js'
+import { CommunitiesHandlerConfig } from '../communities/websocket/types/index.js'
 import { registerCommunitiesAuthHandlers } from '../communities/websocket/auth.handler.js'
 
 /**
@@ -96,17 +96,17 @@ export class WebsocketGateway
    * @param client Socket connection with a new client
    */
   private _registerEventHandlers(client: Socket): void {
-    const baseOptions: BaseHandlerOptions = {
+    const baseConfig: BaseHandlerConfig = {
       socketServer: this.io,
       socket: client,
     }
 
-    const communitiesOptions: CommunitiesHandlerOptions = {
-      ...baseOptions,
+    const communitiesConfig: CommunitiesHandlerConfig = {
+      ...baseConfig,
       storage: this.communityStorageService,
       communitiesManager: this.communitiesManager,
     }
-    registerCommunitiesHandlers(communitiesOptions)
-    registerCommunitiesAuthHandlers(communitiesOptions)
+    registerCommunitiesHandlers(communitiesConfig)
+    registerCommunitiesAuthHandlers(communitiesConfig)
   }
 }

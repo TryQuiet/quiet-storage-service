@@ -29,7 +29,7 @@ import { HOSTNAME } from '../app/const.js'
 import { SigChain } from './auth/sigchain.js'
 import { AuthConnection } from './auth/auth.connection.js'
 import { NativeServerWebsocketEvents } from '../websocket/ws.types.js'
-import { AuthConnectionOptions } from './auth/types.js'
+import { AuthConnectionConfig } from './auth/types.js'
 import { Socket } from 'socket.io'
 
 @Injectable()
@@ -180,13 +180,13 @@ export class CommunitiesManagerService {
    *
    * @param userId ID of the user we are connecting with
    * @param teamId Team ID of the community we are syncing
-   * @param options Related metadata for this auth sync connection
+   * @param config Related metadata/config for this auth sync connection
    * @returns void
    */
   public startAuthSyncConnection(
     userId: string,
     teamId: string,
-    options: AuthConnectionOptions,
+    config: AuthConnectionConfig,
   ): void {
     // get the community from the local cache or storage
     const managedCommunity = this.communities.get(teamId)
@@ -208,7 +208,7 @@ export class CommunitiesManagerService {
     const authConnection = new AuthConnection(
       userId,
       managedCommunity.sigChain,
-      options,
+      config,
     )
     authConnections.set(userId, authConnection)
     this.communities.set(teamId, {
@@ -218,7 +218,7 @@ export class CommunitiesManagerService {
 
     authConnection.start()
     // handle websocket disconnects and stop the auth sync connection
-    options.socket.on(NativeServerWebsocketEvents.Disconnect, () => {
+    config.socket.on(NativeServerWebsocketEvents.Disconnect, () => {
       authConnection.stop()
       this.communities.get(teamId)!.authConnections?.delete(userId)
     })

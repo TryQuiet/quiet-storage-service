@@ -13,7 +13,7 @@ import {
 } from './types.js'
 
 import * as uint8arrays from 'uint8arrays'
-import type { CommunitiesHandlerOptions } from './websocket/types/common.types.js'
+import type { CommunitiesHandlerConfig } from './websocket/types/common.types.js'
 import _ from 'lodash'
 import { StoredKeyRingType } from '../encryption/types.js'
 import { CommunitiesStorageService } from './storage/communities.storage.service.js'
@@ -31,7 +31,7 @@ describe('CommunitiesManagerService', () => {
   let serverKeyManager: ServerKeyManagerService | undefined = undefined
   let storage: CommunitiesStorageService | undefined = undefined
   let redis: RedisClient | undefined = undefined
-  let wsOptions: CommunitiesHandlerOptions | undefined = undefined
+  let wsConfig: CommunitiesHandlerConfig | undefined = undefined
 
   beforeEach(async () => {
     jest.mock('../src/nest/communities/auth/auth.connection.js')
@@ -47,7 +47,7 @@ describe('CommunitiesManagerService', () => {
     storage = module.get<CommunitiesStorageService>(CommunitiesStorageService)
     redis = module.get<RedisClient>(RedisClient)
     testTeamUtils = new TeamTestUtils(serverKeyManager)
-    wsOptions = {
+    wsConfig = {
       communitiesManager: manager,
       storage,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is ok
@@ -96,7 +96,7 @@ describe('CommunitiesManagerService', () => {
         testTeam.testUserContext.user.userId,
         community,
         b64Keyring,
-        wsOptions!.socket,
+        wsConfig!.socket,
       )
       expect(_.isEqual(createdCommunity.community, community)).toBe(true)
     })
@@ -119,7 +119,7 @@ describe('CommunitiesManagerService', () => {
           testTeam.testUserContext.user.userId,
           community,
           b64Keyring,
-          wsOptions!.socket,
+          wsConfig!.socket,
         )
       } catch (e) {
         error = e as Error
@@ -163,7 +163,7 @@ describe('CommunitiesManagerService', () => {
           testTeam.testUserContext.user.userId,
           community,
           b64Keyring,
-          wsOptions!.socket,
+          wsConfig!.socket,
         )
       } catch (e) {
         error = e as Error
@@ -203,7 +203,7 @@ describe('CommunitiesManagerService', () => {
           testTeam.testUserContext.user.userId,
           community,
           invalidKeyring,
-          wsOptions!.socket,
+          wsConfig!.socket,
         )
       } catch (e) {
         error = e as Error

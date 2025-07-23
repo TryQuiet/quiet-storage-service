@@ -21,7 +21,7 @@ import {
   CommunityOperationStatus,
 } from '../websocket/types/index.js'
 import type { QuietLogger } from '../../app/logger/types.js'
-import type { AuthConnectionOptions } from './types.js'
+import type { AuthConnectionConfig } from './types.js'
 
 export class AuthConnection {
   /**
@@ -51,7 +51,7 @@ export class AuthConnection {
   constructor(
     private readonly userId: string,
     private readonly sigChain: SigChain,
-    private readonly options: AuthConnectionOptions,
+    private readonly config: AuthConnectionConfig,
   ) {
     // convert the Server data on the chain to a User object
     const user: UserWithSecrets = castServer.toUser(
@@ -85,7 +85,7 @@ export class AuthConnection {
             },
           },
         }
-        this.options.socket.emit(WebsocketEvents.AuthSync, socketMessage)
+        this.config.socket.emit(WebsocketEvents.AuthSync, socketMessage)
       },
       createLogger: this.createLfaLogger,
     })
@@ -119,7 +119,7 @@ export class AuthConnection {
     this.lfaConnection.on('updated', async head => {
       try {
         this.logger.debug('Received sync message, team graph updated', head)
-        await this.options.communitiesManager.update(this.sigChain.team.id, {
+        await this.config.communitiesManager.update(this.sigChain.team.id, {
           sigChain: this.sigChain.serialize(true),
         })
       } catch (e) {

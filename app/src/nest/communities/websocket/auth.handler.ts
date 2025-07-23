@@ -10,7 +10,7 @@ import {
   CommunityOperationStatus,
   type GeneratePublicKeysMessage,
   type GeneratePublicKeysResponse,
-  type CommunitiesHandlerOptions,
+  type CommunitiesHandlerConfig,
 } from './types/index.js'
 import * as uint8arrays from 'uint8arrays'
 import type { AuthConnection } from '../auth/auth.connection.js'
@@ -22,12 +22,12 @@ const baseLogger = createLogger('Websocket:Event:Communities:Auth')
 /**
  * Adds event handlers for auth-related events
  *
- * @param options Websocket handler options
+ * @param config Websocket handler config
  */
 export function registerCommunitiesAuthHandlers(
-  options: CommunitiesHandlerOptions,
+  config: CommunitiesHandlerConfig,
 ): void {
-  const _logger = baseLogger.extend(options.socket.id)
+  const _logger = baseLogger.extend(config.socket.id)
   _logger.debug(`Initializing communities auth WS event handlers`)
 
   /**
@@ -42,7 +42,7 @@ export function registerCommunitiesAuthHandlers(
   ): Promise<void> {
     try {
       // generate the keys for this community and return to the user
-      const keysetWithSecrets = await options.communitiesManager.getServerKeys(
+      const keysetWithSecrets = await config.communitiesManager.getServerKeys(
         message.payload.teamId,
         AllowedServerKeyState.NOT_STORED,
       )
@@ -83,7 +83,7 @@ export function registerCommunitiesAuthHandlers(
       }
 
       // get the managed community by ID and return an error if not found
-      const community = await options.communitiesManager.get(
+      const community = await config.communitiesManager.get(
         message.payload.payload.teamId,
       )
       if (community == null) {
@@ -113,9 +113,6 @@ export function registerCommunitiesAuthHandlers(
   }
 
   // register event handlers on this socket
-  options.socket.on(
-    WebsocketEvents.GeneratePublicKeys,
-    handleGeneratePublicKeys,
-  )
-  options.socket.on(WebsocketEvents.AuthSync, handleAuthSync)
+  config.socket.on(WebsocketEvents.GeneratePublicKeys, handleGeneratePublicKeys)
+  config.socket.on(WebsocketEvents.AuthSync, handleAuthSync)
 }

@@ -1,6 +1,6 @@
 import type { Server, Socket } from 'socket.io'
 
-export interface BaseHandlerOptions {
+export interface BaseHandlerConfig {
   socketServer: Server
   socket: Socket
 }

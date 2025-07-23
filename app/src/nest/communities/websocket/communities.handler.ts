@@ -6,7 +6,7 @@ import { WebsocketEvents } from '../../websocket/ws.types.js'
 import { DateTime } from 'luxon'
 import { createLogger } from '../../app/logger/logger.js'
 import {
-  type CommunitiesHandlerOptions,
+  type CommunitiesHandlerConfig,
   CreateCommunityStatus,
   type CreateCommunity,
   type CreateCommunityResponse,
@@ -21,12 +21,12 @@ const baseLogger = createLogger('Websocket:Event:Communities')
 /**
  * Adds event handlers for community-related events
  *
- * @param options Websocket handler options
+ * @param config Websocket handler config
  */
 export function registerCommunitiesHandlers(
-  options: CommunitiesHandlerOptions,
+  config: CommunitiesHandlerConfig,
 ): void {
-  const _logger = baseLogger.extend(options.socket.id)
+  const _logger = baseLogger.extend(config.socket.id)
   _logger.debug(`Initializing communities WS event handlers`)
 
   /**
@@ -42,11 +42,11 @@ export function registerCommunitiesHandlers(
     _logger.debug(`Handling community create event`)
     try {
       // Create the community and start syncing the sigchain with this user
-      await options.communitiesManager.create(
+      await config.communitiesManager.create(
         message.payload.userId,
         message.payload.community,
         message.payload.teamKeyring,
-        options.socket,
+        config.socket,
       )
 
       // form and return a success response to the user
@@ -88,7 +88,7 @@ export function registerCommunitiesHandlers(
       }
       const { teamId, userId } = message.payload.payload
       // get the community and return an error response if not found
-      if ((await options.communitiesManager.get(teamId)) == null) {
+      if ((await config.communitiesManager.get(teamId)) == null) {
         _logger.warn(
           `Attempted sign-in to community ${teamId} but no community was initialized for that ID`,
         )
@@ -107,11 +107,7 @@ export function registerCommunitiesHandlers(
       _logger.debug(
         `Found community for ID ${teamId}, initializing sync connection`,
       )
-      options.communitiesManager.startAuthSyncConnection(
-        userId,
-        teamId,
-        options,
-      )
+      config.communitiesManager.startAuthSyncConnection(userId, teamId, config)
 
       const response: CommunitySignInMessage = {
         ts: DateTime.utc().toMillis(),
@@ -145,7 +141,7 @@ export function registerCommunitiesHandlers(
   ): Promise<void> {
     try {
       // get the community and return a success or error response based on result
-      const managedCommunity = await options.communitiesManager.get(
+      const managedCommunity = await config.communitiesManager.get(
         message.payload.id,
       )
       let response: GetCommunityResponse | undefined = undefined
@@ -184,7 +180,7 @@ export function registerCommunitiesHandlers(
   }
 
   // register event handlers on this socket
-  options.socket.on(WebsocketEvents.CreateCommunity, handleCreateCommunity)
-  options.socket.on(WebsocketEvents.GetCommunity, handleGetCommunity)
-  options.socket.on(WebsocketEvents.SignInCommunity, handleSignInToCommunity)
+  config.socket.on(WebsocketEvents.CreateCommunity, handleCreateCommunity)
+  config.socket.on(WebsocketEvents.GetCommunity, handleGetCommunity)
+  config.socket.on(WebsocketEvents.SignInCommunity, handleSignInToCommunity)
 }
