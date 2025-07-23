@@ -40,3 +40,4 @@ lerna-debug.log*
 /auth-packages
 logs-test
 temp
+app/temp
