@@ -39,3 +39,4 @@ lerna-debug.log*
 /bootstrapper/node_modules/
 /auth-packages
 logs-test
+temp
