@@ -97,11 +97,17 @@ export class AuthConnection {
   public start(): void {
     // Set up auth connection event handlers.
     this.lfaConnection.on('connected', () => {
-      this.logger.debug(`Sending sync message because our chain is initialized`)
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- this is valid
-      const { team, user } = this.userContext
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- this is valid
-      this.lfaConnection.emit('sync', { team, user })
+      try {
+        this.logger.debug(
+          `Sending sync message because our chain is initialized`,
+        )
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- this is valid
+        const { team, user } = this.userContext
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- this is valid
+        this.lfaConnection.emit('sync', { team, user })
+      } catch (e) {
+        this.logger.error('Error while sending auth sync message', e)
+      }
     })
 
     // handle disconnects
@@ -111,10 +117,17 @@ export class AuthConnection {
 
     // handle chain updates
     this.lfaConnection.on('updated', async head => {
-      this.logger.debug('Received sync message, team graph updated', head)
-      await this.options.communitiesManager.update(this.sigChain.team.id, {
-        sigChain: this.sigChain.serialize(true),
-      })
+      try {
+        this.logger.debug('Received sync message, team graph updated', head)
+        await this.options.communitiesManager.update(this.sigChain.team.id, {
+          sigChain: this.sigChain.serialize(true),
+        })
+      } catch (e) {
+        this.logger.error(
+          'Error while processing received auth sync message',
+          e,
+        )
+      }
     })
 
     // Handle errors from local or remote sources.
