@@ -45,10 +45,6 @@ export enum NativeServerWebsocketEvents {
 
 export interface BaseWebsocketMessage<T extends object | undefined> {
   ts: number
-  payload: T
-}
-
-export interface BaseStatusPayload<T extends object | undefined> {
   status: string
   reason?: string
   payload?: T

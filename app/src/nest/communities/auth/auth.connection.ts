@@ -76,13 +76,11 @@ export class AuthConnection {
       sendMessage: (message: Uint8Array) => {
         const socketMessage: AuthSyncMessage = {
           ts: DateTime.utc().toMillis(),
+          status: CommunityOperationStatus.SUCCESS,
           payload: {
-            status: CommunityOperationStatus.SUCCESS,
-            payload: {
-              userId: user.userId,
-              teamId: this.sigChain.team.id,
-              message: uint8arrays.toString(message, 'base64'),
-            },
+            userId: user.userId,
+            teamId: this.sigChain.team.id,
+            message: uint8arrays.toString(message, 'base64'),
           },
         }
         this.config.socket.emit(WebsocketEvents.AuthSync, socketMessage)

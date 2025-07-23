@@ -53,19 +53,15 @@ export function registerCommunitiesHandlers(
       let response: CreateCommunityResponse | undefined = undefined
       response = {
         ts: DateTime.utc().toMillis(),
-        payload: {
-          status: CreateCommunityStatus.SUCCESS,
-        },
+        status: CreateCommunityStatus.SUCCESS,
       }
       callback(response)
     } catch (e) {
       _logger.error(`Error while processing create community event`, e)
       const errorResponse: CreateCommunityResponse = {
         ts: DateTime.utc().toMillis(),
-        payload: {
-          status: CreateCommunityStatus.ERROR,
-          reason: `Error while creating community`,
-        },
+        status: CreateCommunityStatus.ERROR,
+        reason: `Error while creating community`,
       }
       callback(errorResponse)
     }
@@ -83,10 +79,10 @@ export function registerCommunitiesHandlers(
   ): Promise<void> {
     _logger.debug(`Handling community sign-in event`)
     try {
-      if (message.payload.payload == null) {
+      if (message.payload == null) {
         throw new Error(`Payload was nullish!`)
       }
-      const { teamId, userId } = message.payload.payload
+      const { teamId, userId } = message.payload
       // get the community and return an error response if not found
       if ((await config.communitiesManager.get(teamId)) == null) {
         _logger.warn(
@@ -94,10 +90,8 @@ export function registerCommunitiesHandlers(
         )
         const notFoundResponse: CommunitySignInMessage = {
           ts: DateTime.utc().toMillis(),
-          payload: {
-            status: CommunityOperationStatus.NOT_FOUND,
-            reason: `No community found for ${teamId}`,
-          },
+          status: CommunityOperationStatus.NOT_FOUND,
+          reason: `No community found for ${teamId}`,
         }
         callback(notFoundResponse)
         return
@@ -111,19 +105,15 @@ export function registerCommunitiesHandlers(
 
       const response: CommunitySignInMessage = {
         ts: DateTime.utc().toMillis(),
-        payload: {
-          status: CommunityOperationStatus.SUCCESS,
-        },
+        status: CommunityOperationStatus.SUCCESS,
       }
       callback(response)
     } catch (e) {
       _logger.error(`Error while processing community sign-in event`, e)
       const errorResponse: CommunitySignInMessage = {
         ts: DateTime.utc().toMillis(),
-        payload: {
-          status: CommunityOperationStatus.ERROR,
-          reason: `Error while signing in to community`,
-        },
+        status: CommunityOperationStatus.ERROR,
+        reason: `Error while signing in to community`,
       }
       callback(errorResponse)
     }
@@ -148,20 +138,16 @@ export function registerCommunitiesHandlers(
       if (managedCommunity == null) {
         response = {
           ts: DateTime.utc().toMillis(),
-          payload: {
-            status: CommunityOperationStatus.NOT_FOUND,
-            reason: 'No community found in storage',
-          },
+          status: CommunityOperationStatus.NOT_FOUND,
+          reason: 'No community found in storage',
         }
       } else {
         response = {
           ts: DateTime.utc().toMillis(),
+          status: CommunityOperationStatus.SUCCESS,
           payload: {
-            status: CommunityOperationStatus.SUCCESS,
-            payload: {
-              sigChain: managedCommunity.sigChain.serialize(true),
-              teamId: managedCommunity.teamId,
-            },
+            sigChain: managedCommunity.sigChain.serialize(true),
+            teamId: managedCommunity.teamId,
           },
         }
       }
@@ -170,10 +156,8 @@ export function registerCommunitiesHandlers(
       _logger.error(`Error while processing update community event`, e)
       const errorResponse: GetCommunityResponse = {
         ts: DateTime.utc().toMillis(),
-        payload: {
-          status: CommunityOperationStatus.ERROR,
-          reason: `Error while getting community`,
-        },
+        status: CommunityOperationStatus.ERROR,
+        reason: `Error while getting community`,
       }
       callback(errorResponse)
     }

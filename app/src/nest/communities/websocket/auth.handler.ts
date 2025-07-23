@@ -9,7 +9,6 @@ import {
   type AuthSyncMessage,
   CommunityOperationStatus,
   type GeneratePublicKeysMessage,
-  type GeneratePublicKeysResponse,
   type CommunitiesHandlerConfig,
 } from './types/index.js'
 import * as uint8arrays from 'uint8arrays'
@@ -38,33 +37,33 @@ export function registerCommunitiesAuthHandlers(
    */
   async function handleGeneratePublicKeys(
     message: GeneratePublicKeysMessage,
-    callback: (payload: GeneratePublicKeysResponse) => void,
+    callback: (payload: GeneratePublicKeysMessage) => void,
   ): Promise<void> {
     try {
+      if (message.payload == null) {
+        throw new Error('Payload missing from generate public keys message')
+      }
+
       // generate the keys for this community and return to the user
       const keysetWithSecrets = await config.communitiesManager.getServerKeys(
         message.payload.teamId,
         AllowedServerKeyState.NOT_STORED,
       )
-      const response: GeneratePublicKeysResponse = {
+      const response: GeneratePublicKeysMessage = {
         ts: DateTime.utc().toMillis(),
+        status: CommunityOperationStatus.SUCCESS,
         payload: {
-          status: CommunityOperationStatus.SUCCESS,
-          payload: {
-            keys: redactKeys(keysetWithSecrets) as Keyset,
-            teamId: message.payload.teamId,
-          },
+          keys: redactKeys(keysetWithSecrets) as Keyset,
+          teamId: message.payload.teamId,
         },
       }
       callback(response)
     } catch (e) {
       _logger.error(`Error while processing get public keys event`, e)
-      const errorResponse: GeneratePublicKeysResponse = {
+      const errorResponse: GeneratePublicKeysMessage = {
         ts: DateTime.utc().toMillis(),
-        payload: {
-          status: CommunityOperationStatus.ERROR,
-          reason: `Error while handling get public keys event`,
-        },
+        status: CommunityOperationStatus.ERROR,
+        reason: `Error while handling get public keys event`,
       }
       callback(errorResponse)
     }
@@ -78,22 +77,20 @@ export function registerCommunitiesAuthHandlers(
   async function handleAuthSync(message: AuthSyncMessage): Promise<void> {
     let authConnection: AuthConnection | undefined = undefined
     try {
-      if (message.payload.payload == null) {
+      if (message.payload == null) {
         throw new Error(`Payload was nullish during auth sync!`)
       }
 
       // get the managed community by ID and return an error if not found
       const community = await config.communitiesManager.get(
-        message.payload.payload.teamId,
+        message.payload.teamId,
       )
       if (community == null) {
         throw new Error(`No community found`)
       }
 
       // get the existing auth connection for this user and return an error if not found
-      authConnection = community.authConnections?.get(
-        message.payload.payload.userId,
-      )
+      authConnection = community.authConnections?.get(message.payload.userId)
       if (authConnection == null) {
         throw new Error(
           `No auth connection was established for this user on this community`,
@@ -101,7 +98,7 @@ export function registerCommunitiesAuthHandlers(
       }
       // push the sync message onto the auth sync connection
       authConnection.lfaConnection.deliver(
-        uint8arrays.fromString(message.payload.payload.message, 'base64'),
+        uint8arrays.fromString(message.payload.message, 'base64'),
       )
     } catch (e) {
       _logger.error(`Error while processing auth sync event`, e)

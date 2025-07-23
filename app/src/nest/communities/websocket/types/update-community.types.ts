@@ -1,8 +1,5 @@
 import type { CommunityUpdate } from '../../types.js'
-import type {
-  BaseStatusPayload,
-  BaseWebsocketMessage,
-} from '../../../websocket/ws.types.js'
+import type { BaseWebsocketMessage } from '../../../websocket/ws.types.js'
 import type { CommunityOperationStatus } from './common.types.js'
 
 export interface UpdateCommunity
@@ -16,14 +13,9 @@ export interface UpdateCommunityPayload {
   updates: CommunityUpdate
 }
 
-export interface UpdateCommunityResponsePayload
-  extends BaseStatusPayload<undefined> {
+export interface UpdateCommunityResponse
+  extends BaseWebsocketMessage<undefined> {
+  ts: number
   status: CommunityOperationStatus
   reason?: string
-}
-
-export interface UpdateCommunityResponse
-  extends BaseWebsocketMessage<UpdateCommunityResponsePayload> {
-  ts: number
-  payload: UpdateCommunityResponsePayload
 }

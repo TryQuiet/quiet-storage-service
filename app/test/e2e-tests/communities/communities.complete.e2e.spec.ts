@@ -7,10 +7,7 @@ import { DateTime } from 'luxon'
 import { createLogger } from '../../../src/nest/app/logger/logger.js'
 import { AppModule } from '../../../src/nest/app/app.module.js'
 import { CommunitiesManagerService } from '../../../src/nest/communities/communities-manager.service.js'
-import {
-  GeneratePublicKeysMessage,
-  GeneratePublicKeysResponse,
-} from '../../../src/nest/communities/websocket/types/gen-pub-keys.types.js'
+import { GeneratePublicKeysMessage } from '../../../src/nest/communities/websocket/types/gen-pub-keys.types.js'
 import {
   createDevice,
   createTeam,
@@ -99,32 +96,31 @@ describe('Communities', () => {
     it('should get public keys from server', async () => {
       const message: GeneratePublicKeysMessage = {
         ts: DateTime.utc().toMillis(),
+        status: CommunityOperationStatus.SENDING,
         payload: {
           teamId: team.id,
         },
       }
       const response =
-        await TestUtils.client.sendMessage<GeneratePublicKeysResponse>(
+        await TestUtils.client.sendMessage<GeneratePublicKeysMessage>(
           WebsocketEvents.GeneratePublicKeys,
           message,
           true,
         )
-      serverKeys = response?.payload.payload?.keys
+      serverKeys = response?.payload?.keys
       expect(response).toEqual(
         expect.objectContaining({
           ts: expect.any(Number),
+          status: CommunityOperationStatus.SUCCESS,
           payload: {
-            status: CommunityOperationStatus.SUCCESS,
-            payload: {
-              teamId: team.id,
-              keys: expect.objectContaining({
-                type: 'SERVER',
-                name: SERVER_NAME,
-                signature: expect.any(String),
-                encryption: expect.any(String),
-                generation: 0,
-              }),
-            },
+            teamId: team.id,
+            keys: expect.objectContaining({
+              type: 'SERVER',
+              name: SERVER_NAME,
+              signature: expect.any(String),
+              encryption: expect.any(String),
+              generation: 0,
+            }),
           },
         }),
       )
@@ -172,9 +168,7 @@ describe('Communities', () => {
       expect(response).toEqual(
         expect.objectContaining({
           ts: expect.any(Number),
-          payload: {
-            status: CreateCommunityStatus.SUCCESS,
-          },
+          status: CreateCommunityStatus.SUCCESS,
         } as CreateCommunityResponse),
       )
     })

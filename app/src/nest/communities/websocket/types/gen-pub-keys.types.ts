@@ -1,33 +1,16 @@
 import type { Keyset } from '@localfirst/crdx'
-import type {
-  BaseStatusPayload,
-  BaseWebsocketMessage,
-} from '../../../websocket/ws.types.js'
+import type { BaseWebsocketMessage } from '../../../websocket/ws.types.js'
 import type { CommunityOperationStatus } from './common.types.js'
 
 export interface GeneratePublicKeysMessagePayload {
   teamId: string
+  keys?: Keyset
 }
 
-export interface GeneratePublicKeysMessage {
+export interface GeneratePublicKeysMessage
+  extends BaseWebsocketMessage<GeneratePublicKeysMessagePayload> {
   ts: number
-  payload: GeneratePublicKeysMessagePayload
-}
-
-export interface GeneratePublicKeysResponseInnerPayload {
-  teamId: string
-  keys: Keyset
-}
-
-export interface GeneratePublicKeysResponsePayload
-  extends BaseStatusPayload<GeneratePublicKeysResponseInnerPayload> {
   status: CommunityOperationStatus
   reason?: string
-  payload?: GeneratePublicKeysResponseInnerPayload
-}
-
-export interface GeneratePublicKeysResponse
-  extends BaseWebsocketMessage<GeneratePublicKeysResponsePayload> {
-  ts: number
-  payload: GeneratePublicKeysResponsePayload
+  payload?: GeneratePublicKeysMessagePayload
 }
