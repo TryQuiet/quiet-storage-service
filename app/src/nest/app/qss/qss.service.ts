@@ -16,7 +16,8 @@ import { PostgresClient } from '../../storage/postgres/postgres.client.js'
 
 @Injectable()
 export class QSSService {
-  public app: NestFastifyApplication | undefined = undefined
+  public static app: NestFastifyApplication | undefined = undefined
+  public static started = false
 
   private readonly logger = createLogger(QSSService.name)
 
@@ -31,8 +32,12 @@ export class QSSService {
    * Create and initialize the Nest app
    */
   public async init(): Promise<void> {
+    if (QSSService.app != null) {
+      throw new Error('Nest application already initialized!')
+    }
+
     this.logger.log(`Initializing QSS`)
-    this.app = await NestFactory.create<NestFastifyApplication>(
+    QSSService.app = await NestFactory.create<NestFastifyApplication>(
       AppModule,
       this.adapter,
       {
@@ -40,18 +45,22 @@ export class QSSService {
       },
     )
 
-    this.app.enableCors({
+    QSSService.app.enableCors({
       origin: '*',
     })
-    await this.app.init()
+    await QSSService.app.init()
   }
 
   /**
    * Start listening on the server
    */
   public async start(): Promise<void> {
-    if (this.app == null) {
+    if (QSSService.app == null) {
       throw new Error(`Must initialize app before starting!`)
+    }
+
+    if (QSSService.started) {
+      throw new Error('App already started!')
     }
 
     this.logger.log(
@@ -59,25 +68,28 @@ export class QSSService {
       this.listenHostname,
       this.port,
     )
-    await this.app.listen({
+    await QSSService.app.listen({
       port: this.port,
       host: this.listenHostname,
     })
+    QSSService.started = true
   }
 
   /**
    * Shutdown the application and close the database connection
    */
   public async close(): Promise<void> {
-    if (this.app == null) {
+    if (QSSService.app == null) {
       this.logger.warn(`App wasn't initialized, can't close!`)
       return
     }
 
     this.logger.log(`Closing QSS`)
-    await this.app.close()
+    await QSSService.app.close()
 
     this.logger.log(`Closing postgres`)
     await this.postgresClient.close()
+
+    QSSService.started = false
   }
 }
