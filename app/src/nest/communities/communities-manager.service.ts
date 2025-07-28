@@ -51,7 +51,7 @@ export class CommunitiesManagerService {
   ) {}
 
   /**
-   * Get a community and it's related metadata from storage or in-memory cache, if available
+   * Get a community and its related metadata from storage or in-memory cache, if available
    *
    * @param teamId LFA team ID of the community we are retrieving
    * @param forceFetchFromStorage Force getting the community from storage even if we have it stored in-memory
