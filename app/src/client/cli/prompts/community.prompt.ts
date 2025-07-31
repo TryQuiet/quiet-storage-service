@@ -6,6 +6,7 @@ import {
   CommunityOperationStatus,
   type GetCommunity,
   type GetCommunityResponse,
+  type GeneratePublicKeysMessage,
 } from '../../../nest/communities/websocket/types/index.js'
 import { createLogger } from '../../../nest/app/logger/logger.js'
 import { isBase64, isHexadecimal } from 'class-validator'
@@ -22,10 +23,13 @@ import {
   type Keyring,
   loadTeam,
   type LocalUserContext,
+  type Server,
   type Team,
   type UserWithSecrets,
 } from '@localfirst/auth'
 import { randomUUID } from 'crypto'
+import { ConfigService } from '../../../nest/utils/config/config.service.js'
+import { EnvVars } from '../../../nest/utils/config/env_vars.js'
 
 const logger = createLogger('Client:Community')
 
@@ -62,6 +66,34 @@ const createCommunity = async (
       device,
     }
     serializedSigchain = createTeam(teamName, context) as Team
+
+    const genKeysMessage: GeneratePublicKeysMessage = {
+      ts: DateTime.utc().toMillis(),
+      status: CommunityOperationStatus.SENDING,
+      payload: {
+        teamId: serializedSigchain.id,
+      },
+    }
+    const genKeysResponse = await client.sendMessage<GeneratePublicKeysMessage>(
+      WebsocketEvents.GeneratePublicKeys,
+      genKeysMessage,
+      true,
+    )
+
+    if (genKeysResponse!.status !== CommunityOperationStatus.SUCCESS) {
+      logger.error(
+        `Failed to generate server keys for new community!`,
+        genKeysResponse!.reason,
+      )
+      return undefined
+    }
+
+    const server: Server = {
+      host: ConfigService.getString(EnvVars.QSS_HOSTNAME)!,
+      keys: genKeysResponse!.payload!.keys!,
+    }
+    serializedSigchain.addServer(server)
+
     sigChain = uint8arrays.toString(serializedSigchain.save(), 'hex')
   } else {
     sigChain = await input({

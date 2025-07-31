@@ -2,6 +2,8 @@ import type { Keyset } from '@localfirst/auth'
 import type { SigChain } from './auth/sigchain.js'
 import type { AuthConnection } from './auth/auth.connection.js'
 
+export const MANAGED_COMMUNITY_TTL_MS = 300_000 // i.e. expire locally stored communities 5 minutes after losing all auth connections
+
 export enum AllowedServerKeyState {
   ANY = 'Any', // keys can be new or old
   STORED_ONLY = 'StoredOnly', // keys must already exist
@@ -35,4 +37,5 @@ export interface ManagedCommunity {
   teamId: string
   sigChain: SigChain
   authConnections?: AuthConnectionMap
+  expiryMs?: number
 }

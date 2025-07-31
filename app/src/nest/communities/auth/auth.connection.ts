@@ -22,8 +22,10 @@ import {
 } from '../websocket/types/index.js'
 import type { QuietLogger } from '../../app/logger/types.js'
 import type { AuthConnectionConfig } from './types.js'
+import EventEmitter from 'events'
+import { type AuthDisconnectedPayload, AuthEvents } from './auth.events.js'
 
-export class AuthConnection {
+export class AuthConnection extends EventEmitter {
   /**
    * Auth sync connection
    */
@@ -53,6 +55,8 @@ export class AuthConnection {
     private readonly sigChain: SigChain,
     private readonly config: AuthConnectionConfig,
   ) {
+    super()
+
     // convert the Server data on the chain to a User object
     const user: UserWithSecrets = castServer.toUser(
       this.sigChain.context.server,
@@ -111,6 +115,11 @@ export class AuthConnection {
     // handle disconnects
     this.lfaConnection.on('disconnected', event => {
       this.logger.log(`LFA Disconnected!`, event)
+      const payload: AuthDisconnectedPayload = {
+        userId: this.userId,
+        teamId: this.sigChain.team.id,
+      }
+      this.emit(AuthEvents.AuthDisconnected, payload)
     })
 
     // handle chain updates
@@ -148,5 +157,10 @@ export class AuthConnection {
   public stop(): void {
     this.logger.debug('Closing connection with user')
     this.lfaConnection.stop(true)
+    const payload: AuthDisconnectedPayload = {
+      userId: this.userId,
+      teamId: this.sigChain.team.id,
+    }
+    this.emit(AuthEvents.AuthDisconnected, payload)
   }
 }

@@ -2,7 +2,7 @@
  * Manages community-related operations
  */
 
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common'
 import { CommunitiesStorageService } from './storage/communities.storage.service.js'
 import { createLogger } from '../app/logger/logger.js'
 import {
@@ -11,6 +11,7 @@ import {
   Community,
   CommunityUpdate,
   CreatedCommunity,
+  MANAGED_COMMUNITY_TTL_MS,
   ManagedCommunity,
 } from './types.js'
 import {
@@ -31,13 +32,20 @@ import { AuthConnection } from './auth/auth.connection.js'
 import { NativeServerWebsocketEvents } from '../websocket/ws.types.js'
 import { AuthConnectionConfig } from './auth/types.js'
 import { Socket } from 'socket.io'
+import { AuthDisconnectedPayload, AuthEvents } from './auth/auth.events.js'
+import { DateTime } from 'luxon'
 
 @Injectable()
-export class CommunitiesManagerService {
+export class CommunitiesManagerService implements OnModuleDestroy {
   /**
    * Map of team IDs to sigchains and associated LFA auth sync connections
    */
   private readonly communities = new Map<string, ManagedCommunity>()
+
+  /**
+   * Interval for checking for clearable locally stored communities
+   */
+  private readonly _communityExpiryHandler: NodeJS.Timeout
 
   private readonly logger = createLogger(CommunitiesManagerService.name)
 
@@ -48,7 +56,22 @@ export class CommunitiesManagerService {
     private readonly storage: CommunitiesStorageService,
     // service for managing creation/storage of server-owned LFA keys and user-generated keyrings
     private readonly serverKeyManager: ServerKeyManagerService,
-  ) {}
+  ) {
+    // Setup community expiration handler to run once a minute
+    this._clearUnusedCommunitiesFromMemory =
+      this._clearUnusedCommunitiesFromMemory.bind(
+        this,
+      ) as typeof this._clearUnusedCommunitiesFromMemory
+    this._communityExpiryHandler = setInterval(() => {
+      this._clearUnusedCommunitiesFromMemory()
+    }, 60_000)
+  }
+
+  public onModuleDestroy(): void {
+    this.logger.info('Clearing CommunitesManagerService')
+    clearTimeout(this._communityExpiryHandler)
+    this.communities.clear()
+  }
 
   /**
    * Get a community and its related metadata from storage or in-memory cache, if available
@@ -216,12 +239,45 @@ export class CommunitiesManagerService {
       authConnections,
     })
 
-    authConnection.start()
+    // handle auth disconnection events (emitted when the LFA connection dies or the socket connection dies)
+    // and remove auth connection from map/set expiry on community data in memory if no open connections left
+    authConnection.on(
+      AuthEvents.AuthDisconnected,
+      (payload: AuthDisconnectedPayload) => {
+        this.logger.verbose(`Got an ${AuthEvents.AuthDisconnected} event`)
+        const managedCommunity = this.communities.get(payload.teamId)
+        if (managedCommunity == null) {
+          return
+        }
+
+        managedCommunity.authConnections?.delete(payload.userId)
+        if ((managedCommunity.authConnections?.size ?? 0) === 0) {
+          const communityExpiryMs =
+            DateTime.utc().toMillis() + MANAGED_COMMUNITY_TTL_MS
+          this.logger.verbose(
+            'Community has no open auth connections, setting expiry',
+            communityExpiryMs,
+          )
+          managedCommunity.expiryMs = communityExpiryMs
+        }
+      },
+    )
+
     // handle websocket disconnects and stop the auth sync connection
     config.socket.on(NativeServerWebsocketEvents.Disconnect, () => {
       authConnection.stop()
-      this.communities.get(teamId)!.authConnections?.delete(userId)
     })
+
+    authConnection.start()
+
+    // ensure we remove the expiry if it was set now that we have an open connection
+    if (this.communities.has(teamId)) {
+      this.communities.set(teamId, {
+        ...this.communities.get(teamId)!,
+        expiryMs: undefined,
+      })
+      this.logger.verbose(this.communities.get(teamId))
+    }
   }
 
   /**
@@ -348,5 +404,36 @@ export class CommunitiesManagerService {
     // put the new managed community into memory
     this.communities.set(community.teamId, managedCommunity)
     return managedCommunity
+  }
+
+  /**
+   * Check for expired/stale communities in memory and delete if necessary (or remove expiry if there are
+   * open connections)
+   *
+   * NOTE: This is run in an interval (see top of class)
+   */
+  private _clearUnusedCommunitiesFromMemory(): void {
+    this.logger.debug('Checking for unused/stale communities in memory')
+    for (const community of this.communities.values()) {
+      if (community.expiryMs == null) {
+        continue
+      }
+
+      if ((community.authConnections?.size ?? 0) > 0) {
+        this.communities.set(community.teamId, {
+          ...community,
+          expiryMs: undefined,
+        })
+        continue
+      }
+
+      if (
+        community.expiryMs != null &&
+        community.expiryMs <= DateTime.utc().toMillis()
+      ) {
+        this.logger.verbose('Removing stale community', community.teamId)
+        this.communities.delete(community.teamId)
+      }
+    }
   }
 }
