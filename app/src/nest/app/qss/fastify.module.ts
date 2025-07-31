@@ -1,4 +1,8 @@
 import { Module } from '@nestjs/common'
+import fastifyGracefulExit from '@mgcrea/fastify-graceful-exit'
+import Fastify, { FastifyInstance } from 'fastify'
+import { FastifyAdapter } from '@nestjs/platform-fastify'
+
 import {
   DEFAULT_HOSTNAME,
   DEFAULT_LISTEN_HOSTNAME,
@@ -10,8 +14,6 @@ import {
   LISTEN_PORT,
 } from '../const.js'
 import { NestFastifyLogger } from '../logger/nest.fastify.logger.js'
-import Fastify, { FastifyInstance } from 'fastify'
-import { FastifyAdapter } from '@nestjs/platform-fastify'
 import { ConfigService } from '../../utils/config/config.service.js'
 import { EnvVars } from '../../utils/config/env_vars.js'
 
@@ -23,10 +25,15 @@ import { EnvVars } from '../../utils/config/env_vars.js'
       provide: FASTIFY,
       useFactory: (
         fastifyLogger: NestFastifyLogger,
-      ): ReturnType<typeof Fastify> =>
-        Fastify({
+      ): ReturnType<typeof Fastify> => {
+        const fastify = Fastify({
           logger: fastifyLogger,
-        }),
+          requestTimeout: 120, // https://fastify.dev/docs/latest/Reference/Server/#requesttimeout,
+          disableRequestLogging: false,
+        })
+        fastify.register(fastifyGracefulExit, { timeout: 15_000 })
+        return fastify
+      },
       inject: [NestFastifyLogger],
     },
     {

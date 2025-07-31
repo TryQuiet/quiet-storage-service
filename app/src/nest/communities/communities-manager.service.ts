@@ -345,7 +345,7 @@ export class CommunitiesManagerService {
       teamId: community.teamId,
       sigChain,
     }
-    // put the new managed community into the in-memory cache
+    // put the new managed community into memory
     this.communities.set(community.teamId, managedCommunity)
     return managedCommunity
   }

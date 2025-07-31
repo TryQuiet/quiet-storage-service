@@ -14,10 +14,6 @@ import { EnvironmentShort } from '../utils/config/types.js'
 @Injectable()
 export class ServerKeyManagerService implements OnModuleDestroy {
   /**
-   * Map of known secret names to keyets/keyrings
-   */
-  private readonly serverKeysets = new Map<string, Uint8Array>()
-  /**
    * Key used by this environment to encrypt stored keys in the AWS secrets manager
    */
   private serverEncKey: Uint8Array | undefined = undefined
@@ -43,7 +39,7 @@ export class ServerKeyManagerService implements OnModuleDestroy {
     type: StoredKeyRingType,
   ): Promise<StoredKeyring> {
     // ensure the server encryption key is generated and stored
-    await this._initServerEncKey()
+    await this._initOrRetrieveServerEncKey()
 
     try {
       // generate a unique name for this secret
@@ -57,8 +53,6 @@ export class ServerKeyManagerService implements OnModuleDestroy {
       }
       // add the new secret to the AWS secrets manager
       await this.awsSecretsService.put(secretName, JSON.stringify(secret))
-      this.serverKeysets.set(secretName, keyring)
-
       return secret
     } catch (e) {
       throw new CompoundError(
@@ -80,14 +74,10 @@ export class ServerKeyManagerService implements OnModuleDestroy {
     type: StoredKeyRingType,
   ): Promise<Uint8Array | undefined> {
     // ensure the server encryption key is generated and stored
-    await this._initServerEncKey()
+    await this._initOrRetrieveServerEncKey()
 
     // generate the unique name for this secret
     const secretName = this._generateSecretName(id, type)
-    // check our local cache of keysets
-    if (this.serverKeysets.has(secretName)) {
-      return this.serverKeysets.get(secretName)
-    }
 
     try {
       // get the secret from the AWS secrets manager
@@ -104,7 +94,6 @@ export class ServerKeyManagerService implements OnModuleDestroy {
       // parse the secret, decrypt the keyring and return
       const storedKeyring: StoredKeyring = JSON.parse(secret) as StoredKeyring
       const decryptedKeyring = await this.decrypt(storedKeyring)
-      this.serverKeysets.set(`${id}-${type}`, decryptedKeyring)
       return decryptedKeyring
     } catch (e) {
       throw new CompoundError(
@@ -126,7 +115,7 @@ export class ServerKeyManagerService implements OnModuleDestroy {
     nonce?: Uint8Array,
   ): Promise<EncryptedPayload> {
     // ensure the server encryption key is generated and stored
-    await this._initServerEncKey()
+    await this._initOrRetrieveServerEncKey()
 
     // generate a new random nonce if one was not supplied
     const thisNonce =
@@ -156,7 +145,7 @@ export class ServerKeyManagerService implements OnModuleDestroy {
    */
   public async decrypt(encPayload: EncryptedPayload): Promise<Uint8Array> {
     // ensure the server encryption key is generated and stored
-    await this._initServerEncKey()
+    await this._initOrRetrieveServerEncKey()
 
     // decrypt and return the decrypted bytes using the server encryption key and the stored nonce
     const { nonce, payload } = encPayload
@@ -204,7 +193,7 @@ export class ServerKeyManagerService implements OnModuleDestroy {
    * Initialize the server encryption key for this environment by either retrieving the key
    * from the AWS secrets manager or generating a new key
    */
-  private async _initServerEncKey(): Promise<void> {
+  private async _initOrRetrieveServerEncKey(): Promise<void> {
     // check for the key locally
     this.logger.verbose(`Checking if server encryption key is initialized`)
     if (this.serverEncKey != null) {

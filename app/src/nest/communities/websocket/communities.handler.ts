@@ -15,6 +15,8 @@ import {
   type GetCommunityResponse,
   type CommunitySignInMessage,
 } from './types/index.js'
+import { Environment } from '../../utils/config/types.js'
+import { ConfigService } from '../../utils/config/config.service.js'
 
 const baseLogger = createLogger('Websocket:Event:Communities')
 
@@ -129,6 +131,10 @@ export function registerCommunitiesHandlers(
     message: GetCommunity,
     callback: (payload: GetCommunityResponse) => void,
   ): Promise<void> {
+    if (ConfigService.getEnv() !== Environment.Local) {
+      return
+    }
+
     try {
       // get the community and return a success or error response based on result
       const managedCommunity = await config.communitiesManager.get(

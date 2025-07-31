@@ -61,6 +61,7 @@
     "@dotenvx/dotenvx": "^1.36.0",
     "@localfirst/auth": "workspace:*",
     "@localfirst/crdx": "workspace:*",
+    "@mgcrea/fastify-graceful-exit": "^1.2.0",
     "@mikro-orm/cli": "^6.4.7",
     "@mikro-orm/core": "^6.4.7",
     "@mikro-orm/migrations": "^6.4.7",
