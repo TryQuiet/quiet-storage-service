@@ -35,7 +35,7 @@ import { Socket } from 'socket.io'
 @Injectable()
 export class CommunitiesManagerService {
   /**
-   * Map of team IDs to communities with related metadata and services
+   * Map of team IDs to sigchains and associated LFA auth sync connections
    */
   private readonly communities = new Map<string, ManagedCommunity>()
 
