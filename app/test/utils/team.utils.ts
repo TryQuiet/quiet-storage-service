@@ -9,6 +9,7 @@ import {
   UserWithSecrets,
   Team,
   LocalUserContext,
+  KeysetWithSecrets,
 } from '@localfirst/auth'
 import { createLogger } from '../../src/nest/app/logger/logger.js'
 import { ServerKeyManagerService } from '../../src/nest/encryption/server-key-manager.service.js'
@@ -24,27 +25,43 @@ export class TeamTestUtils {
   constructor(private readonly serverKeyManager: ServerKeyManagerService) {}
 
   public async createTestTeam(
+    withServer: boolean = true,
     teamName: string = TEAM_NAME,
     serverHostname: string = SERVER_HOSTNAME,
+    userName: string = 'username',
+    deviceName: string = randomUUID(),
   ): Promise<TestTeam> {
-    this.logger.debug(`Creating test team`, teamName, serverHostname)
-    const user = createUser('username') as UserWithSecrets
+    this.logger.debug(
+      `Creating test team`,
+      teamName,
+      serverHostname,
+      userName,
+      deviceName,
+    )
+    const user = createUser(userName) as UserWithSecrets
     const device = createDevice({
       userId: user.userId,
-      deviceName: randomUUID(),
+      deviceName: deviceName,
     })
     const testUserContext: LocalUserContext = { user, device }
     const team = createTeam(teamName, testUserContext) as Team
+    team.addRole('member')
+    team.addMemberRole(user.userId, 'member')
 
-    const serverKeys = createKeyset(
-      { type: 'SERVER', name: SERVER_HOSTNAME },
-      this.serverKeyManager.generateRandomBytes(32, 'base64'),
-    )
-    const server: Server = {
-      host: SERVER_HOSTNAME,
-      keys: redactKeys(serverKeys) as Keyset,
+    let serverKeys: KeysetWithSecrets | undefined = undefined
+    let server: Server | undefined = undefined
+
+    if (withServer) {
+      serverKeys = createKeyset(
+        { type: 'SERVER', name: SERVER_HOSTNAME },
+        this.serverKeyManager.generateRandomBytes(32, 'base64'),
+      )
+      server = {
+        host: SERVER_HOSTNAME,
+        keys: redactKeys(serverKeys) as Keyset,
+      }
+      team.addServer(server)
     }
-    team.addServer(server)
 
     return {
       team,

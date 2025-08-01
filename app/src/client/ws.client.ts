@@ -65,7 +65,11 @@ export class WebsocketClient {
       return (await this.clientSocket.emitWithAck(event, payload)) as T
     }
 
-    this.clientSocket.emit(event, payload)
+    try {
+      this.clientSocket.emit(event, payload)
+    } catch (e) {
+      this.logger.error('Error while emitting event to QSS')
+    }
     return undefined
   }
 

@@ -8,14 +8,15 @@ import {
 import { NestFastifyLogger } from '../../src/nest/app/logger/nest.fastify.logger.js'
 import { Server, Socket as ServerSocket } from 'socket.io'
 import { WebsocketGateway } from '../../src/nest/websocket/ws.gateway.js'
-import { TestSockets } from './types.js'
+import { TestClient, TestSockets } from './types.js'
 import { WebsocketClient } from '../../src/client/ws.client.js'
 import { createLogger } from '../../src/nest/app/logger/logger.js'
 import { LISTEN_PORT } from '../../src/nest/app/const.js'
+import { QSSClientAuthConnection } from '../../src/client/client-auth-conn.js'
+import { InviteeMemberContext, MemberContext } from '@localfirst/auth'
 
 export class TestUtils {
-  public static client: WebsocketClient
-  public static serverSocket: ServerSocket
+  public static clients: Map<string, TestClient> = new Map()
   public static server: Server
   private static module: TestingModule
   private static adapter: FastifyAdapter
@@ -37,25 +38,53 @@ export class TestUtils {
         logger: createLogger('Test'),
       },
     )
-    this.client = this.app.get<WebsocketClient>(WebsocketClient)
     this.logger.log(`Starting server`)
     await this.app.init()
     await this.app.listen(this.app.get<number>(LISTEN_PORT))
   }
 
-  public static async connectClient(): Promise<TestSockets> {
+  public static async connectClient(username: string): Promise<TestClient> {
     this.logger.log(`Creating and connecting client socket`)
+    const client = this.app.get<WebsocketClient>(WebsocketClient)
     this.server = this.module.get<WebsocketGateway>(WebsocketGateway).io
+    let serverSocket: ServerSocket | undefined = undefined
     this.server.on('connection', newSocket => {
-      this.serverSocket = newSocket
+      serverSocket = newSocket
     })
 
-    const clientSocket = await this.client.createSocket()
+    const clientSocket = await client.createSocket()
 
-    return {
+    const sockets: TestSockets = {
       client: clientSocket,
-      server: this.serverSocket,
+      server: serverSocket!,
     }
+    const testClient: TestClient = {
+      client,
+      sockets,
+    }
+    this.clients.set(username, testClient)
+    return testClient
+  }
+
+  public static async startAuthConnection(
+    teamId: string,
+    context: MemberContext | InviteeMemberContext,
+  ): Promise<QSSClientAuthConnection> {
+    const client = this.clients.get(context.user.userName)
+    if (client == null) {
+      throw new Error(
+        `No test client initialized for user ${context.user.userName}`,
+      )
+    }
+
+    const authConnection = new QSSClientAuthConnection(
+      teamId,
+      client.client,
+      context,
+    )
+    authConnection.start()
+    this.clients.set(context.user.userId, { ...client, authConnection })
+    return authConnection
   }
 
   public static getOpenConnectionCount(): number {
@@ -63,8 +92,11 @@ export class TestUtils {
   }
 
   public static async close() {
-    this.logger.log(`Closing client socket and server`)
-    this.client.close()
+    this.logger.log(`Closing client sockets and server`)
+    for (const testClient of this.clients.values()) {
+      testClient.authConnection?.stop(true)
+      testClient.client.close()
+    }
     await this.app.close()
   }
 }
