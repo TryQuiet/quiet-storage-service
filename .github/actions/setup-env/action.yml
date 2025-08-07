@@ -1,5 +1,11 @@
 name: Setup environment
 
+inputs:
+  install-docker:
+    description: 'Install and setup docker/docker compose'
+    required: false
+    default: false
+
 runs:
   using: composite
   steps:
@@ -7,21 +13,17 @@ runs:
       uses: actions/setup-node@v4
       with:
         node-version: 22.14.0
+
+    - name: Set up Docker
+      uses: docker/setup-docker-action@v4
+      if: ${{ inputs.install-docker == true || inputs.install-docker == 'true' }}
+      with:
+        version: version=28.1.1
         
     - name: Install pnpm
       uses: pnpm/action-setup@v4 # pulls version from package.json -> "packageManager"
 
-    - name: Build Submodules
+    - name: Bootstrap app
       shell: bash
       run: |
-        pnpm run build:submodules
-
-    - name: Install dependencies
-      shell: bash
-      run: |
-        pnpm i
-
-    - name: Build app
-      shell: bash
-      run: |
-        pnpm run build
+        pnpm run bootstrap

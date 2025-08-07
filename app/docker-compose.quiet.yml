@@ -1,0 +1,55 @@
+name: qss-quiet
+services:
+  postgres-qss-quiet:
+    image: postgres:latest
+    hostname: postgres-qss-quiet
+    networks:
+      - qss 
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: qss
+    command: -p 5434
+    ports:
+      - "5434:5434"
+      
+  redis-qss-quiet:
+    image: "redis/redis-stack:latest"
+    hostname: redis-qss-quiet
+    networks:
+      - qss
+    ports:
+      - "6381:6381"
+    volumes:
+      - redis_qss_data:/data
+    environment:
+      REDIS_ARGS: "--appendonly yes --port 6381"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6381", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  qss-quiet:
+    image: "qss:latest"
+    networks:
+      - qss
+    depends_on:
+      - postgres-qss-quiet
+      - redis-qss-quiet
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - "3003:3003"
+
+networks:
+  qss:
+    # Specify driver options
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"
+      
+volumes:
+  redis_qss_data:
+    driver: local

@@ -53,6 +53,14 @@ $ pnpm run bootstrap
 
 This will build all submodules, install dependencies and build the application.
 
+## Running commands on the app package.json
+
+Many commands are mapped onto the root `package.json` but for any other pnpm commands you can run them via
+
+```bash
+$ pnpm run run:app <command>
+```
+
 ## Running the app
 
 ```bash
@@ -73,6 +81,18 @@ $ pnpm run start:prod
 
 _NOTE: Running with `start` and `start:debug` will spin up dockerized dependencies (e.g. postgres) and run database migrations_
 
+## Running the app in docker
+
+```bash
+# spin up complete docker environment
+$ pnpm run run:app docker:up:test
+
+# spin down complete docker environment
+$ pnpm run run:app docker:down:test
+```
+
+_NOTE: Running this spins up services in a different container from the one used in pnpm run start and is used for Quiet E2E tests._
+
 ## Running the client
 
 ```bash
@@ -87,23 +107,23 @@ $ pnpm run start:client:dev
 
 ```bash
 # create a new migration
-$ pnpm run migrate:create
+$ pnpm run migrate
 
 # migrate database with existing migrations
-$ pnpm run migrate:up
+$ pnpm run run:app migrate:up
 ```
 
 ## Test
 
 ```bash
 # unit tests
-$ pnpm run test
+$ pnpm run run:app test
 
 # e2e tests
-$ pnpm run test:e2e
+$ pnpm run run:app test:e2e
 
 # test coverage
-$ pnpm run test:cov
+$ pnpm run run:app test:cov
 ```
 
 ## Linting and Formatting
@@ -129,3 +149,7 @@ $ pnpm run format:lint
 # run prettier and eslint with auto-fix
 $ pnpm run format:lint:fix
 ```
+
+## Random Guidance
+
+- To override package versions that are imported by other dependencies (e.g. overriding a package version imported by LFA) you must put the overrides in the `pnpm-workspace.yaml` file and not `package.json` (for more details see [the PNPM docs](https://pnpm.io/settings#dependency-resolution))

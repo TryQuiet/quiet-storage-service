@@ -15,7 +15,18 @@ jobs:
 
       - name: "Setup environment"
         uses: ./.github/actions/setup-env
+        with:
+          install-docker: true
+
+      - name: "Prepare test environment"
+        shell: bash
+        run: pnpm run run:app spinup:tests:ci
 
       - name: "Run E2E tests"
         shell: bash
-        run: pnpm run test:e2e:ci
+        run: pnpm run run:app test:e2e:ci
+
+      - name: "Teardown test environment"
+        if: always()
+        shell: bash
+        run: pnpm run run:app spindown:tests
