@@ -1,6 +1,6 @@
 # app
 
-## 1.0.0-alpha.2
+## 1.0.0-alpha.0
 
 ### Major Changes
 
@@ -14,7 +14,7 @@
   - Adds E2EE on socket connections
   - Adds basic client tool:
 
-## 1.0.0-alpha.1
+## 1.0.0-alpha.23
 
 ### Major Changes
 

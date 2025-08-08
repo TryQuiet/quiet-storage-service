@@ -2,7 +2,7 @@
   "mode": "pre",
   "tag": "alpha",
   "initialVersions": {
-    "app": "1.0.0-alpha.0",
+    "app": "1.0.0-alpha.22",
     "@localfirst/auth": "6.0.0-alpha.6",
     "@localfirst/auth-provider-automerge-repo": "6.0.0-alpha.6",
     "@localfirst/crdx": "6.0.0-alpha.6",
