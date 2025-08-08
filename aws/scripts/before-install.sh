@@ -1,10 +1,15 @@
 cd ~
 
 # install node 22
-echo "Installing node 22.14.0"
-curl -sL https://deb.nodesource.com/setup_22.x -o nodesource_setup.sh
-sudo -E bash nodesource_setup.sh
-sudo apt-get install -y nodejs
+# echo "Installing node 22.14.0"
+# curl -sL https://deb.nodesource.com/setup_22.x -o nodesource_setup.sh
+# sudo -E bash nodesource_setup.sh
+# sudo apt-get install -y nodejs
+
+echo "Installing volta and node 22.14.0"
+curl https://get.volta.sh | bash
+volta install node@22.14.0
+volta install npm@10.9.2
 
 # install pnpm 10
 echo "Installing pnpm 10.6.0"
