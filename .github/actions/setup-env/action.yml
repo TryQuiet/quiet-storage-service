@@ -26,4 +26,4 @@ runs:
     - name: Bootstrap app
       shell: bash
       run: |
-        pnpm run bootstrap
+        pnpm run bootstrap -c
