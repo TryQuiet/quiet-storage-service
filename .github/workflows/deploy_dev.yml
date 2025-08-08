@@ -15,12 +15,17 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: actions/checkout@v2
+      - name: "Checkout branch"
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
-          submodules: 'recursive' 
+          submodules: 'recursive'
+      - name: "Setup environment"
+        uses: ./.github/actions/setup-env
       - name: Extract version
         id: extract_version
         uses: Saionaro/extract-package-version@fdb5b74adc1278ddb777dfed4c988b9d098bb48d # v1.2.1
+        with:
+          path: app/
       # - name: Send Release Start Notificaton
       #   uses: ./.github/actions/release-notifier
       #   if: always()
