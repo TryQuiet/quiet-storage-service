@@ -8,6 +8,7 @@ cd ~
 
 echo "Installing volta and node 22.14.0"
 curl https://get.volta.sh | bash
+volta setup
 volta install node@22.14.0
 volta install npm@10.9.2
 
