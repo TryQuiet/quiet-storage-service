@@ -32,3 +32,5 @@ root hard nofile 65536
 
 curl -fsSL https://toolbelt.treasuredata.com/sh/install-ubuntu-jammy-fluent-package5-lts.sh | sudo sh
 sudo systemctl start fluentd.service
+
+exit 1
