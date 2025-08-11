@@ -14,3 +14,5 @@ export class NotInitializedError extends Error {
     super(`${className} is not initialized!`)
   }
 }
+
+export class EntityValidationError extends Error {}

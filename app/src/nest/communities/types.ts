@@ -1,6 +1,7 @@
 import type { Keyset } from '@localfirst/auth'
 import type { SigChain } from './auth/sigchain.js'
 import type { AuthConnection } from './auth/auth.connection.js'
+import type { DateTime } from 'luxon'
 
 export const MANAGED_COMMUNITY_TTL_MS = 300_000 // i.e. expire locally stored communities 5 minutes after losing all auth connections
 
@@ -38,4 +39,11 @@ export interface ManagedCommunity {
   sigChain: SigChain
   authConnections?: AuthConnectionMap
   expiryMs?: number
+}
+
+export interface CommunitiesData {
+  cid: string
+  communityId: string
+  entry: string
+  receivedAt?: DateTime
 }
