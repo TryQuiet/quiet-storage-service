@@ -83,6 +83,7 @@ export class CommunitiesDataStorageService implements OnModuleInit {
       communityId: payload.communityId,
       entry: Buffer.from(uint8arrays.fromString(payload.entry, 'hex')),
       receivedAt: payload.receivedAt.toUTC().toISO(),
+      createdAt: DateTime.utc().toISO(),
     })
     return entity
   }

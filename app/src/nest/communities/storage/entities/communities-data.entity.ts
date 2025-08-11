@@ -1,6 +1,5 @@
 import { Entity, Property } from '@mikro-orm/core'
 import { TableNames } from '../../../storage/postgres/const.js'
-import { DateTime } from 'luxon'
 import { BasicEntityWithId } from '../../../storage/postgres/basic-id.entity.js'
 
 // https://docs.google.com/document/d/1yBrcXCkiHkSTQ1Nd3yLFo9H9S_yvmq_p86xaH2lQa84/edit?tab=t.0#heading=h.34r38ks7imul
@@ -21,5 +20,5 @@ export class CommunitiesData extends BasicEntityWithId {
   receivedAt!: string // set when the message is originally recieved on the websocket
 
   @Property({ type: 'timestamptz', fieldName: 'created_at' })
-  createdAt: string = DateTime.utc().toISO() // datetime when the record was added to the DB
+  createdAt!: string // datetime when the record was added to the DB
 }
