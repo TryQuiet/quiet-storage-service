@@ -1,7 +1,7 @@
 import { program } from '@commander-js/extra-typings'
 import { createLogger, transports, format } from 'winston'
 import { runShellCommandWithRealTimeLogging } from './common.mjs'
-import { BASE_PNPM_I_COMMAND, GIT_SUBMODULE_COMMAND, LFA_PACKAGES, PNPM_BUILD_COMMAND } from './const.mjs'
+import { BASE_PNPM_I_COMMAND, DEPLOYED_PNPM_I_COMMAND, GIT_SUBMODULE_COMMAND, LFA_PACKAGES, PNPM_BUILD_COMMAND } from './const.mjs'
 import colors from 'ansi-colors'
 import fs from 'fs'
 import path from 'path'
@@ -15,6 +15,7 @@ program
   .option('-r, --reinstall', 'Force reinstall of dependencies', false)
   .option('-s, --skip-submodules', 'Skip initializing/symlinking submodule(s) (e.g. LFA)', false)
   .option('-c, --copy-submodules', 'Create hard copies of submodule directories rather than symlinks', false)
+  .option('-d, --deployed', 'Run bootstrap in a deployed environment', false)
   .action(async (options) => {
     const __dirname = path.dirname(fileURLToPath(import.meta.url))
     const spawnOptions = {
@@ -97,7 +98,8 @@ program
     }
 
     logger.info(`Installing dependencies`)
-    await runShellCommandWithRealTimeLogging(BASE_PNPM_I_COMMAND, logger, options.reinstall ? ['--force'] : [], spawnOptions)
+    const pnpmICommand = options.deployed ? DEPLOYED_PNPM_I_COMMAND : BASE_PNPM_I_COMMAND
+    await runShellCommandWithRealTimeLogging(pnpmICommand, logger, options.reinstall ? ['--force'] : [], spawnOptions)
 
     logger.info(`Compiling application`)
     await runShellCommandWithRealTimeLogging(PNPM_BUILD_COMMAND, logger, [], spawnOptions)

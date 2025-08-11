@@ -12,7 +12,9 @@
   },
   "scripts": {
     "install:deps": "pnpm i --dir --ignore-workspace --force",
-    "bootstrap-app": "pnpm run install:deps && node ./bootstrap.mjs"
+    "install:deps:deployed": "yes | pnpm i --dir --ignore-workspace --frozen-lockfile --child-concurrency 10 --stream",
+    "bootstrap-app": "pnpm run install:deps && node ./bootstrap.mjs",
+    "bootstrap-app:deployed": "pnpm run install:deps:deployed && node ./bootstrap.mjs --deployed --copy-submodules"
   },
   "devDependencies": {
     "winston": "^3.17.0",

@@ -12,8 +12,9 @@
   },
   "scripts": {
     "bootstrap": "cd bootstrapper && pnpm --ignore-workspace run bootstrap-app",
+    "bootstrap:deployed": "ccd bootstrapper && pnpm --ignore-workspace run bootstrap-app:deployed",
     "install:deps": "pnpm i --shamefully-hoist",
-    "install:deps:frozen": "pnpm i --shamefully-hoist --frozen-lockfile",
+    "install:deps:deployed": "yes | pnpm i --frozen-lockfile --shamefully-hoist --child-concurrency 10 --stream",
     "build": "pnpm --stream -r build",
     "format": "pnpm run --filter app format",
     "format:fix": "pnpm run --filter app format:fix",
