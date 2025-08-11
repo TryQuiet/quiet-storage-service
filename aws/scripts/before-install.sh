@@ -1,18 +1,10 @@
 cd ~/qss
 
 # install node 22
-# echo "Installing node 22.14.0"
-# curl -sL https://deb.nodesource.com/setup_22.x -o nodesource_setup.sh
-# sudo -E bash nodesource_setup.sh
-# sudo apt-get install -y nodejs
-
-echo "Installing volta and node 22.14.0"
-curl https://get.volta.sh | bash
-volta setup
-source /home/ubuntu/.bashrc
-
-volta install node@22.14.0
-volta install npm@10.9.2
+echo "Installing node 22.14.0"
+curl -sL https://deb.nodesource.com/setup_22.x -o nodesource_setup.sh
+sudo -E bash nodesource_setup.sh
+sudo apt-get install -y nodejs
 
 # install pnpm 10
 echo "Installing pnpm 10.6.0"
@@ -34,8 +26,3 @@ root hard nofile 65536
 
 curl -fsSL https://toolbelt.treasuredata.com/sh/install-ubuntu-jammy-fluent-package5-lts.sh | sudo sh
 sudo systemctl start fluentd.service
-
-echo $(volta which node)
-echo $(volta which npm)
-
-exit 1

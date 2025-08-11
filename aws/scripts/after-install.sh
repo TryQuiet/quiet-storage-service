@@ -4,9 +4,6 @@ source /home/ubuntu/.bashrc
 
 echo "Bootstrapping QSS"
 
-echo $(volta which node)
-echo $(volta which npm)
-
 rm -rf dist/
 rm -rf node_modules/
 
