@@ -97,8 +97,8 @@ export class AWSSecretsService {
         await this.executeCommandAws(command)
       return response.SecretString ?? response.SecretBinary
     } catch (e) {
-      this.logger.error('Error retrieving secret:', e)
-      throw new CompoundError('Error getting secret from AWS', e as Error)
+      this.logger.error('Error retrieving secret from AWS', e)
+      return undefined
     }
   }
 
