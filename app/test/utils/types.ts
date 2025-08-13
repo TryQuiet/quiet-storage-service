@@ -20,6 +20,7 @@ export interface TestTeam {
   server?: Server
   serverKeys?: KeysetWithSecrets
   testUserContext: LocalUserContext
+  otherUsers: LocalUserContext[]
 }
 
 export interface SigChainWithTestTeam {
