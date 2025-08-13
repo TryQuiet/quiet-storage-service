@@ -4,12 +4,12 @@
 import {
   SecretsManagerClient,
   GetSecretValueCommand,
-  PutSecretValueCommand,
   GetSecretValueCommandInput,
-  PutSecretValueCommandInput,
   GetSecretValueCommandOutput,
   ServiceOutputTypes,
   SecretsManagerClientConfig,
+  CreateSecretCommandInput,
+  CreateSecretCommand,
 } from '@aws-sdk/client-secrets-manager'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '../config/config.service.js'
@@ -108,7 +108,7 @@ export class AWSSecretsService {
    * @param secretName Secret name we are inserting
    * @param secret Encrypted secret to insert
    */
-  public async put(
+  public async create(
     secretName: string,
     secret: string | Uint8Array,
   ): Promise<void> {
@@ -120,8 +120,8 @@ export class AWSSecretsService {
       }
 
       // generate the AWS secrets command and insert the secret
-      const commandInput: PutSecretValueCommandInput = {
-        SecretId: secretName,
+      const commandInput: CreateSecretCommandInput = {
+        Name: secretName,
       }
       if (typeof secret === 'string') {
         commandInput.SecretString = secret
@@ -131,7 +131,7 @@ export class AWSSecretsService {
         throw new Error(`Secret must be a string or Uint8Array!`)
       }
 
-      const command = new PutSecretValueCommand(commandInput)
+      const command = new CreateSecretCommand(commandInput)
       await this.executeCommandAws(command)
     } catch (e) {
       this.logger.error('Error putting secret:', e)

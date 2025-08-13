@@ -55,9 +55,9 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@aws-sdk/client-lambda": "^3.758.0",
-    "@aws-sdk/client-secrets-manager": "^3.750.0",
-    "@aws-sdk/rds-signer": "^3.758.0",
+    "@aws-sdk/client-lambda": "^3.865.0",
+    "@aws-sdk/client-secrets-manager": "^3.864.0",
+    "@aws-sdk/rds-signer": "^3.864.0",
     "@dotenvx/dotenvx": "^1.36.0",
     "@localfirst/auth": "workspace:*",
     "@localfirst/crdx": "workspace:*",
