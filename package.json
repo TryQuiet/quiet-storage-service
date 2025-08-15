@@ -12,8 +12,9 @@
   },
   "scripts": {
     "bootstrap": "cd bootstrapper && pnpm --ignore-workspace run bootstrap-app",
+    "bootstrap:deployed": "cd bootstrapper && pnpm --ignore-workspace run bootstrap-app:deployed",
     "install:deps": "pnpm i --shamefully-hoist",
-    "install:deps:frozen": "pnpm i --shamefully-hoist --frozen-lockfile",
+    "install:deps:deployed": "yes | pnpm i --frozen-lockfile --shamefully-hoist --child-concurrency 10 --stream",
     "build": "pnpm --stream -r build",
     "format": "pnpm run --filter app format",
     "format:fix": "pnpm run --filter app format:fix",
@@ -33,6 +34,7 @@
     "prepare": "husky"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.29.5",
     "@herbcaudill/random": "^0.3.0",
     "@playwright/test": "^1.40.1",
     "@types/body-parser": "^1.19.5",
@@ -62,8 +64,8 @@
     "pnpm": "10.6.0"
   },
   "engines": {
-    "node": "22.14.0",
-    "npm": "10.9.2",
+    "node": ">=22.14.0",
+    "npm": ">=10.9.2",
     "pnpm": "10.6.0"
   },
   "packageManager": "pnpm@10.6.0"
