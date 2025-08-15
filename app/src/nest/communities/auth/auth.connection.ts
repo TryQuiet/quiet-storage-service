@@ -21,7 +21,7 @@ import {
   CommunityOperationStatus,
 } from '../websocket/types/index.js'
 import type { QuietLogger } from '../../app/logger/types.js'
-import type { AuthConnectionConfig } from './types.js'
+import { type AuthConnectionConfig, AuthStatus } from './types.js'
 import EventEmitter from 'events'
 import { type AuthDisconnectedPayload, AuthEvents } from './auth.events.js'
 
@@ -38,6 +38,10 @@ export class AuthConnection extends EventEmitter {
    * User context cast from Server
    */
   public localUserContext: LocalUserContext
+  /**
+   * Current status of this auth connection (e.g. has the user been authenticated)
+   */
+  private _status: AuthStatus = AuthStatus.PENDING
 
   /**
    * Generate a new logger for this auth sync connection
@@ -93,6 +97,10 @@ export class AuthConnection extends EventEmitter {
     })
   }
 
+  public get status(): AuthStatus {
+    return this._status
+  }
+
   /**
    * Start the auth sync connection and handle connection events
    */
@@ -107,6 +115,7 @@ export class AuthConnection extends EventEmitter {
         const { team, user } = this.userContext
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- this is valid
         this.lfaConnection.emit('sync', { team, user })
+        this._status = AuthStatus.JOINED
       } catch (e) {
         this.logger.error('Error while sending auth sync message', e)
       }
@@ -115,6 +124,7 @@ export class AuthConnection extends EventEmitter {
     // handle disconnects
     this.lfaConnection.on('disconnected', event => {
       this.logger.log(`LFA Disconnected!`, event)
+      this._status = AuthStatus.REJECTED_OR_CLOSED
       const payload: AuthDisconnectedPayload = {
         userId: this.userId,
         teamId: this.sigChain.team.id,
@@ -148,6 +158,7 @@ export class AuthConnection extends EventEmitter {
     this.logger.log(
       `Auth connection established with Peer for ${(this.userContext.team as Team).id}`,
     )
+    this._status = AuthStatus.JOINING
     this.lfaConnection.start()
   }
 

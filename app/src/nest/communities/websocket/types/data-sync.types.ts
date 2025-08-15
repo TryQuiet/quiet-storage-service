@@ -2,17 +2,16 @@ import type { BaseWebsocketMessage } from '../../../websocket/ws.types.js'
 import type { EncryptedAndSignedPayload } from '../../types.js'
 import type { CommunityOperationStatus } from './common.types.js'
 
-export interface QSSDataSyncPayload {
+export interface DataSyncPayload {
   teamId: string
   hash: string
   hashedDbId: string
-  encEntry: EncryptedAndSignedPayload
+  encEntry?: EncryptedAndSignedPayload
 }
 
-export interface QSSDataSyncMessage
-  extends BaseWebsocketMessage<QSSDataSyncPayload> {
+export interface DataSyncMessage extends BaseWebsocketMessage<DataSyncPayload> {
   ts: number
   status: CommunityOperationStatus
   reason?: string
-  payload: QSSDataSyncPayload
+  payload: DataSyncPayload
 }

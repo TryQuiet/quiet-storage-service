@@ -8,6 +8,7 @@ import { createLogger } from '../app/logger/logger.js'
 import {
   AllowedServerKeyState,
   AuthConnectionMap,
+  CommunitiesData,
   Community,
   CommunityUpdate,
   CreatedCommunity,
@@ -30,10 +31,12 @@ import { HOSTNAME } from '../app/const.js'
 import { SigChain } from './auth/sigchain.js'
 import { AuthConnection } from './auth/auth.connection.js'
 import { NativeServerWebsocketEvents } from '../websocket/ws.types.js'
-import { AuthConnectionConfig } from './auth/types.js'
+import { AuthConnectionConfig, AuthStatus } from './auth/types.js'
 import { Socket } from 'socket.io'
 import { AuthDisconnectedPayload, AuthEvents } from './auth/auth.events.js'
 import { DateTime } from 'luxon'
+import { CommunitiesDataStorageService } from './storage/communities-data.storage.service.js'
+import { DataSyncPayload } from './websocket/types/data-sync.types.js'
 
 @Injectable()
 export class CommunitiesManagerService implements OnModuleDestroy {
@@ -52,8 +55,10 @@ export class CommunitiesManagerService implements OnModuleDestroy {
   constructor(
     // hostname of the QSS server to provide to LFA
     @Inject(HOSTNAME) private readonly hostname: string,
-    // DB abstraction layer service for community data
+    // DB abstraction layer service for community metadata (e.g. sigchains)
     private readonly storage: CommunitiesStorageService,
+    // DB abstraction layer service for community sync data (e.g. messages)
+    private readonly dataSyncStorage: CommunitiesDataStorageService,
     // service for managing creation/storage of server-owned LFA keys and user-generated keyrings
     private readonly serverKeyManager: ServerKeyManagerService,
   ) {
@@ -348,6 +353,70 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     }
 
     return JSON.parse(uint8arrays.toString(teamKeys, 'utf8')) as Keyring
+  }
+
+  public async processIncomingSyncMessage(
+    payload: DataSyncPayload,
+  ): Promise<boolean> {
+    const managedCommunity = await this.get(payload.teamId)
+    if (managedCommunity == null) {
+      throw new Error(`No community found for this team ID: ${payload.teamId}`)
+    }
+
+    if (
+      managedCommunity.authConnections == null ||
+      !managedCommunity.authConnections.has(payload.encEntry!.userId)
+    ) {
+      throw new Error(`User hasn't signed in to this community`)
+    }
+
+    const authConnection = managedCommunity.authConnections.get(
+      payload.encEntry!.userId,
+    )!
+    switch (authConnection.status) {
+      case AuthStatus.PENDING:
+      case AuthStatus.JOINING:
+        this.logger.warn(
+          `Waiting for user to be authenticated before processing sync message`,
+        )
+        throw new Error('User authentication pending')
+      case AuthStatus.REJECTED_OR_CLOSED:
+        this.logger.warn(
+          `User has either disconnected or was unable to authenticate against the sigchain, skipping sync message processing`,
+        )
+        throw new Error('User not authenticated')
+      case AuthStatus.JOINED:
+        this.logger.debug(
+          'User is authenticated, continuing with processing sync message',
+        )
+        break
+    }
+
+    if (payload.encEntry?.userId !== payload.encEntry?.signature.author.name) {
+      throw new Error(`User ID doesn't match signature`)
+    }
+
+    const dbPayload: CommunitiesData = {
+      communityId: payload.teamId,
+      cid: payload.hashedDbId,
+      entry: uint8arrays.toString(
+        uint8arrays.fromString(JSON.stringify(payload.encEntry), 'utf8'),
+        'hex',
+      ),
+      receivedAt: DateTime.utc(),
+    }
+    const written = await this.dataSyncStorage.addCommunitiesData(dbPayload)
+    if (written) {
+      this.logger.debug(
+        'Data sync successfully written to the DB',
+        dbPayload.cid,
+      )
+      // TODO: add fanout logic
+    } else {
+      this.logger.error('Data sync write to DB was unsuccessful', dbPayload.cid)
+    }
+
+    return written
   }
 
   /**

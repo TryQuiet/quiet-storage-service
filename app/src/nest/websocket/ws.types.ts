@@ -9,9 +9,6 @@ export interface BaseHandlerConfig {
  * Quiet-specific websocket event types
  */
 export enum WebsocketEvents {
-  // bullshit
-  Ping = 'ping',
-  Pong = 'pong',
   // communities
   CreateCommunity = 'create-community',
   GetCommunity = 'get-community',
@@ -19,6 +16,8 @@ export enum WebsocketEvents {
   //// community auth
   GeneratePublicKeys = 'generate-public-keys',
   AuthSync = 'auth-sync',
+  //// community data sync
+  DataSync = 'data-sync',
 }
 
 /**
