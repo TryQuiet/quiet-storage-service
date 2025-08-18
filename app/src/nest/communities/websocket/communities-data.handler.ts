@@ -10,6 +10,11 @@ import {
   CommunityOperationStatus,
 } from './types/index.js'
 import type { DataSyncMessage } from './types/data-sync.types.js'
+import {
+  AuthenticationError,
+  CommunityNotFoundError,
+  SignatureMismatchError,
+} from '../../utils/errors.js'
 
 const baseLogger = createLogger('Websocket:Event:Communities:DataSync')
 
@@ -64,10 +69,19 @@ export function registerCommunitiesDataHandlers(
       callback(response)
     } catch (e) {
       _logger.error(`Error while processing community data sync event`, e)
+      let reason = `Error while handling data sync message`
+      if (
+        e instanceof SignatureMismatchError ||
+        e instanceof AuthenticationError ||
+        e instanceof CommunityNotFoundError
+      ) {
+        reason = e.message
+      }
+
       const errorResponse: DataSyncMessage = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.ERROR,
-        reason: `Error while handling data sync message`,
+        reason,
         payload: {
           hash: message.payload.hash,
           hashedDbId: message.payload.hashedDbId,

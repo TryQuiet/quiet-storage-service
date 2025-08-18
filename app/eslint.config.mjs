@@ -26,6 +26,7 @@ export default [
         'eslint-comments/no-unused-disable': 'off',
         'eslint-comments/no-unused-enable': 'off',
         '@typescript-eslint/prefer-optional-chain': 'off',
+        'complexity': ['error', { "variant": "modified" }]
       },
       files: [
         "src/**/*.ts",

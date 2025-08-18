@@ -4,7 +4,6 @@ import { StorageModule } from '../../storage/storage.module.js'
 import type { CommunitiesData } from '../types.js'
 import { SodiumHelper } from '../../encryption/sodium.helper.js'
 import { EncryptionModule } from '../../encryption/enc.module.js'
-import * as uint8arrays from 'uint8arrays'
 import { CommunitiesDataStorageService } from './communities-data.storage.service.js'
 import { DateTime } from 'luxon'
 
@@ -42,10 +41,7 @@ describe('CommunitesDataStorageService', () => {
       cid: sodiumHelper!.sodium.to_hex(
         sodiumHelper!.sodium.randombytes_buf(32),
       ),
-      entry: uint8arrays.toString(
-        sodiumHelper!.sodium.randombytes_buf(256),
-        'hex',
-      ),
+      entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
       communityId: 'communityId',
       receivedAt: DateTime.utc(),
     }
@@ -60,10 +56,7 @@ describe('CommunitesDataStorageService', () => {
     )
     const data: CommunitiesData = {
       cid,
-      entry: uint8arrays.toString(
-        sodiumHelper!.sodium.randombytes_buf(256),
-        'hex',
-      ),
+      entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
       communityId: 'communityId',
       receivedAt: DateTime.utc(),
     }
@@ -73,10 +66,7 @@ describe('CommunitesDataStorageService', () => {
 
     const dupeIdData: CommunitiesData = {
       cid,
-      entry: uint8arrays.toString(
-        sodiumHelper!.sodium.randombytes_buf(256),
-        'hex',
-      ),
+      entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
       communityId: 'communityId',
       receivedAt: DateTime.utc(),
     }
@@ -90,10 +80,7 @@ describe('CommunitesDataStorageService', () => {
       cid: sodiumHelper!.sodium.to_hex(
         sodiumHelper!.sodium.randombytes_buf(32),
       ),
-      entry: uint8arrays.toString(
-        sodiumHelper!.sodium.randombytes_buf(256),
-        'hex',
-      ),
+      entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
       communityId: 'communityId',
       receivedAt: undefined,
     }
@@ -109,10 +96,7 @@ describe('CommunitesDataStorageService', () => {
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
-        entry: uint8arrays.toString(
-          sodiumHelper!.sodium.randombytes_buf(256),
-          'hex',
-        ),
+        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'communityId',
         receivedAt: DateTime.utc(),
       },
@@ -120,10 +104,7 @@ describe('CommunitesDataStorageService', () => {
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
-        entry: uint8arrays.toString(
-          sodiumHelper!.sodium.randombytes_buf(256),
-          'hex',
-        ),
+        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'communityId',
         receivedAt: DateTime.utc(),
       },
@@ -131,10 +112,7 @@ describe('CommunitesDataStorageService', () => {
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
-        entry: uint8arrays.toString(
-          sodiumHelper!.sodium.randombytes_buf(256),
-          'hex',
-        ),
+        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'communityId',
         receivedAt: DateTime.utc(),
       },
@@ -142,10 +120,7 @@ describe('CommunitesDataStorageService', () => {
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
-        entry: uint8arrays.toString(
-          sodiumHelper!.sodium.randombytes_buf(256),
-          'hex',
-        ),
+        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'communityId',
         receivedAt: DateTime.utc(),
       },
@@ -153,10 +128,7 @@ describe('CommunitesDataStorageService', () => {
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
-        entry: uint8arrays.toString(
-          sodiumHelper!.sodium.randombytes_buf(256),
-          'hex',
-        ),
+        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'otherId',
         receivedAt: DateTime.utc(),
       },
@@ -184,10 +156,7 @@ describe('CommunitesDataStorageService', () => {
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
-        entry: uint8arrays.toString(
-          sodiumHelper!.sodium.randombytes_buf(256),
-          'hex',
-        ),
+        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'communityId',
         receivedAt: DateTime.utc().minus({ days: 1 }),
       },
@@ -195,10 +164,7 @@ describe('CommunitesDataStorageService', () => {
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
-        entry: uint8arrays.toString(
-          sodiumHelper!.sodium.randombytes_buf(256),
-          'hex',
-        ),
+        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'communityId',
         receivedAt: DateTime.utc().minus({ days: 1 }),
       },
@@ -206,10 +172,7 @@ describe('CommunitesDataStorageService', () => {
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
-        entry: uint8arrays.toString(
-          sodiumHelper!.sodium.randombytes_buf(256),
-          'hex',
-        ),
+        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'communityId',
         receivedAt: DateTime.utc().minus({ days: 1 }),
       },
@@ -217,10 +180,7 @@ describe('CommunitesDataStorageService', () => {
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
-        entry: uint8arrays.toString(
-          sodiumHelper!.sodium.randombytes_buf(256),
-          'hex',
-        ),
+        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'communityId',
         receivedAt: DateTime.utc(),
       },
@@ -228,10 +188,7 @@ describe('CommunitesDataStorageService', () => {
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
-        entry: uint8arrays.toString(
-          sodiumHelper!.sodium.randombytes_buf(256),
-          'hex',
-        ),
+        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'otherId',
         receivedAt: DateTime.utc().minus({ days: 1 }),
       },
@@ -264,10 +221,7 @@ describe('CommunitesDataStorageService', () => {
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
-        entry: uint8arrays.toString(
-          sodiumHelper!.sodium.randombytes_buf(256),
-          'hex',
-        ),
+        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'communityId',
         receivedAt: DateTime.utc().minus({ days: 1 }),
       },
@@ -275,10 +229,7 @@ describe('CommunitesDataStorageService', () => {
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
-        entry: uint8arrays.toString(
-          sodiumHelper!.sodium.randombytes_buf(256),
-          'hex',
-        ),
+        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'communityId',
         receivedAt: DateTime.utc().minus({ days: 1 }),
       },
@@ -286,10 +237,7 @@ describe('CommunitesDataStorageService', () => {
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
-        entry: uint8arrays.toString(
-          sodiumHelper!.sodium.randombytes_buf(256),
-          'hex',
-        ),
+        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'communityId',
         receivedAt: DateTime.utc().minus({ days: 1 }),
       },
@@ -297,10 +245,7 @@ describe('CommunitesDataStorageService', () => {
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
-        entry: uint8arrays.toString(
-          sodiumHelper!.sodium.randombytes_buf(256),
-          'hex',
-        ),
+        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'communityId',
         receivedAt: DateTime.utc(),
       },
@@ -308,10 +253,7 @@ describe('CommunitesDataStorageService', () => {
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
-        entry: uint8arrays.toString(
-          sodiumHelper!.sodium.randombytes_buf(256),
-          'hex',
-        ),
+        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'otherId',
         receivedAt: DateTime.utc().minus({ days: 1 }),
       },

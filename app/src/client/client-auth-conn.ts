@@ -131,7 +131,6 @@ export class QSSClientAuthConnection extends EventEmitter {
           if (message.payload.message == null) {
             throw new Error(`Missing message`)
           }
-          this.logger.warn(message.payload.message)
           this.authConnection!.deliver(
             uint8arrays.fromString(message.payload.message, 'base64'),
           )

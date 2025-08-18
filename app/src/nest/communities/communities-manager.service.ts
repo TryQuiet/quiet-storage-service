@@ -26,8 +26,13 @@ import {
 import { ServerKeyManagerService } from '../encryption/server-key-manager.service.js'
 import { StoredKeyRingType } from '../encryption/types.js'
 import * as uint8arrays from 'uint8arrays'
-import { CompoundError } from '../types.js'
-import { HOSTNAME } from '../app/const.js'
+import {
+  AuthenticationError,
+  CommunityNotFoundError,
+  CompoundError,
+  SignatureMismatchError,
+} from '../utils/errors.js'
+import { HOSTNAME, SERIALIZER } from '../app/const.js'
 import { SigChain } from './auth/sigchain.js'
 import { AuthConnection } from './auth/auth.connection.js'
 import { NativeServerWebsocketEvents } from '../websocket/ws.types.js'
@@ -37,6 +42,7 @@ import { AuthDisconnectedPayload, AuthEvents } from './auth/auth.events.js'
 import { DateTime } from 'luxon'
 import { CommunitiesDataStorageService } from './storage/communities-data.storage.service.js'
 import { DataSyncPayload } from './websocket/types/data-sync.types.js'
+import { Serializer } from '../utils/serialization/serializer.service.js'
 
 @Injectable()
 export class CommunitiesManagerService implements OnModuleDestroy {
@@ -52,9 +58,12 @@ export class CommunitiesManagerService implements OnModuleDestroy {
 
   private readonly logger = createLogger(CommunitiesManagerService.name)
 
+  /* eslint-disable-next-line @typescript-eslint/max-params --  we can't do much about this */
   constructor(
     // hostname of the QSS server to provide to LFA
     @Inject(HOSTNAME) private readonly hostname: string,
+    // serializer for converting between objects and buffers/uint8arrays and back to objects
+    @Inject(SERIALIZER) private readonly serializer: Serializer,
     // DB abstraction layer service for community metadata (e.g. sigchains)
     private readonly storage: CommunitiesStorageService,
     // DB abstraction layer service for community sync data (e.g. messages)
@@ -219,7 +228,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     // get the community from the local cache or storage
     const managedCommunity = this.communities.get(teamId)
     if (managedCommunity == null) {
-      throw new Error(`No community found for this team ID: ${teamId}`)
+      throw new CommunityNotFoundError(teamId)
     }
 
     // return an existing auth connection, if found
@@ -355,54 +364,25 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     return JSON.parse(uint8arrays.toString(teamKeys, 'utf8')) as Keyring
   }
 
+  /**
+   * Validate that a user has permissions on a given community and then write the entry to postgres
+   *
+   * @param payload Data sync payload containing the encrypted oplog entry we are writing to the DB
+   * @returns True if written, false if not written
+   */
   public async processIncomingSyncMessage(
     payload: DataSyncPayload,
   ): Promise<boolean> {
     const managedCommunity = await this.get(payload.teamId)
-    if (managedCommunity == null) {
-      throw new Error(`No community found for this team ID: ${payload.teamId}`)
-    }
+    this._validateIncomingSyncMessage(payload, managedCommunity)
 
-    if (
-      managedCommunity.authConnections == null ||
-      !managedCommunity.authConnections.has(payload.encEntry!.userId)
-    ) {
-      throw new Error(`User hasn't signed in to this community`)
-    }
-
-    const authConnection = managedCommunity.authConnections.get(
-      payload.encEntry!.userId,
-    )!
-    switch (authConnection.status) {
-      case AuthStatus.PENDING:
-      case AuthStatus.JOINING:
-        this.logger.warn(
-          `Waiting for user to be authenticated before processing sync message`,
-        )
-        throw new Error('User authentication pending')
-      case AuthStatus.REJECTED_OR_CLOSED:
-        this.logger.warn(
-          `User has either disconnected or was unable to authenticate against the sigchain, skipping sync message processing`,
-        )
-        throw new Error('User not authenticated')
-      case AuthStatus.JOINED:
-        this.logger.debug(
-          'User is authenticated, continuing with processing sync message',
-        )
-        break
-    }
-
-    if (payload.encEntry?.userId !== payload.encEntry?.signature.author.name) {
-      throw new Error(`User ID doesn't match signature`)
-    }
-
+    // convert the message payload to a form writable to the DB
+    // NOTE: the entry field is a binary column in postgres so we must losslessly serialize
+    //       the object to a buffer
     const dbPayload: CommunitiesData = {
       communityId: payload.teamId,
       cid: payload.hashedDbId,
-      entry: uint8arrays.toString(
-        uint8arrays.fromString(JSON.stringify(payload.encEntry), 'utf8'),
-        'hex',
-      ),
+      entry: this.serializer.serialize(payload.encEntry),
       receivedAt: DateTime.utc(),
     }
     const written = await this.dataSyncStorage.addCommunitiesData(dbPayload)
@@ -417,6 +397,67 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     }
 
     return written
+  }
+
+  /**
+   * Validate that this user can write a sync entry to this community
+   *
+   * @param payload Data sync payload containing the encrypted oplog entry we are writing to the DB
+   * @param managedCommunity Community this data sync is associated with
+   */
+  private _validateIncomingSyncMessage(
+    payload: DataSyncPayload,
+    managedCommunity: ManagedCommunity | undefined,
+  ): void {
+    if (managedCommunity == null) {
+      throw new CommunityNotFoundError(payload.teamId)
+    }
+
+    // check if we have an auth connection for this user before anything else to make sure
+    // they have signed in already
+    if (
+      managedCommunity.authConnections == null ||
+      !managedCommunity.authConnections.has(payload.encEntry!.userId)
+    ) {
+      throw new AuthenticationError(`User hasn't signed in to this community`)
+    }
+
+    const authConnection = managedCommunity.authConnections.get(
+      payload.encEntry!.userId,
+    )!
+
+    // validate that the user has successfully authenticated on this community
+    switch (authConnection.status) {
+      // if the user has just attempted to sign in we may not have validated that they are part of the community
+      // NOTE: it is on the client to reattempt the sync later
+      case AuthStatus.PENDING:
+      case AuthStatus.JOINING:
+        this.logger.warn(
+          `Waiting for user to be authenticated before processing sync message`,
+        )
+        throw new AuthenticationError('User authentication pending')
+      // if the user's auth connection instance is present but has disconnected we don't know if this is due to auth failure or
+      // some other disconnect but we can't proceed
+      case AuthStatus.REJECTED_OR_CLOSED:
+        this.logger.warn(
+          `User has either disconnected or was unable to authenticate against the sigchain, skipping sync message processing`,
+        )
+        throw new AuthenticationError('User not authenticated')
+      // this is the only success state for auth status
+      case AuthStatus.JOINED:
+        this.logger.debug(
+          'User is authenticated, continuing with processing sync message',
+        )
+        break
+    }
+
+    // validate that the user ID on the signature matches the one on the entry
+    if (payload.encEntry?.userId !== payload.encEntry?.signature.author.name) {
+      const entryUserId = payload.encEntry?.userId ?? 'USER_ID_UNDEFINED'
+      const signatureUserId =
+        payload.encEntry?.signature.author.name ?? 'USER_ID_UNDEFINED'
+      throw new SignatureMismatchError(entryUserId, signatureUserId)
+    }
   }
 
   /**
@@ -462,6 +503,12 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       localServerContext,
       teamKeys,
     )
+
+    sigChain.on('update', async () => {
+      await this.update(sigChain.team.id, {
+        sigChain: sigChain.serialize(true),
+      })
+    })
 
     // if we already have a managed community for this team merge it with the new data
     const existingManagedCommunity = this.communities.get(teamId)

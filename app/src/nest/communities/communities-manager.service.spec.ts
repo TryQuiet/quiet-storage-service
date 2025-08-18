@@ -21,8 +21,9 @@ import { CommunitiesStorageService } from './storage/communities.storage.service
 import MockedSocket from 'socket.io-mock'
 import type { Socket } from 'socket.io'
 import type { KeysetWithSecrets } from '@localfirst/crdx'
-import type { CompoundError } from '../types.js'
+import type { CompoundError } from '../utils/errors.js'
 import { RedisClient } from '../storage/redis/redis.client.js'
+import { CommunitiesDataStorageService } from './storage/communities-data.storage.service.js'
 
 describe('CommunitiesManagerService', () => {
   let module: TestingModule | undefined = undefined
@@ -30,6 +31,7 @@ describe('CommunitiesManagerService', () => {
   let testTeamUtils: TeamTestUtils | undefined = undefined
   let serverKeyManager: ServerKeyManagerService | undefined = undefined
   let storage: CommunitiesStorageService | undefined = undefined
+  let dataSyncStorage: CommunitiesDataStorageService | undefined = undefined
   let redis: RedisClient | undefined = undefined
   let wsConfig: CommunitiesHandlerConfig | undefined = undefined
 
@@ -45,11 +47,15 @@ describe('CommunitiesManagerService', () => {
       ServerKeyManagerService,
     )
     storage = module.get<CommunitiesStorageService>(CommunitiesStorageService)
+    dataSyncStorage = module.get<CommunitiesDataStorageService>(
+      CommunitiesDataStorageService,
+    )
     redis = module.get<RedisClient>(RedisClient)
     testTeamUtils = new TeamTestUtils(serverKeyManager)
     wsConfig = {
       communitiesManager: manager,
       storage,
+      dataSyncStorage,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is ok
       socket: new MockedSocket() as Socket,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- this doesn't get used anywhere in this code

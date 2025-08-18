@@ -19,7 +19,10 @@ import {
   LocalUserContext,
   Server,
 } from '@localfirst/auth'
-import { Community } from '../../../src/nest/communities/types.js'
+import {
+  Community,
+  EncryptionScopeType,
+} from '../../../src/nest/communities/types.js'
 import { SodiumHelper } from '../../../src/nest/encryption/sodium.helper.js'
 import * as uint8arrays from 'uint8arrays'
 import { Keyset, redactUser } from '@localfirst/crdx'
@@ -35,6 +38,14 @@ import waitForExpect from 'wait-for-expect'
 import { QSSClientAuthConnection } from '../../../src/client/client-auth-conn.js'
 import { ClientEvents } from '../../../src/client/ws.client.events.js'
 import { ServerKeyManagerService } from '../../../src/nest/encryption/server-key-manager.service.js'
+import {
+  DataSyncMessage,
+  DataSyncPayload,
+} from '../../../src/nest/communities/websocket/types/data-sync.types.js'
+import { CommunitiesDataStorageService } from '../../../src/nest/communities/storage/communities-data.storage.service.js'
+import { Serializer } from '../../../src/nest/utils/serialization/serializer.service.js'
+import _ from 'lodash'
+import { SERIALIZER } from '../../../src/nest/app/const.js'
 
 describe('Communities', () => {
   let testClient: TestClient
@@ -51,6 +62,8 @@ describe('Communities', () => {
   let communitiesManagerService: CommunitiesManagerService
   let sodiumHelper: SodiumHelper
   let storage: CommunitiesStorageService
+  let dataSyncStorage: CommunitiesDataStorageService
+  let serializer: Serializer
   let community: Community
   let testTeam: TestTeam
   let serverKeys: Keyset | undefined = undefined
@@ -80,9 +93,13 @@ describe('Communities', () => {
     storage = testingModule.get<CommunitiesStorageService>(
       CommunitiesStorageService,
     )
+    dataSyncStorage = testingModule.get<CommunitiesDataStorageService>(
+      CommunitiesDataStorageService,
+    )
     teamTestUtils = new TeamTestUtils(
       testingModule.get<ServerKeyManagerService>(ServerKeyManagerService),
     )
+    serializer = testingModule.get<Serializer>(SERIALIZER)
   })
 
   afterAll(async () => {
@@ -311,6 +328,79 @@ describe('Communities', () => {
           testTeam.team.memberByDeviceId(secondClientContext.device.deviceId),
         ).toBeDefined()
       }, 15_000)
+    })
+  })
+
+  describe('Data Sync', () => {
+    let dataSyncMessage: DataSyncMessage
+    let dataSyncAck: DataSyncMessage | undefined
+    it('client should send a data sync message', async () => {
+      const rawMessage = 'this is a message'
+      const encryptedMessage = testTeam.team.encrypt(rawMessage, 'member')
+      const signature = testTeam.team.sign(rawMessage)
+      const dataSyncPayload: DataSyncPayload = {
+        teamId: testTeam.team.id,
+        hash: sodiumHelper.sodium.crypto_hash(rawMessage, 'base64'),
+        hashedDbId: sodiumHelper.sodium.crypto_hash(
+          sodiumHelper.sodium.randombytes_buf(32),
+          'base64',
+        ),
+        encEntry: {
+          userId: testTeam.testUserContext.user.userId,
+          ts: DateTime.utc().toMillis(),
+          teamId: testTeam.team.id,
+          signature,
+          encrypted: {
+            contents: encryptedMessage.contents,
+            scope: {
+              name: 'member',
+              type: EncryptionScopeType.ROLE,
+              generation: encryptedMessage.recipient.generation,
+            },
+          },
+        },
+      }
+      dataSyncMessage = {
+        ts: DateTime.utc().toMillis(),
+        status: CommunityOperationStatus.SENDING,
+        payload: dataSyncPayload,
+      }
+      dataSyncAck = await testClient.client.sendMessage<DataSyncMessage>(
+        WebsocketEvents.DataSync,
+        dataSyncMessage,
+        true,
+      )
+    })
+
+    it('should return a valid data sync ack', () => {
+      expect(dataSyncAck).not.toBeNull()
+      expect(dataSyncAck!.status).toBe(CommunityOperationStatus.SUCCESS)
+      expect(dataSyncAck!.reason).toBeUndefined()
+      expect(dataSyncAck!.payload).toMatchObject(
+        expect.objectContaining({
+          teamId: dataSyncMessage.payload.teamId,
+          hashedDbId: dataSyncMessage.payload.hashedDbId,
+          hash: dataSyncMessage.payload.hash,
+        }),
+      )
+    })
+
+    it('should store the message contents in postgres', async () => {
+      const storedSyncContents = await dataSyncStorage.getCommunitiesData(
+        testTeam.team.id,
+        dataSyncMessage.ts - 10_000,
+      )
+      expect(storedSyncContents).not.toBeNull()
+      expect(storedSyncContents!.length).toBe(1)
+      const contents = storedSyncContents![0]
+      expect(contents.cid).toBe(dataSyncMessage.payload.hashedDbId)
+      expect(contents.communityId).toBe(testTeam.team.id)
+      expect(
+        _.isEqual(
+          contents.entry,
+          serializer.serialize(dataSyncMessage.payload.encEntry),
+        ),
+      ).toBe(true)
     })
   })
 

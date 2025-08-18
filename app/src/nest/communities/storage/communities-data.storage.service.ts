@@ -9,8 +9,7 @@ import { CommunitiesData as CommunitiesDataEntity } from './entities/communities
 import { PostgresClient } from '../../storage/postgres/postgres.client.js'
 import { PostgresRepo } from '../../storage/postgres/postgres.repo.js'
 import { MikroORM } from '@mikro-orm/postgresql'
-import * as uint8arrays from 'uint8arrays'
-import { EntityValidationError } from '../../types.js'
+import { EntityValidationError } from '../../utils/errors.js'
 import { DateTime } from 'luxon'
 
 @Injectable()
@@ -81,7 +80,7 @@ export class CommunitiesDataStorageService implements OnModuleInit {
     entity.assign({
       id: payload.cid,
       communityId: payload.communityId,
-      entry: Buffer.from(uint8arrays.fromString(payload.entry, 'hex')),
+      entry: payload.entry,
       receivedAt: payload.receivedAt.toUTC().toISO(),
       createdAt: DateTime.utc().toISO(),
     })
@@ -91,7 +90,7 @@ export class CommunitiesDataStorageService implements OnModuleInit {
   private entityToPayload(entity: CommunitiesDataEntity): CommunitiesData {
     return {
       communityId: entity.communityId,
-      entry: uint8arrays.toString(Uint8Array.from(entity.entry), 'hex'),
+      entry: entity.entry,
       cid: entity.id,
       receivedAt: DateTime.fromJSDate(new Date(entity.receivedAt)).toUTC(),
     }

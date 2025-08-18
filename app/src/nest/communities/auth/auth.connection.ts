@@ -133,12 +133,10 @@ export class AuthConnection extends EventEmitter {
     })
 
     // handle chain updates
-    this.lfaConnection.on('updated', async head => {
+    this.lfaConnection.on('updated', head => {
       try {
         this.logger.debug('Received sync message, team graph updated', head)
-        await this.config.communitiesManager.update(this.sigChain.team.id, {
-          sigChain: this.sigChain.serialize(true),
-        })
+        this.sigChain.emit('update')
       } catch (e) {
         this.logger.error(
           'Error while processing received auth sync message',
