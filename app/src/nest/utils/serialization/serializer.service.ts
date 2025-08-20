@@ -2,9 +2,14 @@
 // TODO: Use for serializing/deserializing keyrings
 
 import { Injectable } from '@nestjs/common'
-import { Packr, PackrStream } from 'msgpackr'
+import { addExtension, Packr } from 'msgpackr'
 import { type SerializerConfig, SerializerEncodingType } from './types.js'
-import { DEFAULT_PACKER_CONFIG, DEFAULT_STREAM_PACKER_CONFIG } from './const.js'
+import { DEFAULT_PACKER_CONFIG } from './const.js'
+import { DateTime } from 'luxon'
+import { createLogger } from '../../app/logger/logger.js'
+import * as uint8arrays from 'uint8arrays'
+import { CompoundError } from '../errors.js'
+import { isUint8Array } from 'util/types'
 
 /**
  * Serialization helper class for converting between objects and buffers/uint8arrays without losing context
@@ -14,14 +19,41 @@ import { DEFAULT_PACKER_CONFIG, DEFAULT_STREAM_PACKER_CONFIG } from './const.js'
 export class Serializer {
   // msgpackr instance for standard objects
   private readonly _packer: Packr
-  // msgpackr instance for streams
-  private readonly _streamPacker: PackrStream
+  private readonly logger = createLogger('Utils:Serializer')
 
   constructor(options?: SerializerConfig) {
     this._packer = new Packr(options?.packer ?? DEFAULT_PACKER_CONFIG)
-    this._streamPacker = new PackrStream(
-      options?.streamPacker ?? DEFAULT_STREAM_PACKER_CONFIG,
-    )
+    this._configureExtensions()
+  }
+
+  /**
+   * Configure custom extensions for handling classes that aren't handled natively by msgpackr
+   */
+  private _configureExtensions(): void {
+    // properly handle luxon DateTime objects
+    addExtension({
+      Class: DateTime,
+      type: 1,
+      write: (instance: DateTime): number => instance.toMillis(),
+      read: (data: number): DateTime => DateTime.fromMillis(data).toUTC(),
+    })
+    // properly handle uint8arrays
+    addExtension({
+      Class: Uint8Array,
+      type: 2,
+      write: (instance: Uint8Array | Buffer): string =>
+        isUint8Array(instance)
+          ? uint8arrays.toString(instance, 'hex')
+          : (instance as Buffer).toString('hex'),
+      read: (data: string): unknown => uint8arrays.fromString(data, 'hex'),
+    })
+    // properly handle buffers
+    addExtension({
+      Class: Buffer,
+      type: 3,
+      write: (instance: Buffer): string => instance.toString('hex'),
+      read: (data: string): Buffer => Buffer.from(data, 'hex'),
+    })
   }
 
   public serialize(
@@ -43,12 +75,20 @@ export class Serializer {
     payload: unknown,
     encoding: SerializerEncodingType = SerializerEncodingType.BUFFER,
   ): Buffer | Uint8Array {
-    const bufferPayload = this._packer.pack(payload)
-    if (encoding == null || encoding === SerializerEncodingType.BUFFER) {
-      return bufferPayload
-    }
+    try {
+      const bufferPayload = this._packer.pack(payload)
+      if (encoding == null || encoding === SerializerEncodingType.BUFFER) {
+        return bufferPayload
+      }
 
-    return this.toUint8array(bufferPayload)
+      return this.bufferToUint8array(bufferPayload)
+    } catch (e) {
+      this.logger.error('Error while serializing payload', e)
+      throw new CompoundError(
+        'Error while serializing payload',
+        e instanceof Error ? e : undefined,
+      )
+    }
   }
 
   /**
@@ -58,7 +98,14 @@ export class Serializer {
    * @returns Reconstituted object
    */
   public deserialize(serializedPayload: Buffer | Uint8Array): unknown {
-    return this._packer.unpack(serializedPayload)
+    let buffer: Buffer | undefined = undefined
+    if (serializedPayload instanceof Uint8Array) {
+      buffer = this.uint8arrayToBuffer(serializedPayload)
+    } else {
+      buffer = serializedPayload
+    }
+
+    return this._packer.unpack(buffer)
   }
 
   /**
@@ -67,7 +114,37 @@ export class Serializer {
    * @param buffer Buffer to convert to UInt8Array
    * @returns Uint8Array representation of a buffer
    */
-  public toUint8array(buffer: Buffer): Uint8Array {
-    return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength)
+  public bufferToUint8array(buffer: Buffer): Uint8Array {
+    try {
+      return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength)
+    } catch (e) {
+      this.logger.error('Error while converting buffer to uint8array', e)
+      throw new CompoundError(
+        'Error while converting buffer to uint8array',
+        e instanceof Error ? e : undefined,
+      )
+    }
+  }
+
+  /**
+   * Converts a uint8array to its buffer representation
+   *
+   * @param uint8array Uint8array to convert to Buffer
+   * @returns Buffer representation of a uint8array
+   */
+  public uint8arrayToBuffer(uint8array: Uint8Array): Buffer {
+    try {
+      return Buffer.from(
+        uint8array.buffer,
+        uint8array.byteOffset,
+        uint8array.byteLength,
+      )
+    } catch (e) {
+      this.logger.error('Error while converting uint8array to buffer', e)
+      throw new CompoundError(
+        'Error while converting uint8array to buffer',
+        e instanceof Error ? e : undefined,
+      )
+    }
   }
 }

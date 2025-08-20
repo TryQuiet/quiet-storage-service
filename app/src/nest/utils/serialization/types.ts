@@ -11,5 +11,4 @@ export type PackrStreamOptions =
 
 export interface SerializerConfig {
   packer?: Options
-  streamPacker?: PackrStreamOptions
 }

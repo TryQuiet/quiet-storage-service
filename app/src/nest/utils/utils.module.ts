@@ -1,9 +1,6 @@
 import { Module } from '@nestjs/common'
 import { Serializer } from './serialization/serializer.service.js'
-import {
-  DEFAULT_PACKER_CONFIG,
-  DEFAULT_STREAM_PACKER_CONFIG,
-} from './serialization/const.js'
+import { DEFAULT_PACKER_CONFIG } from './serialization/const.js'
 import { SERIALIZER } from '../app/const.js'
 
 @Module({
@@ -14,7 +11,6 @@ import { SERIALIZER } from '../app/const.js'
       useFactory: (): Serializer =>
         new Serializer({
           packer: DEFAULT_PACKER_CONFIG,
-          streamPacker: DEFAULT_STREAM_PACKER_CONFIG,
         }),
     },
   ],

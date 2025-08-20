@@ -20,7 +20,9 @@ import {
   Server,
 } from '@localfirst/auth'
 import {
+  CommunitiesData,
   Community,
+  EncryptedAndSignedPayload,
   EncryptionScopeType,
 } from '../../../src/nest/communities/types.js'
 import { SodiumHelper } from '../../../src/nest/encryption/sodium.helper.js'
@@ -360,6 +362,9 @@ describe('Communities', () => {
           },
         },
       }
+      const serialized = serializer.serialize(dataSyncPayload.encEntry)
+      const deserialized = serializer.deserialize(serialized)
+      expect(deserialized).toStrictEqual(dataSyncPayload.encEntry)
       dataSyncMessage = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.SENDING,
@@ -395,12 +400,31 @@ describe('Communities', () => {
       const contents = storedSyncContents![0]
       expect(contents.cid).toBe(dataSyncMessage.payload.hashedDbId)
       expect(contents.communityId).toBe(testTeam.team.id)
+      const deserializedContents = serializer.deserialize(
+        contents.entry,
+      ) as EncryptedAndSignedPayload
+      expect(deserializedContents).toEqual(
+        expect.objectContaining({
+          userId: dataSyncMessage.payload.encEntry!.userId,
+          ts: dataSyncMessage.payload.encEntry!.ts,
+          teamId: dataSyncMessage.payload.encEntry!.teamId,
+          signature: dataSyncMessage.payload.encEntry!.signature,
+          encrypted: expect.objectContaining({
+            contents: expect.any(Buffer),
+            scope: {
+              name: dataSyncMessage.payload.encEntry!.encrypted.scope.name,
+              type: dataSyncMessage.payload.encEntry!.encrypted.scope.type,
+              generation:
+                dataSyncMessage.payload.encEntry!.encrypted.scope.generation,
+            },
+          }),
+        }),
+      )
       expect(
-        _.isEqual(
-          contents.entry,
-          serializer.serialize(dataSyncMessage.payload.encEntry),
+        serializer.bufferToUint8array(
+          deserializedContents.encrypted.contents as Buffer,
         ),
-      ).toBe(true)
+      ).toStrictEqual(dataSyncMessage.payload.encEntry?.encrypted.contents)
     })
   })
 
