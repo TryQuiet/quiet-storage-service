@@ -44,6 +44,6 @@ export interface ManagedCommunity {
 export interface CommunitiesData {
   cid: string
   communityId: string
-  entry: string
-  receivedAt?: DateTime
+  entry: Buffer
+  receivedAt: DateTime
 }

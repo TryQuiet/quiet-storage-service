@@ -99,7 +99,7 @@ export class CommunitiesStorageService implements OnModuleInit {
 
   public async clearRepository(): Promise<void> {
     this.logger.warn(`Clearing the communities respository!`)
-    await this.orm.getSchemaGenerator().clearDatabase()
+    await this.repository.clearRepository()
   }
 
   private payloadToEntity(payload: Community): CommunityEntity {
