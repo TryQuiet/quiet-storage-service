@@ -25,7 +25,7 @@ import {
 import { ServerKeyManagerService } from '../encryption/server-key-manager.service.js'
 import { StoredKeyRingType } from '../encryption/types.js'
 import * as uint8arrays from 'uint8arrays'
-import { CompoundError } from '../types.js'
+import { CompoundError, NoPopulatedCommunitiesError } from '../types.js'
 import { HOSTNAME } from '../app/const.js'
 import { SigChain } from './auth/sigchain.js'
 import { AuthConnection } from './auth/auth.connection.js'
@@ -122,19 +122,6 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       const deserializedTeamKeyring: Keyring = JSON.parse(
         uint8arrays.toString(serializedTeamKeyring, 'utf8'),
       ) as Keyring
-      this.logger.verbose(`Storing team keyset`)
-      // store the team keyring in the AWS secrets manager
-      await this.serverKeyManager.storeKeyring(
-        community.teamId,
-        serializedTeamKeyring,
-        StoredKeyRingType.TEAM_KEYRING,
-      )
-      this.logger.verbose(`Storing community metadata`)
-      // put the community metadata into the database
-      const stored = await this.storage.addCommunity(community)
-      if (!stored) {
-        throw new Error(`Failed to store community!`)
-      }
 
       this.logger.log(`Deserializing and joining team`)
       // get the previously created server LFA keys from the AWS secrets manager
@@ -155,6 +142,26 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         localServerContext,
         deserializedTeamKeyring,
       )
+
+      const userCount = sigChain.team.members().length
+      if (userCount > 1) {
+        throw new NoPopulatedCommunitiesError(community.teamId, userCount)
+      }
+
+      this.logger.verbose(`Storing team keyset`)
+      // store the team keyring in the AWS secrets manager
+      await this.serverKeyManager.storeKeyring(
+        community.teamId,
+        serializedTeamKeyring,
+        StoredKeyRingType.TEAM_KEYRING,
+      )
+      this.logger.verbose(`Storing community metadata`)
+      // put the community metadata into the database
+      const stored = await this.storage.addCommunity(community)
+      if (!stored) {
+        throw new Error(`Failed to store community!`)
+      }
+
       this.communities.set(community.teamId, {
         teamId: community.teamId,
         sigChain,

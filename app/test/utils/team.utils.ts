@@ -10,6 +10,7 @@ import {
   Team,
   LocalUserContext,
   KeysetWithSecrets,
+  generateProof,
 } from '@localfirst/auth'
 import { createLogger } from '../../src/nest/app/logger/logger.js'
 import { ServerKeyManagerService } from '../../src/nest/encryption/server-key-manager.service.js'
@@ -68,7 +69,34 @@ export class TeamTestUtils {
       serverKeys,
       server,
       testUserContext,
+      otherUsers: [],
     }
+  }
+
+  public async addUserToTeam(
+    testTeam: TestTeam,
+    userName: string,
+    deviceName: string = randomUUID(),
+  ): Promise<TestTeam> {
+    this.logger.info(
+      'Adding new user to the test team',
+      userName,
+      testTeam.team.id,
+    )
+    const user = createUser(userName) as UserWithSecrets
+    const device = createDevice({
+      userId: user.userId,
+      deviceName: deviceName,
+    })
+    const testUserContext: LocalUserContext = { user, device }
+    const invitation = testTeam.team.inviteMember()
+    testTeam.team.admitMember(
+      generateProof(invitation.seed),
+      user.keys,
+      userName,
+    )
+    testTeam.otherUsers.push(testUserContext)
+    return testTeam
   }
 
   public async createSigchainFromTestTeam(

@@ -16,3 +16,11 @@ export class NotInitializedError extends Error {
 }
 
 export class EntityValidationError extends Error {}
+
+export class NoPopulatedCommunitiesError extends Error {
+  constructor(communityId: string, userCount: number) {
+    super(
+      `QSS can't join community with more than 1 user!  Community with team ID ${communityId} has ${userCount} users!`,
+    )
+  }
+}
