@@ -1,4 +1,4 @@
-import { CompoundError } from '../types.js'
+import { CompoundError } from '../utils/errors.js'
 
 export enum Base64ErrorDirection {
   TO = 'to',

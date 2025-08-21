@@ -6,15 +6,18 @@ import * as auth from '@localfirst/auth'
 import { Injectable } from '@nestjs/common'
 import { createLogger } from '../../app/logger/logger.js'
 import * as uint8arrays from 'uint8arrays'
+import EventEmitter from 'events'
 
 const logger = createLogger('Auth:SigChain')
 
 @Injectable()
-export class SigChain {
+export class SigChain extends EventEmitter {
   private constructor(
     public team: auth.Team,
     public context: auth.LocalServerContext,
-  ) {}
+  ) {
+    super()
+  }
 
   public static create(
     serializedSigchain: Uint8Array,

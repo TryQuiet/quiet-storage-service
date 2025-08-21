@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common'
 import winston, { format, type Logger, transports } from 'winston'
 import 'winston-daily-rotate-file'
-import type { CompoundError } from '../../types.js'
+import type { CompoundError } from '../../utils/errors.js'
 import colors from 'ansi-colors'
 import { ConfigService } from '../../utils/config/config.service.js'
 import { EnvVars } from '../../utils/config/env_vars.js'

@@ -5,3 +5,10 @@ export interface AuthConnectionConfig {
   socket: Socket
   communitiesManager: CommunitiesManagerService
 }
+
+export enum AuthStatus {
+  PENDING = 'PENDING',
+  JOINING = 'JOINING',
+  JOINED = 'JOINED',
+  REJECTED_OR_CLOSED = 'REJECTED_OR_CLOSED',
+}
