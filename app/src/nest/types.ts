@@ -15,6 +15,8 @@ export class NotInitializedError extends Error {
   }
 }
 
+export class EntityValidationError extends Error {}
+
 export class NoPopulatedCommunitiesError extends Error {
   constructor(communityId: string, userCount: number) {
     super(

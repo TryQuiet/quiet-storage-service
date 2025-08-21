@@ -4,14 +4,11 @@
 
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { createLogger } from '../../app/logger/logger.js'
-import {
-  BaseEntity,
-  EntityManager,
-  EntityName,
-  MikroORM,
-} from '@mikro-orm/postgresql'
+import { EntityManager, EntityName, MikroORM } from '@mikro-orm/postgresql'
 import { PostgresRepo } from './postgres.repo.js'
 import { Community } from '../../communities/storage/entities/community.entity.js'
+import { CommunitiesData } from '../../communities/storage/entities/communities-data.entity.js'
+import { BasicEntityWithId } from './basic-id.entity.js'
 
 @Injectable()
 export class PostgresClient implements OnModuleInit, OnModuleDestroy {
@@ -26,10 +23,20 @@ export class PostgresClient implements OnModuleInit, OnModuleDestroy {
     private readonly orm: MikroORM,
     private readonly entityManager: EntityManager,
   ) {
-    // load our repository map
+    /**
+     * load our repository map
+     */
+
+    // Community - this is community metadata and stores the sigchain
     this.repositories.set(
       Community,
       new PostgresRepo(Community, this.entityManager),
+    )
+
+    // Communities Data - stores data sync entities for all communities
+    this.repositories.set(
+      CommunitiesData,
+      new PostgresRepo(CommunitiesData, this.entityManager),
     )
   }
 
@@ -59,7 +66,7 @@ export class PostgresClient implements OnModuleInit, OnModuleDestroy {
    * @param entityName DB entity that this repository handles
    * @returns Postgres repository instance for this entity
    */
-  public getRepository<T extends BaseEntity>(
+  public getRepository<T extends BasicEntityWithId>(
     entityName: EntityName<T>,
   ): PostgresRepo<T> {
     const repo = this.repositories.get(entityName)
