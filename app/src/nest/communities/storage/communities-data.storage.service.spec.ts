@@ -75,20 +75,6 @@ describe('CommunitesDataStorageService', () => {
     ).toBe(false)
   })
 
-  it('should fail to write a community data record to postgres when receivedAt is nullish', async () => {
-    const data: CommunitiesData = {
-      cid: sodiumHelper!.sodium.to_hex(
-        sodiumHelper!.sodium.randombytes_buf(32),
-      ),
-      entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
-      communityId: 'communityId',
-      receivedAt: undefined,
-    }
-    expect(await communitiesDataStorageService?.addCommunitiesData(data)).toBe(
-      false,
-    )
-  })
-
   it('should write and then get an array of all records for a community ID', async () => {
     const filterTs = DateTime.utc().toMillis() - 500
     const payloads: CommunitiesData[] = [
@@ -209,7 +195,7 @@ describe('CommunitesDataStorageService', () => {
     ).toEqual([])
     expect(
       result?.filter(
-        entity => entity.receivedAt! >= DateTime.fromMillis(filterTs),
+        entity => entity.receivedAt >= DateTime.fromMillis(filterTs),
       ).length,
     ).toEqual(1)
   })

@@ -7,6 +7,8 @@ import type { EntityManager } from '@mikro-orm/postgresql'
 import { createLogger } from '../../app/logger/logger.js'
 import type { QuietLogger } from '../../app/logger/types.js'
 import type { BasicEntityWithId } from './basic-id.entity.js'
+import { ConfigService } from '../../utils/config/config.service.js'
+import { Environment } from '../../utils/config/types.js'
 
 export class PostgresRepo<T extends BasicEntityWithId> {
   private readonly logger: QuietLogger
@@ -15,10 +17,12 @@ export class PostgresRepo<T extends BasicEntityWithId> {
     public readonly entityName: EntityName<T>,
     public readonly entityManager: EntityManager,
   ) {
-    this.logger = createLogger(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- this is safe
-      `Storage:${PostgresRepo.name}:${(entityName as any).name}`,
-    )
+    this.logger = createLogger(`Storage:${PostgresRepo.name}:${this.name}`)
+  }
+
+  public get name(): string {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- this is safe
+    return (this.entityName as any).name as string
   }
 
   /**
@@ -173,6 +177,24 @@ export class PostgresRepo<T extends BasicEntityWithId> {
         `Error while checking for existence of row with ID ${id}`,
         e,
       )
+    }
+    return result
+  }
+
+  public async clearRepository(): Promise<number | undefined> {
+    if (ConfigService.getEnv() === Environment.Production) {
+      throw new Error('Clearing a repsitory is forbidden in production')
+    }
+
+    let result: number | undefined = undefined
+    try {
+      await this.entityManager.transactional(async em => {
+        const repo = em.getRepository(this.entityName)
+        result = await repo.nativeDelete({})
+      })
+      this.logger.info(`Cleared ${this.name} repository`, result)
+    } catch (e) {
+      this.logger.error(`Error while clearing repository`, e)
     }
     return result
   }

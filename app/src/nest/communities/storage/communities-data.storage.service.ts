@@ -9,7 +9,6 @@ import { CommunitiesData as CommunitiesDataEntity } from './entities/communities
 import { PostgresClient } from '../../storage/postgres/postgres.client.js'
 import { PostgresRepo } from '../../storage/postgres/postgres.repo.js'
 import { MikroORM } from '@mikro-orm/postgresql'
-import { EntityValidationError } from '../../utils/errors.js'
 import { DateTime } from 'luxon'
 
 @Injectable()
@@ -65,17 +64,11 @@ export class CommunitiesDataStorageService implements OnModuleInit {
   }
 
   public async clearRepository(): Promise<void> {
-    this.logger.warn(`Clearing the communities respository!`)
-    await this.orm.getSchemaGenerator().clearDatabase()
+    this.logger.warn(`Clearing the communities data respository!`)
+    await this.repository.clearRepository()
   }
 
   private payloadToEntity(payload: CommunitiesData): CommunitiesDataEntity {
-    if (payload.receivedAt == null) {
-      throw new EntityValidationError(
-        `${CommunitiesDataEntity.name}: receivedAt must be non-null`,
-      )
-    }
-
     const entity = new CommunitiesDataEntity()
     entity.assign({
       id: payload.cid,

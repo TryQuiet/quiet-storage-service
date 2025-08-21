@@ -46,7 +46,7 @@ export interface CommunitiesData {
   cid: string
   communityId: string
   entry: Buffer
-  receivedAt?: DateTime
+  receivedAt: DateTime
 }
 
 export enum EncryptionScopeType {

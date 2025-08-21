@@ -201,7 +201,7 @@ describe('CommunitiesManagerService', () => {
       expect(error?.message).toBe('Error while creating community')
       expect(
         (error as CompoundError<Error> | undefined)?.original?.message,
-      ).toBe('Failed to store community!')
+      ).toBe('Non-base16 character')
     })
 
     it('should fail to create a new managed community when team keyring is not in base64', async () => {
@@ -244,6 +244,50 @@ describe('CommunitiesManagerService', () => {
           /\bUnexpected end of data\b|\bUnexpected token\b.*/,
         ),
       ).toBeDefined()
+    })
+
+    it('should fail to create a new managed community sigchain has more than 1 user', async () => {
+      const testTeam = await testTeamUtils!.createTestTeam()
+      await testTeamUtils?.addUserToTeam(testTeam, 'second-user')
+      const serializedTeamKeyring = uint8arrays.fromString(
+        JSON.stringify(testTeam.team.teamKeyring()),
+        'utf8',
+      )
+      const serializedServerKeyring = uint8arrays.fromString(
+        JSON.stringify(testTeam.serverKeys),
+        'utf8',
+      )
+
+      await serverKeyManager!.storeKeyring(
+        testTeam.team.id,
+        serializedServerKeyring,
+        StoredKeyRingType.SERVER_KEYRING,
+      )
+      const community: Community = {
+        teamId: testTeam.team.id,
+        sigChain: uint8arrays.toString(testTeam.team.save(), 'hex'),
+      }
+      const b64Keyring = uint8arrays.toString(serializedTeamKeyring, 'base64')
+      let createdCommunity: CreatedCommunity | undefined = undefined
+      let error: Error | undefined = undefined
+      try {
+        createdCommunity = await manager!.create(
+          testTeam.testUserContext.user.userId,
+          community,
+          b64Keyring,
+          wsConfig!.socket,
+        )
+      } catch (e) {
+        error = e as Error
+      }
+      expect(createdCommunity).toBeUndefined()
+      expect(error).toBeDefined()
+      expect(error?.message).toBe('Error while creating community')
+      expect(
+        (error as CompoundError<Error> | undefined)?.original?.message,
+      ).toBe(
+        `QSS can't join community with more than 1 user!  Community with team ID ${testTeam.team.id} has 2 users!`,
+      )
     })
   })
 
