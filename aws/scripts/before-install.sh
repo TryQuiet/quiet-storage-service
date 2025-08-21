@@ -1,4 +1,4 @@
-cd ~
+cd ~/qss
 
 # install node 22
 echo "Installing node 22.14.0"
