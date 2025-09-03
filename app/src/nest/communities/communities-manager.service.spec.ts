@@ -27,8 +27,8 @@ import type { Socket } from 'socket.io'
 import type { KeysetWithSecrets } from '@localfirst/crdx'
 import type { CompoundError } from '../utils/errors.js'
 import { RedisClient } from '../storage/redis/redis.client.js'
-import { CommunitiesDataSyncStorageService } from './storage/communities-data-sync.storage.service.js'
-import type { DataSyncPayload } from './websocket/types/data-sync.types.js'
+import { LogEntrySyncStorageService } from './storage/log-entry-sync.storage.service.js'
+import type { LogEntrySyncPayload } from './websocket/types/log-entry-sync.types.js'
 import type { TestTeam } from '../../../test/utils/types.js'
 import { DateTime } from 'luxon'
 import { SodiumHelper } from '../encryption/sodium.helper.js'
@@ -44,7 +44,7 @@ describe('CommunitiesManagerService', () => {
   let testTeamUtils: TeamTestUtils | undefined = undefined
   let serverKeyManager: ServerKeyManagerService | undefined = undefined
   let storage: CommunitiesStorageService | undefined = undefined
-  let dataSyncStorage: CommunitiesDataSyncStorageService | undefined = undefined
+  let dataSyncStorage: LogEntrySyncStorageService | undefined = undefined
   let redis: RedisClient | undefined = undefined
   let sodiumHelper: SodiumHelper | undefined = undefined
   let serializer: Serializer | undefined = undefined
@@ -67,8 +67,8 @@ describe('CommunitiesManagerService', () => {
       ServerKeyManagerService,
     )
     storage = module.get<CommunitiesStorageService>(CommunitiesStorageService)
-    dataSyncStorage = module.get<CommunitiesDataSyncStorageService>(
-      CommunitiesDataSyncStorageService,
+    dataSyncStorage = module.get<LogEntrySyncStorageService>(
+      LogEntrySyncStorageService,
     )
     redis = module.get<RedisClient>(RedisClient)
     sodiumHelper = module.get<SodiumHelper>(SodiumHelper)
@@ -358,11 +358,13 @@ describe('CommunitiesManagerService', () => {
   })
 
   describe('processIncomingSyncMessage', () => {
-    const generateDataSyncPayload = (testTeam: TestTeam): DataSyncPayload => {
+    const generateDataSyncPayload = (
+      testTeam: TestTeam,
+    ): LogEntrySyncPayload => {
       const rawMessage = 'this is a message'
       const encryptedMessage = testTeam.team.encrypt(rawMessage, 'member')
       const signature = testTeam.team.sign(rawMessage)
-      const dataSyncPayload: DataSyncPayload = {
+      const dataSyncPayload: LogEntrySyncPayload = {
         teamId: testTeam.team.id,
         hash: sodiumHelper!.sodium.crypto_hash(rawMessage, 'base64'),
         hashedDbId: sodiumHelper!.sodium.crypto_hash(
@@ -425,7 +427,7 @@ describe('CommunitiesManagerService', () => {
       let error: Error | undefined = undefined
       let written = false
       try {
-        written = await manager!.processIncomingSyncMessage(payload)
+        written = await manager!.processIncomingLogEntrySyncMessage(payload)
       } catch (e) {
         error = e as Error
       }
@@ -433,10 +435,11 @@ describe('CommunitiesManagerService', () => {
       expect(error).toBeUndefined()
       expect(written).toBe(true)
 
-      const storedSyncContents = await dataSyncStorage!.getCommunitiesSyncData(
-        testTeam.team.id,
-        payload.encEntry.ts - 10_000,
-      )
+      const storedSyncContents =
+        await dataSyncStorage!.getLogEntriesForCommunity(
+          testTeam.team.id,
+          payload.encEntry.ts - 10_000,
+        )
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(1)
       const contents = storedSyncContents![0]
@@ -501,7 +504,7 @@ describe('CommunitiesManagerService', () => {
       let error: Error | undefined = undefined
       let written = false
       try {
-        written = await manager!.processIncomingSyncMessage(payload)
+        written = await manager!.processIncomingLogEntrySyncMessage(payload)
       } catch (e) {
         error = e as Error
       }
@@ -512,10 +515,11 @@ describe('CommunitiesManagerService', () => {
       )
       expect(written).toBe(false)
 
-      const storedSyncContents = await dataSyncStorage!.getCommunitiesSyncData(
-        testTeam.team.id,
-        payload.encEntry.ts - 10_000,
-      )
+      const storedSyncContents =
+        await dataSyncStorage!.getLogEntriesForCommunity(
+          testTeam.team.id,
+          payload.encEntry.ts - 10_000,
+        )
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(0)
     })
@@ -558,7 +562,7 @@ describe('CommunitiesManagerService', () => {
       let error: Error | undefined = undefined
       let written = false
       try {
-        written = await manager!.processIncomingSyncMessage(payload)
+        written = await manager!.processIncomingLogEntrySyncMessage(payload)
       } catch (e) {
         error = e as Error
       }
@@ -569,10 +573,11 @@ describe('CommunitiesManagerService', () => {
       )
       expect(written).toBe(false)
 
-      const storedSyncContents = await dataSyncStorage!.getCommunitiesSyncData(
-        testTeam.team.id,
-        payload.encEntry.ts - 10_000,
-      )
+      const storedSyncContents =
+        await dataSyncStorage!.getLogEntriesForCommunity(
+          testTeam.team.id,
+          payload.encEntry.ts - 10_000,
+        )
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(0)
     })
@@ -615,7 +620,7 @@ describe('CommunitiesManagerService', () => {
       let error: Error | undefined = undefined
       let written = false
       try {
-        written = await manager!.processIncomingSyncMessage(payload)
+        written = await manager!.processIncomingLogEntrySyncMessage(payload)
       } catch (e) {
         error = e as Error
       }
@@ -626,10 +631,11 @@ describe('CommunitiesManagerService', () => {
       )
       expect(written).toBe(false)
 
-      const storedSyncContents = await dataSyncStorage!.getCommunitiesSyncData(
-        testTeam.team.id,
-        payload.encEntry.ts - 10_000,
-      )
+      const storedSyncContents =
+        await dataSyncStorage!.getLogEntriesForCommunity(
+          testTeam.team.id,
+          payload.encEntry.ts - 10_000,
+        )
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(0)
     })
@@ -647,7 +653,7 @@ describe('CommunitiesManagerService', () => {
       let error: Error | undefined = undefined
       let written = false
       try {
-        written = await manager!.processIncomingSyncMessage(payload)
+        written = await manager!.processIncomingLogEntrySyncMessage(payload)
       } catch (e) {
         error = e as Error
       }
@@ -658,10 +664,11 @@ describe('CommunitiesManagerService', () => {
       )
       expect(written).toBe(false)
 
-      const storedSyncContents = await dataSyncStorage!.getCommunitiesSyncData(
-        testTeam.team.id,
-        payload.encEntry.ts - 10_000,
-      )
+      const storedSyncContents =
+        await dataSyncStorage!.getLogEntriesForCommunity(
+          testTeam.team.id,
+          payload.encEntry.ts - 10_000,
+        )
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(0)
     })
@@ -705,7 +712,7 @@ describe('CommunitiesManagerService', () => {
       let error: Error | undefined = undefined
       let written = false
       try {
-        written = await manager!.processIncomingSyncMessage(payload)
+        written = await manager!.processIncomingLogEntrySyncMessage(payload)
       } catch (e) {
         error = e as Error
       }
@@ -714,10 +721,11 @@ describe('CommunitiesManagerService', () => {
       expect(error?.message).toBe(`User ID on entry doesn't match signature`)
       expect(written).toBe(false)
 
-      const storedSyncContents = await dataSyncStorage!.getCommunitiesSyncData(
-        testTeam.team.id,
-        payload.encEntry.ts - 10_000,
-      )
+      const storedSyncContents =
+        await dataSyncStorage!.getLogEntriesForCommunity(
+          testTeam.team.id,
+          payload.encEntry.ts - 10_000,
+        )
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(0)
     })

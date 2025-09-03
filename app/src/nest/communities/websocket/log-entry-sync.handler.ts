@@ -10,52 +10,52 @@ import {
   CommunityOperationStatus,
 } from './types/index.js'
 import type {
-  DataSyncMessage,
-  DataSyncResponseMessage,
-} from './types/data-sync.types.js'
+  LogEntrySyncMessage,
+  LogEntrySyncResponseMessage,
+} from './types/log-entry-sync.types.js'
 import {
   AuthenticationError,
   CommunityNotFoundError,
   SignatureMismatchError,
 } from '../../utils/errors.js'
 
-const baseLogger = createLogger('Websocket:Event:Communities:DataSync')
+const baseLogger = createLogger('Websocket:Event:Communities:LogEntrySync')
 
 /**
- * Adds event handlers for events related to communities sync data (i.e. OrbitDB data)
+ * Adds event handlers for events related to communities log sync data (i.e. OrbitDB data)
  *
  * @param config Websocket handler config
  */
-export function registerCommunitiesDataSyncHandlers(
+export function registerLogEntrySyncHandlers(
   config: CommunitiesHandlerConfig,
 ): void {
   const _logger = baseLogger.extend(config.socket.id)
-  _logger.debug(`Initializing communities data sync WS event handlers`)
+  _logger.debug(`Initializing communities log entry sync WS event handlers`)
 
   /**
-   * Process an incoming data sync message and write to the DB
+   * Process an incoming log entry sync message and write to the DB
    *
-   * @param message Data sync message
+   * @param message Log entry sync message
    * @param callback Callback for sending response
    */
-  async function handleDataSync(
-    message: DataSyncMessage,
-    callback: (payload: DataSyncResponseMessage) => void,
+  async function handleLogEntrySync(
+    message: LogEntrySyncMessage,
+    callback: (payload: LogEntrySyncResponseMessage) => void,
   ): Promise<void> {
-    _logger.debug(`Handling community data sync message`)
+    _logger.debug(`Handling community log entry sync message`)
     try {
       // Check that the user has authenticated on this community and then write to the DB
       const success =
-        await config.communitiesManager.processIncomingSyncMessage(
+        await config.communitiesManager.processIncomingLogEntrySyncMessage(
           message.payload,
         )
 
       if (!success) {
-        throw new Error('Failed to write data sync message to the DB')
+        throw new Error('Failed to write log entry sync message to the DB')
       }
 
       // form and return a success response to the user
-      let response: DataSyncResponseMessage | undefined = undefined
+      let response: LogEntrySyncResponseMessage | undefined = undefined
       response = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.SUCCESS,
@@ -67,8 +67,8 @@ export function registerCommunitiesDataSyncHandlers(
       }
       callback(response)
     } catch (e) {
-      _logger.error(`Error while processing community data sync event`, e)
-      let reason = `Error while handling data sync message`
+      _logger.error(`Error while processing log entry data sync event`, e)
+      let reason = `Error while handling log entry sync message`
       if (
         e instanceof SignatureMismatchError ||
         e instanceof AuthenticationError ||
@@ -77,7 +77,7 @@ export function registerCommunitiesDataSyncHandlers(
         reason = e.message
       }
 
-      const errorResponse: DataSyncResponseMessage = {
+      const errorResponse: LogEntrySyncResponseMessage = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.ERROR,
         reason,
@@ -92,5 +92,5 @@ export function registerCommunitiesDataSyncHandlers(
   }
 
   // register event handlers on this socket
-  config.socket.on(WebsocketEvents.DataSync, handleDataSync)
+  config.socket.on(WebsocketEvents.LogEntrySync, handleLogEntrySync)
 }

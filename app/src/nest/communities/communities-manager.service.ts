@@ -8,7 +8,7 @@ import { createLogger } from '../app/logger/logger.js'
 import {
   AllowedServerKeyState,
   AuthConnectionMap,
-  CommunitiesData,
+  LogSyncEntry,
   Community,
   CommunityUpdate,
   CreatedCommunity,
@@ -41,8 +41,8 @@ import { AuthConnectionConfig, AuthStatus } from './auth/types.js'
 import { Socket } from 'socket.io'
 import { AuthDisconnectedPayload, AuthEvents } from './auth/auth.events.js'
 import { DateTime } from 'luxon'
-import { CommunitiesDataSyncStorageService } from './storage/communities-data-sync.storage.service.js'
-import { DataSyncPayload } from './websocket/types/data-sync.types.js'
+import { LogEntrySyncStorageService } from './storage/log-entry-sync.storage.service.js'
+import { LogEntrySyncPayload } from './websocket/types/log-entry-sync.types.js'
 import { Serializer } from '../utils/serialization/serializer.service.js'
 
 @Injectable()
@@ -67,8 +67,8 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     @Inject(SERIALIZER) private readonly serializer: Serializer,
     // DB abstraction layer service for community metadata (e.g. sigchains)
     private readonly storage: CommunitiesStorageService,
-    // DB abstraction layer service for community sync data (e.g. messages)
-    private readonly dataSyncStorage: CommunitiesDataSyncStorageService,
+    // DB abstraction layer service for community log sync data (e.g. messages)
+    private readonly logEntrySyncStorage: LogEntrySyncStorageService,
     // service for managing creation/storage of server-owned LFA keys and user-generated keyrings
     private readonly serverKeyManager: ServerKeyManagerService,
   ) {
@@ -378,8 +378,8 @@ export class CommunitiesManagerService implements OnModuleDestroy {
    * @param payload Data sync payload containing the encrypted oplog entry we are writing to the DB
    * @returns True if written, false if not written
    */
-  public async processIncomingSyncMessage(
-    payload: DataSyncPayload,
+  public async processIncomingLogEntrySyncMessage(
+    payload: LogEntrySyncPayload,
   ): Promise<boolean> {
     const managedCommunity = await this.get(payload.teamId)
     this._validateIncomingSyncMessage(payload, managedCommunity)
@@ -387,13 +387,13 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     // convert the message payload to a form writable to the DB
     // NOTE: the entry field is a binary column in postgres so we must losslessly serialize
     //       the object to a buffer
-    const dbPayload: CommunitiesData = {
+    const dbPayload: LogSyncEntry = {
       communityId: payload.teamId,
       cid: payload.hashedDbId,
       entry: this.serializer.serialize(payload.encEntry),
       receivedAt: DateTime.utc(),
     }
-    const written = await this.dataSyncStorage.addCommunitiesData(dbPayload)
+    const written = await this.logEntrySyncStorage.addLogEntry(dbPayload)
     if (written) {
       this.logger.debug(
         'Data sync successfully written to the DB',
@@ -414,7 +414,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
    * @param managedCommunity Community this data sync is associated with
    */
   private _validateIncomingSyncMessage(
-    payload: DataSyncPayload,
+    payload: LogEntrySyncPayload,
     managedCommunity: ManagedCommunity | undefined,
   ): void {
     if (managedCommunity == null) {

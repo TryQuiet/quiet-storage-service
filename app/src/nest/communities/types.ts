@@ -42,7 +42,7 @@ export interface ManagedCommunity {
   expiryMs?: number
 }
 
-export interface CommunitiesData {
+export interface LogSyncEntry {
   cid: string
   communityId: string
   entry: Buffer

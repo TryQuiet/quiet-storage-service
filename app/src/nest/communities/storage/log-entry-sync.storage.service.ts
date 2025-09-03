@@ -4,51 +4,51 @@
 
 import { Injectable, OnModuleInit } from '@nestjs/common'
 import { createLogger } from '../../app/logger/logger.js'
-import { CommunitiesData } from '../types.js'
-import { CommunitiesDataSync as CommunitiesDataSyncEntity } from './entities/communities-data-sync.entity.js'
+import { LogSyncEntry } from '../types.js'
+import { LogEntrySync as LogEntrySyncEntity } from './entities/log-sync.entity.js'
 import { PostgresClient } from '../../storage/postgres/postgres.client.js'
 import { PostgresRepo } from '../../storage/postgres/postgres.repo.js'
 import { MikroORM } from '@mikro-orm/postgresql'
 import { DateTime } from 'luxon'
 
 @Injectable()
-export class CommunitiesDataSyncStorageService implements OnModuleInit {
+export class LogEntrySyncStorageService implements OnModuleInit {
   /**
    * Postgres repository
    */
-  private readonly repository: PostgresRepo<CommunitiesDataSyncEntity>
+  private readonly repository: PostgresRepo<LogEntrySyncEntity>
 
-  private readonly logger = createLogger('Storage:Communities')
+  private readonly logger = createLogger('Storage:Communities:LogEntrySync')
 
   constructor(
     private readonly postgresClient: PostgresClient,
     private readonly orm: MikroORM,
   ) {
-    this.repository = postgresClient.getRepository(CommunitiesDataSyncEntity)
+    this.repository = postgresClient.getRepository(LogEntrySyncEntity)
   }
 
   onModuleInit(): void {
-    this.logger.log(`${CommunitiesDataSyncStorageService.name} initialized!`)
+    this.logger.log(`${LogEntrySyncStorageService.name} initialized!`)
   }
 
-  public async addCommunitiesData(payload: CommunitiesData): Promise<boolean> {
+  public async addLogEntry(payload: LogSyncEntry): Promise<boolean> {
     try {
-      this.logger.log(`Adding new community sync data with ID ${payload.cid}`)
+      this.logger.log(`Adding new log sync data with ID ${payload.cid}`)
       const entity = this.payloadToEntity(payload)
       return await this.repository.add(entity)
     } catch (e) {
-      this.logger.error(`Error while writing community sync data to storage`, e)
+      this.logger.error(`Error while writing log sync data to storage`, e)
       return false
     }
   }
 
-  public async getCommunitiesSyncData(
+  public async getLogEntriesForCommunity(
     communityId: string,
     startTs: number,
-  ): Promise<CommunitiesData[] | undefined | null> {
+  ): Promise<LogSyncEntry[] | undefined | null> {
     const startDateTime = DateTime.fromMillis(startTs).toISO()
     this.logger.log(
-      `Getting communities data for ID ${communityId} and starting datetime ${startDateTime}`,
+      `Getting log entries for community ID ${communityId} and starting datetime ${startDateTime}`,
     )
     const result = await this.repository.findMany({
       communityId: { $eq: communityId },
@@ -56,7 +56,7 @@ export class CommunitiesDataSyncStorageService implements OnModuleInit {
     })
     if (result == null) {
       this.logger.warn(
-        `No community data found in storage for ID ${communityId} and starting datetime ${startDateTime}`,
+        `No log entries found in storage for community ID ${communityId} and starting datetime ${startDateTime}`,
       )
       return undefined
     }
@@ -68,8 +68,8 @@ export class CommunitiesDataSyncStorageService implements OnModuleInit {
     await this.repository.clearRepository()
   }
 
-  private payloadToEntity(payload: CommunitiesData): CommunitiesDataSyncEntity {
-    const entity = new CommunitiesDataSyncEntity()
+  private payloadToEntity(payload: LogSyncEntry): LogEntrySyncEntity {
+    const entity = new LogEntrySyncEntity()
     entity.assign({
       id: payload.cid,
       communityId: payload.communityId,
@@ -80,7 +80,7 @@ export class CommunitiesDataSyncStorageService implements OnModuleInit {
     return entity
   }
 
-  private entityToPayload(entity: CommunitiesDataSyncEntity): CommunitiesData {
+  private entityToPayload(entity: LogEntrySyncEntity): LogSyncEntry {
     return {
       communityId: entity.communityId,
       entry: entity.entry,

@@ -16,8 +16,8 @@ export enum WebsocketEvents {
   //// community auth
   GeneratePublicKeys = 'generate-public-keys',
   AuthSync = 'auth-sync',
-  //// community data sync
-  DataSync = 'data-sync',
+  //// community log entry sync
+  LogEntrySync = 'log-entry-sync',
 }
 
 /**

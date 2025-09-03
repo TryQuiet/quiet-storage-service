@@ -20,7 +20,7 @@ import {
   Server,
 } from '@localfirst/auth'
 import {
-  CommunitiesData,
+  LogSyncEntry,
   Community,
   EncryptedAndSignedPayload,
   EncryptionScopeType,
@@ -41,10 +41,10 @@ import { QSSClientAuthConnection } from '../../../src/client/client-auth-conn.js
 import { ClientEvents } from '../../../src/client/ws.client.events.js'
 import { ServerKeyManagerService } from '../../../src/nest/encryption/server-key-manager.service.js'
 import {
-  DataSyncMessage,
-  DataSyncPayload,
-} from '../../../src/nest/communities/websocket/types/data-sync.types.js'
-import { CommunitiesDataSyncStorageService } from '../../../src/nest/communities/storage/communities-data-sync.storage.service.js'
+  LogEntrySyncMessage,
+  LogEntrySyncPayload,
+} from '../../../src/nest/communities/websocket/types/log-entry-sync.types.js'
+import { LogEntrySyncStorageService } from '../../../src/nest/communities/storage/log-entry-sync.storage.service.js'
 import { Serializer } from '../../../src/nest/utils/serialization/serializer.service.js'
 import _ from 'lodash'
 import { SERIALIZER } from '../../../src/nest/app/const.js'
@@ -65,7 +65,7 @@ describe('Communities', () => {
   let communitiesManagerService: CommunitiesManagerService
   let sodiumHelper: SodiumHelper
   let storage: CommunitiesStorageService
-  let dataSyncStorage: CommunitiesDataSyncStorageService
+  let dataSyncStorage: LogEntrySyncStorageService
   let serializer: Serializer
   let community: Community
   let testTeam: TestTeam
@@ -96,8 +96,8 @@ describe('Communities', () => {
     storage = testingModule.get<CommunitiesStorageService>(
       CommunitiesStorageService,
     )
-    dataSyncStorage = testingModule.get<CommunitiesDataSyncStorageService>(
-      CommunitiesDataSyncStorageService,
+    dataSyncStorage = testingModule.get<LogEntrySyncStorageService>(
+      LogEntrySyncStorageService,
     )
     teamTestUtils = new TeamTestUtils(
       testingModule.get<ServerKeyManagerService>(ServerKeyManagerService),
@@ -338,13 +338,13 @@ describe('Communities', () => {
   })
 
   describe('Data Sync', () => {
-    let dataSyncMessage: DataSyncMessage
-    let dataSyncAck: DataSyncMessage | undefined
+    let logSyncMessage: LogEntrySyncMessage
+    let logSyncAck: LogEntrySyncMessage | undefined
     it('client should send a data sync message', async () => {
       const rawMessage = 'this is a message'
       const encryptedMessage = testTeam.team.encrypt(rawMessage, 'member')
       const signature = testTeam.team.sign(rawMessage)
-      const dataSyncPayload: DataSyncPayload = {
+      const logSyncPayload: LogEntrySyncPayload = {
         teamId: testTeam.team.id,
         hash: sodiumHelper.sodium.crypto_hash(rawMessage, 'base64'),
         hashedDbId: sodiumHelper.sodium.crypto_hash(
@@ -366,60 +366,61 @@ describe('Communities', () => {
           },
         },
       }
-      const serialized = serializer.serialize(dataSyncPayload.encEntry)
+      const serialized = serializer.serialize(logSyncPayload.encEntry)
       const deserialized = serializer.deserialize(serialized)
-      expect(deserialized).toStrictEqual(dataSyncPayload.encEntry)
-      dataSyncMessage = {
+      expect(deserialized).toStrictEqual(logSyncPayload.encEntry)
+      logSyncMessage = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.SENDING,
-        payload: dataSyncPayload,
+        payload: logSyncPayload,
       }
-      dataSyncAck = await testClient.client.sendMessage<DataSyncMessage>(
-        WebsocketEvents.DataSync,
-        dataSyncMessage,
+      logSyncAck = await testClient.client.sendMessage<LogEntrySyncMessage>(
+        WebsocketEvents.LogEntrySync,
+        logSyncMessage,
         true,
       )
     })
 
     it('should return a valid data sync ack', () => {
-      expect(dataSyncAck).not.toBeNull()
-      expect(dataSyncAck!.status).toBe(CommunityOperationStatus.SUCCESS)
-      expect(dataSyncAck!.reason).toBeUndefined()
-      expect(dataSyncAck!.payload).toMatchObject(
+      expect(logSyncAck).not.toBeNull()
+      expect(logSyncAck!.status).toBe(CommunityOperationStatus.SUCCESS)
+      expect(logSyncAck!.reason).toBeUndefined()
+      expect(logSyncAck!.payload).toMatchObject(
         expect.objectContaining({
-          teamId: dataSyncMessage.payload.teamId,
-          hashedDbId: dataSyncMessage.payload.hashedDbId,
-          hash: dataSyncMessage.payload.hash,
+          teamId: logSyncMessage.payload.teamId,
+          hashedDbId: logSyncMessage.payload.hashedDbId,
+          hash: logSyncMessage.payload.hash,
         }),
       )
     })
 
     it('should store the message contents in postgres', async () => {
-      const storedSyncContents = await dataSyncStorage.getCommunitiesSyncData(
-        testTeam.team.id,
-        dataSyncMessage.ts - 10_000,
-      )
+      const storedSyncContents =
+        await dataSyncStorage.getLogEntriesForCommunity(
+          testTeam.team.id,
+          logSyncMessage.ts - 10_000,
+        )
       expect(storedSyncContents).not.toBeNull()
       expect(storedSyncContents!.length).toBe(1)
       const contents = storedSyncContents![0]
-      expect(contents.cid).toBe(dataSyncMessage.payload.hashedDbId)
+      expect(contents.cid).toBe(logSyncMessage.payload.hashedDbId)
       expect(contents.communityId).toBe(testTeam.team.id)
       const deserializedContents = serializer.deserialize(
         contents.entry,
       ) as EncryptedAndSignedPayload
       expect(deserializedContents).toEqual(
         expect.objectContaining({
-          userId: dataSyncMessage.payload.encEntry!.userId,
-          ts: dataSyncMessage.payload.encEntry!.ts,
-          teamId: dataSyncMessage.payload.encEntry!.teamId,
-          signature: dataSyncMessage.payload.encEntry!.signature,
+          userId: logSyncMessage.payload.encEntry!.userId,
+          ts: logSyncMessage.payload.encEntry!.ts,
+          teamId: logSyncMessage.payload.encEntry!.teamId,
+          signature: logSyncMessage.payload.encEntry!.signature,
           encrypted: expect.objectContaining({
             contents: expect.any(Buffer),
             scope: {
-              name: dataSyncMessage.payload.encEntry!.encrypted.scope.name,
-              type: dataSyncMessage.payload.encEntry!.encrypted.scope.type,
+              name: logSyncMessage.payload.encEntry!.encrypted.scope.name,
+              type: logSyncMessage.payload.encEntry!.encrypted.scope.type,
               generation:
-                dataSyncMessage.payload.encEntry!.encrypted.scope.generation,
+                logSyncMessage.payload.encEntry!.encrypted.scope.generation,
             },
           }),
         }),
@@ -428,7 +429,7 @@ describe('Communities', () => {
         serializer.bufferToUint8array(
           deserializedContents.encrypted.contents as Buffer,
         ),
-      ).toStrictEqual(dataSyncMessage.payload.encEntry?.encrypted.contents)
+      ).toStrictEqual(logSyncMessage.payload.encEntry?.encrypted.contents)
     })
   })
 
