@@ -56,11 +56,11 @@
           "mappedType": "datetime"
         }
       },
-      "name": "communities_data",
+      "name": "communities_data_sync",
       "schema": "public",
       "indexes": [
         {
-          "keyName": "communities_data_pkey",
+          "keyName": "communities_data_sync_pkey",
           "columnNames": [
             "id"
           ],

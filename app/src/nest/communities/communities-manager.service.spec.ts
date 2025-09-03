@@ -27,7 +27,7 @@ import type { Socket } from 'socket.io'
 import type { KeysetWithSecrets } from '@localfirst/crdx'
 import type { CompoundError } from '../utils/errors.js'
 import { RedisClient } from '../storage/redis/redis.client.js'
-import { CommunitiesDataStorageService } from './storage/communities-data.storage.service.js'
+import { CommunitiesDataSyncStorageService } from './storage/communities-data-sync.storage.service.js'
 import type { DataSyncPayload } from './websocket/types/data-sync.types.js'
 import type { TestTeam } from '../../../test/utils/types.js'
 import { DateTime } from 'luxon'
@@ -44,7 +44,7 @@ describe('CommunitiesManagerService', () => {
   let testTeamUtils: TeamTestUtils | undefined = undefined
   let serverKeyManager: ServerKeyManagerService | undefined = undefined
   let storage: CommunitiesStorageService | undefined = undefined
-  let dataSyncStorage: CommunitiesDataStorageService | undefined = undefined
+  let dataSyncStorage: CommunitiesDataSyncStorageService | undefined = undefined
   let redis: RedisClient | undefined = undefined
   let sodiumHelper: SodiumHelper | undefined = undefined
   let serializer: Serializer | undefined = undefined
@@ -67,8 +67,8 @@ describe('CommunitiesManagerService', () => {
       ServerKeyManagerService,
     )
     storage = module.get<CommunitiesStorageService>(CommunitiesStorageService)
-    dataSyncStorage = module.get<CommunitiesDataStorageService>(
-      CommunitiesDataStorageService,
+    dataSyncStorage = module.get<CommunitiesDataSyncStorageService>(
+      CommunitiesDataSyncStorageService,
     )
     redis = module.get<RedisClient>(RedisClient)
     sodiumHelper = module.get<SodiumHelper>(SodiumHelper)
@@ -433,9 +433,9 @@ describe('CommunitiesManagerService', () => {
       expect(error).toBeUndefined()
       expect(written).toBe(true)
 
-      const storedSyncContents = await dataSyncStorage!.getCommunitiesData(
+      const storedSyncContents = await dataSyncStorage!.getCommunitiesSyncData(
         testTeam.team.id,
-        payload.encEntry!.ts - 10_000,
+        payload.encEntry.ts - 10_000,
       )
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(1)
@@ -447,16 +447,16 @@ describe('CommunitiesManagerService', () => {
       ) as EncryptedAndSignedPayload
       expect(deserializedContents).toEqual(
         expect.objectContaining({
-          userId: payload.encEntry!.userId,
-          ts: payload.encEntry!.ts,
-          teamId: payload.encEntry!.teamId,
-          signature: payload.encEntry!.signature,
+          userId: payload.encEntry.userId,
+          ts: payload.encEntry.ts,
+          teamId: payload.encEntry.teamId,
+          signature: payload.encEntry.signature,
           encrypted: {
-            contents: payload.encEntry!.encrypted.contents,
+            contents: payload.encEntry.encrypted.contents,
             scope: {
-              name: payload.encEntry!.encrypted.scope.name,
-              type: payload.encEntry!.encrypted.scope.type,
-              generation: payload.encEntry!.encrypted.scope.generation,
+              name: payload.encEntry.encrypted.scope.name,
+              type: payload.encEntry.encrypted.scope.type,
+              generation: payload.encEntry.encrypted.scope.generation,
             },
           },
         }),
@@ -512,9 +512,9 @@ describe('CommunitiesManagerService', () => {
       )
       expect(written).toBe(false)
 
-      const storedSyncContents = await dataSyncStorage!.getCommunitiesData(
+      const storedSyncContents = await dataSyncStorage!.getCommunitiesSyncData(
         testTeam.team.id,
-        payload.encEntry!.ts - 10_000,
+        payload.encEntry.ts - 10_000,
       )
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(0)
@@ -569,9 +569,9 @@ describe('CommunitiesManagerService', () => {
       )
       expect(written).toBe(false)
 
-      const storedSyncContents = await dataSyncStorage!.getCommunitiesData(
+      const storedSyncContents = await dataSyncStorage!.getCommunitiesSyncData(
         testTeam.team.id,
-        payload.encEntry!.ts - 10_000,
+        payload.encEntry.ts - 10_000,
       )
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(0)
@@ -626,9 +626,9 @@ describe('CommunitiesManagerService', () => {
       )
       expect(written).toBe(false)
 
-      const storedSyncContents = await dataSyncStorage!.getCommunitiesData(
+      const storedSyncContents = await dataSyncStorage!.getCommunitiesSyncData(
         testTeam.team.id,
-        payload.encEntry!.ts - 10_000,
+        payload.encEntry.ts - 10_000,
       )
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(0)
@@ -658,9 +658,9 @@ describe('CommunitiesManagerService', () => {
       )
       expect(written).toBe(false)
 
-      const storedSyncContents = await dataSyncStorage!.getCommunitiesData(
+      const storedSyncContents = await dataSyncStorage!.getCommunitiesSyncData(
         testTeam.team.id,
-        payload.encEntry!.ts - 10_000,
+        payload.encEntry.ts - 10_000,
       )
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(0)
@@ -670,7 +670,7 @@ describe('CommunitiesManagerService', () => {
       const testTeam = await testTeamUtils!.createTestTeam()
       const sigChain = await testTeamUtils!.createSigchainFromTestTeam(testTeam)
       const payload = generateDataSyncPayload(testTeam)
-      payload.encEntry!.signature.author.name = 'foobar'
+      payload.encEntry.signature.author.name = 'foobar'
 
       const authConnection = new AuthConnection(
         testTeam.testUserContext.user.userId,
@@ -714,9 +714,9 @@ describe('CommunitiesManagerService', () => {
       expect(error?.message).toBe(`User ID on entry doesn't match signature`)
       expect(written).toBe(false)
 
-      const storedSyncContents = await dataSyncStorage!.getCommunitiesData(
+      const storedSyncContents = await dataSyncStorage!.getCommunitiesSyncData(
         testTeam.team.id,
-        payload.encEntry!.ts - 10_000,
+        payload.encEntry.ts - 10_000,
       )
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(0)

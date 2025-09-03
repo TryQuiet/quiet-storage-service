@@ -2,11 +2,11 @@ import type { CommunitiesStorageService } from '../../storage/communities.storag
 import type { CommunitiesManagerService } from '../../communities-manager.service.js'
 import type { AuthConnection } from '../../auth/auth.connection.js'
 import type { BaseHandlerConfig } from '../../../websocket/ws.types.js'
-import type { CommunitiesDataStorageService } from '../../storage/communities-data.storage.service.js'
+import type { CommunitiesDataSyncStorageService } from '../../storage/communities-data-sync.storage.service.js'
 
 export interface CommunitiesHandlerConfig extends BaseHandlerConfig {
   storage: CommunitiesStorageService
-  dataSyncStorage: CommunitiesDataStorageService
+  dataSyncStorage: CommunitiesDataSyncStorageService
   communitiesManager: CommunitiesManagerService
 }
 

@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals'
-import { Test } from '@nestjs/testing'
+import { Test, TestingModule } from '@nestjs/testing'
 import { TestUtils } from '../../utils/test.utils.js'
 import { TeamTestUtils } from '../../utils/team.utils.js'
 import { TestClient, TestTeam } from '../../utils/types.js'
@@ -44,7 +44,7 @@ import {
   DataSyncMessage,
   DataSyncPayload,
 } from '../../../src/nest/communities/websocket/types/data-sync.types.js'
-import { CommunitiesDataStorageService } from '../../../src/nest/communities/storage/communities-data.storage.service.js'
+import { CommunitiesDataSyncStorageService } from '../../../src/nest/communities/storage/communities-data-sync.storage.service.js'
 import { Serializer } from '../../../src/nest/utils/serialization/serializer.service.js'
 import _ from 'lodash'
 import { SERIALIZER } from '../../../src/nest/app/const.js'
@@ -61,10 +61,11 @@ describe('Communities', () => {
   let invalidClientContext: LocalUserContext
   let invite: InviteResult
 
+  let testingModule: TestingModule
   let communitiesManagerService: CommunitiesManagerService
   let sodiumHelper: SodiumHelper
   let storage: CommunitiesStorageService
-  let dataSyncStorage: CommunitiesDataStorageService
+  let dataSyncStorage: CommunitiesDataSyncStorageService
   let serializer: Serializer
   let community: Community
   let testTeam: TestTeam
@@ -83,7 +84,7 @@ describe('Communities', () => {
   const logger = createLogger('E2E:Websocket:Communities:Complete')
 
   beforeAll(async () => {
-    const testingModule = await Test.createTestingModule({
+    testingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile()
 
@@ -95,8 +96,8 @@ describe('Communities', () => {
     storage = testingModule.get<CommunitiesStorageService>(
       CommunitiesStorageService,
     )
-    dataSyncStorage = testingModule.get<CommunitiesDataStorageService>(
-      CommunitiesDataStorageService,
+    dataSyncStorage = testingModule.get<CommunitiesDataSyncStorageService>(
+      CommunitiesDataSyncStorageService,
     )
     teamTestUtils = new TeamTestUtils(
       testingModule.get<ServerKeyManagerService>(ServerKeyManagerService),
@@ -105,8 +106,11 @@ describe('Communities', () => {
   })
 
   afterAll(async () => {
-    // each test need to release the connection for next
+    testClient.client.close()
+    secondTestClient.client.close()
+    invalidTestClient.client.close()
     await TestUtils.close()
+    await testingModule.close()
   })
 
   describe('Startup', () => {
@@ -391,7 +395,7 @@ describe('Communities', () => {
     })
 
     it('should store the message contents in postgres', async () => {
-      const storedSyncContents = await dataSyncStorage.getCommunitiesData(
+      const storedSyncContents = await dataSyncStorage.getCommunitiesSyncData(
         testTeam.team.id,
         dataSyncMessage.ts - 10_000,
       )

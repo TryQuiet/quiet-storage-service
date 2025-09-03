@@ -10,7 +10,7 @@ import { Environment } from '../../utils/config/types.js'
 import { AWSSecretNames } from '../../utils/aws/const.js'
 import type { ConnectionOptions } from 'tls'
 import { Community } from '../../communities/storage/entities/community.entity.js'
-import { CommunitiesData } from '../../communities/storage/entities/communities-data.entity.js'
+import { CommunitiesDataSync } from '../../communities/storage/entities/communities-data-sync.entity.js'
 import { createLogger } from '../../app/logger/logger.js'
 import { RedisClient } from '../redis/redis.client.js'
 import type { RDSCredentials } from '../../utils/aws/types.js'
@@ -92,7 +92,7 @@ export default defineConfig({
   replicas: getReplicaConfigs(),
   connect: true,
   driver: PostgreSqlDriver,
-  entities: [Community, CommunitiesData],
+  entities: [Community, CommunitiesDataSync],
   metadataProvider: preferTs
     ? TsMorphMetadataProvider
     : ReflectMetadataProvider,

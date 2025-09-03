@@ -4,8 +4,8 @@ import { BasicEntityWithId } from '../../../storage/postgres/basic-id.entity.js'
 
 // https://docs.google.com/document/d/1yBrcXCkiHkSTQ1Nd3yLFo9H9S_yvmq_p86xaH2lQa84/edit?tab=t.0#heading=h.34r38ks7imul
 // NOTE: id field corresponds to encrypted cid of entry as a hex string
-@Entity({ tableName: TableNames.COMMUNITIES_DATA })
-export class CommunitiesData extends BasicEntityWithId {
+@Entity({ tableName: TableNames.COMMUNITIES_DATA_SYNC })
+export class CommunitiesDataSync extends BasicEntityWithId {
   @Property({
     type: 'string',
     columnType: 'varchar',

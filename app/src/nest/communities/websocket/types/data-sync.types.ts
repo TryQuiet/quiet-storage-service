@@ -6,7 +6,7 @@ export interface DataSyncPayload {
   teamId: string
   hash: string
   hashedDbId: string
-  encEntry?: EncryptedAndSignedPayload
+  encEntry: EncryptedAndSignedPayload
 }
 
 export interface DataSyncMessage extends BaseWebsocketMessage<DataSyncPayload> {
@@ -14,4 +14,18 @@ export interface DataSyncMessage extends BaseWebsocketMessage<DataSyncPayload> {
   status: CommunityOperationStatus
   reason?: string
   payload: DataSyncPayload
+}
+
+export interface DataSyncResponsePayload {
+  teamId: string
+  hash: string
+  hashedDbId: string
+}
+
+export interface DataSyncResponseMessage
+  extends BaseWebsocketMessage<DataSyncResponsePayload> {
+  ts: number
+  status: CommunityOperationStatus
+  reason?: string
+  payload: DataSyncResponsePayload
 }

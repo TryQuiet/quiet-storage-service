@@ -7,7 +7,7 @@ export const DEFAULT_POSTGRES_PASSWORD = 'postgres'
 
 export enum TableNames {
   COMMUNITIES = 'communities',
-  COMMUNITIES_DATA = 'communities_data',
+  COMMUNITIES_DATA_SYNC = 'communities_data_sync',
 }
 
 export enum PostgresSources {

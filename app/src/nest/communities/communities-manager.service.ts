@@ -41,7 +41,7 @@ import { AuthConnectionConfig, AuthStatus } from './auth/types.js'
 import { Socket } from 'socket.io'
 import { AuthDisconnectedPayload, AuthEvents } from './auth/auth.events.js'
 import { DateTime } from 'luxon'
-import { CommunitiesDataStorageService } from './storage/communities-data.storage.service.js'
+import { CommunitiesDataSyncStorageService } from './storage/communities-data-sync.storage.service.js'
 import { DataSyncPayload } from './websocket/types/data-sync.types.js'
 import { Serializer } from '../utils/serialization/serializer.service.js'
 
@@ -68,7 +68,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     // DB abstraction layer service for community metadata (e.g. sigchains)
     private readonly storage: CommunitiesStorageService,
     // DB abstraction layer service for community sync data (e.g. messages)
-    private readonly dataSyncStorage: CommunitiesDataStorageService,
+    private readonly dataSyncStorage: CommunitiesDataSyncStorageService,
     // service for managing creation/storage of server-owned LFA keys and user-generated keyrings
     private readonly serverKeyManager: ServerKeyManagerService,
   ) {
@@ -425,13 +425,13 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     // they have signed in already
     if (
       managedCommunity.authConnections == null ||
-      !managedCommunity.authConnections.has(payload.encEntry!.userId)
+      !managedCommunity.authConnections.has(payload.encEntry.userId)
     ) {
       throw new AuthenticationError(`User hasn't signed in to this community`)
     }
 
     const authConnection = managedCommunity.authConnections.get(
-      payload.encEntry!.userId,
+      payload.encEntry.userId,
     )!
 
     // validate that the user has successfully authenticated on this community
@@ -460,10 +460,10 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     }
 
     // validate that the user ID on the signature matches the one on the entry
-    if (payload.encEntry?.userId !== payload.encEntry?.signature.author.name) {
-      const entryUserId = payload.encEntry?.userId ?? 'USER_ID_UNDEFINED'
+    if (payload.encEntry.userId !== payload.encEntry.signature.author.name) {
+      const entryUserId = payload.encEntry.userId ?? 'USER_ID_UNDEFINED'
       const signatureUserId =
-        payload.encEntry?.signature.author.name ?? 'USER_ID_UNDEFINED'
+        payload.encEntry.signature.author.name ?? 'USER_ID_UNDEFINED'
       throw new SignatureMismatchError(entryUserId, signatureUserId)
     }
   }

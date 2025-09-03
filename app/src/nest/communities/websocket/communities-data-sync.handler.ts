@@ -9,7 +9,10 @@ import {
   type CommunitiesHandlerConfig,
   CommunityOperationStatus,
 } from './types/index.js'
-import type { DataSyncMessage } from './types/data-sync.types.js'
+import type {
+  DataSyncMessage,
+  DataSyncResponseMessage,
+} from './types/data-sync.types.js'
 import {
   AuthenticationError,
   CommunityNotFoundError,
@@ -23,11 +26,11 @@ const baseLogger = createLogger('Websocket:Event:Communities:DataSync')
  *
  * @param config Websocket handler config
  */
-export function registerCommunitiesDataHandlers(
+export function registerCommunitiesDataSyncHandlers(
   config: CommunitiesHandlerConfig,
 ): void {
   const _logger = baseLogger.extend(config.socket.id)
-  _logger.debug(`Initializing communities WS event handlers`)
+  _logger.debug(`Initializing communities data sync WS event handlers`)
 
   /**
    * Process an incoming data sync message and write to the DB
@@ -37,14 +40,10 @@ export function registerCommunitiesDataHandlers(
    */
   async function handleDataSync(
     message: DataSyncMessage,
-    callback: (payload: DataSyncMessage) => void,
+    callback: (payload: DataSyncResponseMessage) => void,
   ): Promise<void> {
     _logger.debug(`Handling community data sync message`)
     try {
-      if (message.payload.encEntry == null) {
-        throw new Error('Encrypted entry missing from message payload!')
-      }
-
       // Check that the user has authenticated on this community and then write to the DB
       const success =
         await config.communitiesManager.processIncomingSyncMessage(
@@ -56,7 +55,7 @@ export function registerCommunitiesDataHandlers(
       }
 
       // form and return a success response to the user
-      let response: DataSyncMessage | undefined = undefined
+      let response: DataSyncResponseMessage | undefined = undefined
       response = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.SUCCESS,
@@ -78,7 +77,7 @@ export function registerCommunitiesDataHandlers(
         reason = e.message
       }
 
-      const errorResponse: DataSyncMessage = {
+      const errorResponse: DataSyncResponseMessage = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.ERROR,
         reason,

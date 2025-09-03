@@ -4,12 +4,13 @@ import { StorageModule } from '../../storage/storage.module.js'
 import type { CommunitiesData } from '../types.js'
 import { SodiumHelper } from '../../encryption/sodium.helper.js'
 import { EncryptionModule } from '../../encryption/enc.module.js'
-import { CommunitiesDataStorageService } from './communities-data.storage.service.js'
+import { CommunitiesDataSyncStorageService } from './communities-data-sync.storage.service.js'
 import { DateTime } from 'luxon'
 
-describe('CommunitesDataStorageService', () => {
-  let communitiesDataStorageService: CommunitiesDataStorageService | undefined =
-    undefined
+describe('CommunitesDataSyncStorageService', () => {
+  let communitiesDataStorageService:
+    | CommunitiesDataSyncStorageService
+    | undefined = undefined
   let sodiumHelper: SodiumHelper | undefined = undefined
   let module: TestingModule | undefined = undefined
 
@@ -19,9 +20,10 @@ describe('CommunitesDataStorageService', () => {
     }).compile()
     await module.init()
 
-    communitiesDataStorageService = module.get<CommunitiesDataStorageService>(
-      CommunitiesDataStorageService,
-    )
+    communitiesDataStorageService =
+      module.get<CommunitiesDataSyncStorageService>(
+        CommunitiesDataSyncStorageService,
+      )
     sodiumHelper = module.get<SodiumHelper>(SodiumHelper)
   })
 
@@ -125,7 +127,7 @@ describe('CommunitesDataStorageService', () => {
       ).toBe(true)
     }
 
-    const result = await communitiesDataStorageService?.getCommunitiesData(
+    const result = await communitiesDataStorageService?.getCommunitiesSyncData(
       'communityId',
       filterTs,
     )
@@ -185,7 +187,7 @@ describe('CommunitesDataStorageService', () => {
       ).toBe(true)
     }
 
-    const result = await communitiesDataStorageService?.getCommunitiesData(
+    const result = await communitiesDataStorageService?.getCommunitiesSyncData(
       'communityId',
       filterTs,
     )
@@ -250,7 +252,7 @@ describe('CommunitesDataStorageService', () => {
       ).toBe(true)
     }
 
-    const result = await communitiesDataStorageService?.getCommunitiesData(
+    const result = await communitiesDataStorageService?.getCommunitiesSyncData(
       'foobar',
       filterTs,
     )

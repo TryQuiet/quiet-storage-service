@@ -5,18 +5,18 @@
 import { Injectable, OnModuleInit } from '@nestjs/common'
 import { createLogger } from '../../app/logger/logger.js'
 import { CommunitiesData } from '../types.js'
-import { CommunitiesData as CommunitiesDataEntity } from './entities/communities-data.entity.js'
+import { CommunitiesDataSync as CommunitiesDataSyncEntity } from './entities/communities-data-sync.entity.js'
 import { PostgresClient } from '../../storage/postgres/postgres.client.js'
 import { PostgresRepo } from '../../storage/postgres/postgres.repo.js'
 import { MikroORM } from '@mikro-orm/postgresql'
 import { DateTime } from 'luxon'
 
 @Injectable()
-export class CommunitiesDataStorageService implements OnModuleInit {
+export class CommunitiesDataSyncStorageService implements OnModuleInit {
   /**
    * Postgres repository
    */
-  private readonly repository: PostgresRepo<CommunitiesDataEntity>
+  private readonly repository: PostgresRepo<CommunitiesDataSyncEntity>
 
   private readonly logger = createLogger('Storage:Communities')
 
@@ -24,11 +24,11 @@ export class CommunitiesDataStorageService implements OnModuleInit {
     private readonly postgresClient: PostgresClient,
     private readonly orm: MikroORM,
   ) {
-    this.repository = postgresClient.getRepository(CommunitiesDataEntity)
+    this.repository = postgresClient.getRepository(CommunitiesDataSyncEntity)
   }
 
   onModuleInit(): void {
-    this.logger.log(`${CommunitiesDataStorageService.name} initialized!`)
+    this.logger.log(`${CommunitiesDataSyncStorageService.name} initialized!`)
   }
 
   public async addCommunitiesData(payload: CommunitiesData): Promise<boolean> {
@@ -42,7 +42,7 @@ export class CommunitiesDataStorageService implements OnModuleInit {
     }
   }
 
-  public async getCommunitiesData(
+  public async getCommunitiesSyncData(
     communityId: string,
     startTs: number,
   ): Promise<CommunitiesData[] | undefined | null> {
@@ -68,8 +68,8 @@ export class CommunitiesDataStorageService implements OnModuleInit {
     await this.repository.clearRepository()
   }
 
-  private payloadToEntity(payload: CommunitiesData): CommunitiesDataEntity {
-    const entity = new CommunitiesDataEntity()
+  private payloadToEntity(payload: CommunitiesData): CommunitiesDataSyncEntity {
+    const entity = new CommunitiesDataSyncEntity()
     entity.assign({
       id: payload.cid,
       communityId: payload.communityId,
@@ -80,7 +80,7 @@ export class CommunitiesDataStorageService implements OnModuleInit {
     return entity
   }
 
-  private entityToPayload(entity: CommunitiesDataEntity): CommunitiesData {
+  private entityToPayload(entity: CommunitiesDataSyncEntity): CommunitiesData {
     return {
       communityId: entity.communityId,
       entry: entity.entry,
