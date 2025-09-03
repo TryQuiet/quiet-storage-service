@@ -26,6 +26,9 @@ export class WebsocketClient {
         autoConnect: false,
         forceNew: true,
         transports: ['websocket'],
+        timeout: 15_000,
+        autoUnref: true,
+        closeOnBeforeunload: true,
       },
     )
     await this._waitForConnect()
@@ -42,6 +45,7 @@ export class WebsocketClient {
     let count = 20
     while (!this.clientSocket.connected) {
       if (count < 0) {
+        this.close()
         throw new Error(`Client didn't connect in time!`)
       }
 
@@ -81,5 +85,6 @@ export class WebsocketClient {
 
     this.logger.log(`Closing client socket`)
     this.clientSocket.close()
+    this.clientSocket = undefined
   }
 }

@@ -19,6 +19,8 @@ import { CommunitiesStorageService } from '../communities/storage/communities.st
 import { CommunitiesManagerService } from '../communities/communities-manager.service.js'
 import { CommunitiesHandlerConfig } from '../communities/websocket/types/index.js'
 import { registerCommunitiesAuthHandlers } from '../communities/websocket/auth.handler.js'
+import { LogEntrySyncStorageService } from '../communities/storage/log-entry-sync.storage.service.js'
+import { registerLogEntrySyncHandlers } from '../communities/websocket/log-entry-sync.handler.js'
 
 /**
  * Websocket gateway configuration
@@ -47,6 +49,7 @@ export class WebsocketGateway
 
   constructor(
     private readonly communityStorageService: CommunitiesStorageService,
+    private readonly communitiesDataStorageService: LogEntrySyncStorageService,
     private readonly communitiesManager: CommunitiesManagerService,
   ) {}
 
@@ -104,9 +107,11 @@ export class WebsocketGateway
     const communitiesConfig: CommunitiesHandlerConfig = {
       ...baseConfig,
       storage: this.communityStorageService,
+      dataSyncStorage: this.communitiesDataStorageService,
       communitiesManager: this.communitiesManager,
     }
     registerCommunitiesHandlers(communitiesConfig)
     registerCommunitiesAuthHandlers(communitiesConfig)
+    registerLogEntrySyncHandlers(communitiesConfig)
   }
 }

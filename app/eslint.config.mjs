@@ -24,7 +24,9 @@ export default [
         '@typescript-eslint/class-methods-use-this': 'off',
         '@typescript-eslint/no-explicit-any': 'warn',
         'eslint-comments/no-unused-disable': 'off',
-        'eslint-comments/no-unused-enable': 'off'
+        'eslint-comments/no-unused-enable': 'off',
+        '@typescript-eslint/prefer-optional-chain': 'off',
+        'complexity': ['error', { "variant": "modified" }]
       },
       files: [
         "src/**/*.ts",

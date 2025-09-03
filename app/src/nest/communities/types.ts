@@ -1,7 +1,8 @@
-import type { Keyset } from '@localfirst/auth'
+import type { Base58, Keyset } from '@localfirst/auth'
 import type { SigChain } from './auth/sigchain.js'
 import type { AuthConnection } from './auth/auth.connection.js'
 import type { DateTime } from 'luxon'
+import type { KeyMetadata } from '@localfirst/crdx'
 
 export const MANAGED_COMMUNITY_TTL_MS = 300_000 // i.e. expire locally stored communities 5 minutes after losing all auth connections
 
@@ -41,9 +42,43 @@ export interface ManagedCommunity {
   expiryMs?: number
 }
 
-export interface CommunitiesData {
+export interface LogSyncEntry {
   cid: string
   communityId: string
   entry: Buffer
   receivedAt: DateTime
+}
+
+export enum EncryptionScopeType {
+  ROLE = 'ROLE',
+  CHANNEL = 'CHANNEL',
+  USER = 'USER',
+  TEAM = 'TEAM',
+}
+
+export interface EncryptionScope {
+  type: EncryptionScopeType
+  name?: string
+}
+
+export type EncryptionScopeDetail = EncryptionScope & {
+  generation: number
+}
+
+export interface Signature {
+  signature: Base58
+  author: KeyMetadata
+}
+
+export interface LFAEncryptedPayload {
+  contents: Uint8Array
+  scope: EncryptionScopeDetail
+}
+
+export interface EncryptedAndSignedPayload {
+  encrypted: LFAEncryptedPayload
+  signature: Signature
+  ts: number
+  userId: string
+  teamId: string
 }

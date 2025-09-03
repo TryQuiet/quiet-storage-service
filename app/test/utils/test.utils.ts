@@ -91,10 +91,10 @@ export class TestUtils {
     return this.server?.sockets.sockets.size
   }
 
-  public static async close() {
+  public static async close(sendAuthClose: boolean = false) {
     this.logger.log(`Closing client sockets and server`)
     for (const testClient of this.clients.values()) {
-      testClient.authConnection?.stop(true)
+      testClient.authConnection?.stop(sendAuthClose)
       testClient.client.close()
     }
     await this.app.close()

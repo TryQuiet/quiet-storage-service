@@ -10,7 +10,7 @@ import {
   type LogLevel,
   type ConsoleLoggerOptions,
 } from '@nestjs/common'
-import type { CompoundError } from '../../types.js'
+import type { CompoundError } from '../../utils/errors.js'
 
 import colors from 'ansi-colors'
 import { ConfigService } from '../../utils/config/config.service.js'

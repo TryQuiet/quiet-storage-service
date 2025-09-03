@@ -7,7 +7,7 @@ import { createLogger } from '../../app/logger/logger.js'
 import { EntityManager, EntityName, MikroORM } from '@mikro-orm/postgresql'
 import { PostgresRepo } from './postgres.repo.js'
 import { Community } from '../../communities/storage/entities/community.entity.js'
-import { CommunitiesData } from '../../communities/storage/entities/communities-data.entity.js'
+import { LogEntrySync } from '../../communities/storage/entities/log-sync.entity.js'
 import { BasicEntityWithId } from './basic-id.entity.js'
 
 @Injectable()
@@ -33,10 +33,10 @@ export class PostgresClient implements OnModuleInit, OnModuleDestroy {
       new PostgresRepo(Community, this.entityManager),
     )
 
-    // Communities Data - stores data sync entities for all communities
+    // Communities Sync Data - stores data sync entities for all communities
     this.repositories.set(
-      CommunitiesData,
-      new PostgresRepo(CommunitiesData, this.entityManager),
+      LogEntrySync,
+      new PostgresRepo(LogEntrySync, this.entityManager),
     )
   }
 

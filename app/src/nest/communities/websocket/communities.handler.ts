@@ -17,6 +17,10 @@ import {
 } from './types/index.js'
 import { Environment } from '../../utils/config/types.js'
 import { ConfigService } from '../../utils/config/config.service.js'
+import {
+  AuthenticationError,
+  CommunityNotFoundError,
+} from '../../utils/errors.js'
 
 const baseLogger = createLogger('Websocket:Event:Communities')
 
@@ -112,10 +116,17 @@ export function registerCommunitiesHandlers(
       callback(response)
     } catch (e) {
       _logger.error(`Error while processing community sign-in event`, e)
+      let reason = `Error while signing in to community`
+      if (
+        e instanceof AuthenticationError ||
+        e instanceof CommunityNotFoundError
+      ) {
+        reason = e.message
+      }
       const errorResponse: CommunitySignInMessage = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.ERROR,
-        reason: `Error while signing in to community`,
+        reason,
       }
       callback(errorResponse)
     }
@@ -160,10 +171,17 @@ export function registerCommunitiesHandlers(
       callback(response)
     } catch (e) {
       _logger.error(`Error while processing update community event`, e)
+      let reason = `Error while getting community`
+      if (
+        e instanceof AuthenticationError ||
+        e instanceof CommunityNotFoundError
+      ) {
+        reason = e.message
+      }
       const errorResponse: GetCommunityResponse = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.ERROR,
-        reason: `Error while getting community`,
+        reason,
       }
       callback(errorResponse)
     }

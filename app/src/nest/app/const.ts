@@ -9,3 +9,5 @@ export const DEFAULT_LISTEN_HOSTNAME = 'localhost'
 
 export const FASTIFY = 'fastify'
 export const FASTIFY_ADAPTER = 'fastifyAdapter'
+
+export const SERIALIZER = 'serializer'

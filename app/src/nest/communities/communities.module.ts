@@ -4,18 +4,19 @@ import { StorageModule } from '../storage/storage.module.js'
 import { EncryptionModule } from '../encryption/enc.module.js'
 import { CommunitiesManagerService } from './communities-manager.service.js'
 import { FastifyModule } from '../app/qss/fastify.module.js'
-import { CommunitiesDataStorageService } from './storage/communities-data.storage.service.js'
+import { LogEntrySyncStorageService } from './storage/log-entry-sync.storage.service.js'
+import { UtilsModule } from '../utils/utils.module.js'
 
 @Module({
-  imports: [StorageModule, EncryptionModule, FastifyModule],
+  imports: [UtilsModule, StorageModule, EncryptionModule, FastifyModule],
   providers: [
     CommunitiesStorageService,
-    CommunitiesDataStorageService,
+    LogEntrySyncStorageService,
     CommunitiesManagerService,
   ],
   exports: [
     CommunitiesStorageService,
-    CommunitiesDataStorageService,
+    LogEntrySyncStorageService,
     CommunitiesManagerService,
   ],
 })
