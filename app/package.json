@@ -89,7 +89,7 @@
     "libsodium-wrappers-sumo": "0.7.15",
     "lodash": "^4.17.21",
     "luxon": "^3.5.0",
-    "msgpackr": "1.11.5",
+    "msgpackr": "1.11.2",
     "nest-winston": "^1.10.2",
     "p-defer": "^4.0.1",
     "p-timeout": "^6.1.4",
