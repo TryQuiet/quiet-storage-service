@@ -52,7 +52,7 @@ export class ServerKeyManagerService implements OnModuleDestroy {
         type,
       }
       // add the new secret to the AWS secrets manager
-      await this.awsSecretsService.put(secretName, JSON.stringify(secret))
+      await this.awsSecretsService.create(secretName, JSON.stringify(secret))
       return secret
     } catch (e) {
       throw new CompoundError(
@@ -211,7 +211,7 @@ export class ServerKeyManagerService implements OnModuleDestroy {
       )
       // if key isn't found in the secrets manager generate a new key and store it in the secrets manager
       serverEncKey = this._generateEncryptionKey()
-      await this.awsSecretsService.put(
+      await this.awsSecretsService.create(
         this._getServerEncKeySecretName(),
         this.sodiumHelper.toBase64(serverEncKey),
       )
@@ -247,7 +247,7 @@ export class ServerKeyManagerService implements OnModuleDestroy {
    * @returns Deterministic unique secret name for this keyring
    */
   private _generateSecretName(id: string, type: StoredKeyRingType): string {
-    return `qss!${ConfigService.getEnvShort()}-te-${type}-${this.sodiumHelper.sodium.crypto_hash_sha512(`${id}-${type}`, 'base64')}`
+    return `qss/${ConfigService.getEnvShort()}-te-${type}-${this.sodiumHelper.sodium.crypto_hash_sha512(`${id}-${type}`, 'base64')}`
   }
 
   /**

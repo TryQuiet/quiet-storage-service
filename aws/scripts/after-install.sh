@@ -13,11 +13,11 @@ ENVIRONMENT=$(TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X
 if [ $ENVIRONMENT == "Production" ]
 then
   echo "Running production migrations"
-  pnpm run migrate:up:prod
+  pnpm run --filter app migrate:up:prod
 elif [ $ENVIRONMENT == "Development" ]
 then
   echo "Running development migrations"
-  pnpm run migrate:up:dev
+  pnpm run --filter app migrate:up:dev
 else
   echo "Unknown environment: $ENVIRONMENT"
   exit 1
