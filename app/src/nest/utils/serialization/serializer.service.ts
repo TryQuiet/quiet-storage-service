@@ -7,9 +7,7 @@ import { type SerializerConfig, SerializerEncodingType } from './types.js'
 import { DEFAULT_PACKER_CONFIG } from './const.js'
 import { DateTime } from 'luxon'
 import { createLogger } from '../../app/logger/logger.js'
-import * as uint8arrays from 'uint8arrays'
 import { CompoundError } from '../errors.js'
-import { isUint8Array } from 'util/types'
 
 /**
  * Serialization helper class for converting between objects and buffers/uint8arrays without losing context
@@ -38,22 +36,28 @@ export class Serializer {
       read: (data: number): DateTime => DateTime.fromMillis(data).toUTC(),
     })
     // properly handle uint8arrays
-    addExtension({
-      Class: Uint8Array,
-      type: 2,
-      write: (instance: Uint8Array | Buffer): string =>
-        isUint8Array(instance)
-          ? uint8arrays.toString(instance, 'hex')
-          : (instance as Buffer).toString('hex'),
-      read: (data: string): unknown => uint8arrays.fromString(data, 'hex'),
-    })
-    // properly handle buffers
-    addExtension({
-      Class: Buffer,
-      type: 3,
-      write: (instance: Buffer): string => instance.toString('hex'),
-      read: (data: string): Buffer => Buffer.from(data, 'hex'),
-    })
+    // TODO: verify these being missing doesn't cause problems down the line before deleting
+    // addExtension({
+    //   Class: Uint8Array,
+    //   type: 3,
+    //   write: (instance: Uint8Array | Buffer): string => {
+    //     return isUint8Array(instance)
+    //       ? uint8arrays.toString(instance, 'hex')
+    //       : (instance as Buffer).toString('hex')
+    //   },
+    //   read: (data: unknown): unknown => {
+    //     this.logger.warn(data)
+    //     return typeof data === 'string' ? uint8arrays.fromString(data, 'hex') : data},
+    // })
+    // // properly handle buffers
+    // addExtension({
+    //   Class: Buffer,
+    //   type: 1,
+    //   write: (instance: Buffer): string => instance.toString('hex'),
+    //   read: (data: string): Buffer => {
+    //     this.logger.warn(data)
+    //     return Buffer.from(data, 'hex') },
+    // })
   }
 
   public serialize(

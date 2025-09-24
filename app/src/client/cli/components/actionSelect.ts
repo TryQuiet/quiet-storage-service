@@ -213,7 +213,6 @@ export default createPrompt(
       },
       pageSize,
       loop,
-      theme,
     })
 
     if (status === 'done') {

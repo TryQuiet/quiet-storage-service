@@ -14,6 +14,7 @@ program
   .option('-v, --verbose', 'Verbose mode', false)
   .option('-r, --reinstall', 'Force reinstall of dependencies', false)
   .option('-s, --skip-submodules', 'Skip initializing/symlinking submodule(s) (e.g. LFA)', false)
+  .option('-m, --skip-submodule-pull', `Don't pull submodules from git`, false)
   .action(async (options) => {
     const __dirname = path.dirname(fileURLToPath(import.meta.url))
     const spawnOptions = {
@@ -43,8 +44,12 @@ program
     if (options.skipSubmodules) {
       logger.warn(`Skipping submodule initialization - NOTE: the install and build will fail if you haven't done this previously!`)
     } else {
-      logger.info(`Initializing git submodules`)
-      await runShellCommandWithRealTimeLogging(GIT_SUBMODULE_COMMAND, logger, [], spawnOptions)
+      if (!options.skipSubmodulePull) {
+        logger.info(`Initializing git submodules`)
+        await runShellCommandWithRealTimeLogging(GIT_SUBMODULE_COMMAND, logger, [], spawnOptions)
+      } else {
+        logger.warn(`Skipping submodule pull from git - NOTE: the install and build will fail if you haven't done this previously!`)
+      }
 
       logger.info(`Ensuring package directories exist`)
       const authPkgDir = path.join(__dirname, '../auth-packages')
