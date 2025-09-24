@@ -101,8 +101,7 @@ export class PostgresRepo<T extends BasicEntityWithId> {
           return undefined
         }
         // find and return the updated row
-        // @ts-expect-error this is just dumb generic nonsense
-        return await repo.findOne({ id: { $eq: id } })
+        return (await repo.findOne({ id: { $eq: id } })) as T
       })
       return result
     } catch (e) {
@@ -123,8 +122,7 @@ export class PostgresRepo<T extends BasicEntityWithId> {
       let result: T | undefined = undefined
       await this.entityManager.transactional(async em => {
         const repo = em.getRepository(this.entityName)
-        // @ts-expect-error this is just dumb generic nonsense
-        result = await repo.findOne({ id: { $eq: id } })
+        result = (await repo.findOne({ id: { $eq: id } })) as T
       })
       return result
     } catch (e) {
@@ -168,7 +166,6 @@ export class PostgresRepo<T extends BasicEntityWithId> {
       this.logger.verbose(`Checking for existence of ID ${id}`)
       await this.entityManager.transactional(async em => {
         const repo = em.getRepository(this.entityName)
-        // @ts-expect-error this is just dumb generic nonsense
         const count = await repo.count({ id: { $eq: id } })
         result = count > 0
       })

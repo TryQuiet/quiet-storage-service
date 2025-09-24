@@ -14,7 +14,7 @@ program
   .option('-v, --verbose', 'Verbose mode', false)
   .option('-r, --reinstall', 'Force reinstall of dependencies', false)
   .option('-s, --skip-submodules', 'Skip initializing/symlinking submodule(s) (e.g. LFA)', false)
-  .option('-m, --no-submodule-pull', `Don't pull submodules from git`)
+  .option('-m, --skip-submodule-pull', `Don't pull submodules from git`, false)
   .action(async (options) => {
     const __dirname = path.dirname(fileURLToPath(import.meta.url))
     const spawnOptions = {
@@ -44,7 +44,7 @@ program
     if (options.skipSubmodules) {
       logger.warn(`Skipping submodule initialization - NOTE: the install and build will fail if you haven't done this previously!`)
     } else {
-      if (options.noSubmodulePull) {
+      if (!options.skipSubmodulePull) {
         logger.info(`Initializing git submodules`)
         await runShellCommandWithRealTimeLogging(GIT_SUBMODULE_COMMAND, logger, [], spawnOptions)
       } else {
