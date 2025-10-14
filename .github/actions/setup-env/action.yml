@@ -23,7 +23,7 @@ runs:
     - name: Install pnpm
       uses: pnpm/action-setup@v4 # pulls version from package.json -> "packageManager"
 
-    - name: Bootstrap app
+    - name: Bootstrap app # bootstrap with verbose logging and skipping submodule pull from git (handled during checkout)
       shell: bash
       run: |
-        pnpm run bootstrap -c
+        pnpm run bootstrap -vmc

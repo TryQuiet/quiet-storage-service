@@ -2,22 +2,27 @@
  * Postgres repository with CRUD functionality for a single DB entity
  */
 
-import type { BaseEntity, EntityData, EntityName } from '@mikro-orm/core'
+import type { EntityData, EntityName, FilterQuery } from '@mikro-orm/core'
 import type { EntityManager } from '@mikro-orm/postgresql'
 import { createLogger } from '../../app/logger/logger.js'
 import type { QuietLogger } from '../../app/logger/types.js'
+import type { BasicEntityWithId } from './basic-id.entity.js'
+import { ConfigService } from '../../utils/config/config.service.js'
+import { Environment } from '../../utils/config/types.js'
 
-export class PostgresRepo<T extends BaseEntity> {
+export class PostgresRepo<T extends BasicEntityWithId> {
   private readonly logger: QuietLogger
 
   constructor(
-    private readonly entityName: EntityName<T>,
-    private readonly entityManager: EntityManager,
+    public readonly entityName: EntityName<T>,
+    public readonly entityManager: EntityManager,
   ) {
-    this.logger = createLogger(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- this is safe
-      `Storage:${PostgresRepo.name}:${(entityName as any).name}`,
-    )
+    this.logger = createLogger(`Storage:${PostgresRepo.name}:${this.name}`)
+  }
+
+  public get name(): string {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- this is safe
+    return (this.entityName as any).name as string
   }
 
   /**
@@ -96,8 +101,7 @@ export class PostgresRepo<T extends BaseEntity> {
           return undefined
         }
         // find and return the updated row
-        // @ts-expect-error this is just dumb generic nonsense
-        return await repo.findOne({ id: { $eq: id } })
+        return (await repo.findOne({ id: { $eq: id } })) as T
       })
       return result
     } catch (e) {
@@ -118,12 +122,34 @@ export class PostgresRepo<T extends BaseEntity> {
       let result: T | undefined = undefined
       await this.entityManager.transactional(async em => {
         const repo = em.getRepository(this.entityName)
-        // @ts-expect-error this is just dumb generic nonsense
-        result = await repo.findOne({ id: { $eq: id } })
+        result = (await repo.findOne({ id: { $eq: id } })) as T
       })
       return result
     } catch (e) {
       this.logger.error(`Error while finding one with ID ${id}`, e)
+      return null
+    }
+  }
+
+  /**
+   * Find and return existing rows in the DB for a given filter query
+   *
+   * @param query Filter query definition
+   * @returns Found entities
+   */
+  public async findMany(
+    query: FilterQuery<T>,
+  ): Promise<T[] | undefined | null> {
+    try {
+      this.logger.verbose(`Finding many with query`, query)
+      let result: T[] | undefined = undefined
+      await this.entityManager.transactional(async em => {
+        const repo = em.getRepository(this.entityName)
+        result = await repo.find(query)
+      })
+      return result
+    } catch (e) {
+      this.logger.error(`Error while finding many`, e)
       return null
     }
   }
@@ -140,7 +166,6 @@ export class PostgresRepo<T extends BaseEntity> {
       this.logger.verbose(`Checking for existence of ID ${id}`)
       await this.entityManager.transactional(async em => {
         const repo = em.getRepository(this.entityName)
-        // @ts-expect-error this is just dumb generic nonsense
         const count = await repo.count({ id: { $eq: id } })
         result = count > 0
       })
@@ -149,6 +174,24 @@ export class PostgresRepo<T extends BaseEntity> {
         `Error while checking for existence of row with ID ${id}`,
         e,
       )
+    }
+    return result
+  }
+
+  public async clearRepository(): Promise<number | undefined> {
+    if (ConfigService.getEnv() === Environment.Production) {
+      throw new Error('Clearing a repsitory is forbidden in production')
+    }
+
+    let result: number | undefined = undefined
+    try {
+      await this.entityManager.transactional(async em => {
+        const repo = em.getRepository(this.entityName)
+        result = await repo.nativeDelete({})
+      })
+      this.logger.info(`Cleared ${this.name} repository`, result)
+    } catch (e) {
+      this.logger.error(`Error while clearing repository`, e)
     }
     return result
   }
