@@ -10,6 +10,7 @@
     "@localfirst/shared": "6.0.0-alpha.6"
   },
   "changesets": [
+    "curly-bags-arrive",
     "lazy-grapes-act",
     "thick-cloths-hear"
   ]

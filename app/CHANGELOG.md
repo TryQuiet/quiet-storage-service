@@ -1,5 +1,11 @@
 # app
 
+## 1.0.0-alpha.27
+
+### Minor Changes
+
+- ecb13d4: OrbitDB syncing (client to server only)
+
 ## 1.0.0-alpha.0
 
 ### Major Changes
