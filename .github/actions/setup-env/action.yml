@@ -26,4 +26,4 @@ runs:
     - name: Bootstrap app # bootstrap with verbose logging and skipping submodule pull from git (handled during checkout)
       shell: bash
       run: |
-        pnpm run bootstrap -vm
+        pnpm run bootstrap -vmc

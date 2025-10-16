@@ -29,6 +29,10 @@ runs:
     - name: Build QSS
       uses: ./.github/actions/setup-env
 
+    - name: Remove 3rd-party directory
+      shell: bash
+      run: rm -rf ./3rd-party/
+
     - name: Generate release archive name
       shell: bash
       run: echo "ZIP_FILE_NAME=${{ inputs.code_deploy_application }}_${{ inputs.version }}_${{ github.sha }}.zip" >> $GITHUB_ENV

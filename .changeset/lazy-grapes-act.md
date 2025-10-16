@@ -1,5 +1,5 @@
 ---
-'quiet-storage-service': major
+'app': major
 ---
 
 - Updates web server to use Fastify and socket.io
@@ -10,4 +10,4 @@
 - Adds DB migrations
 - Adds better logging
 - Adds E2EE on socket connections
-- Adds basic client tool:
+- Adds basic client tool

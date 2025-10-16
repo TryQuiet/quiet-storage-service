@@ -1,7 +1,7 @@
 import { program } from '@commander-js/extra-typings'
 import { createLogger, transports, format } from 'winston'
 import { runShellCommandWithRealTimeLogging } from './common.mjs'
-import { BASE_PNPM_I_COMMAND, GIT_SUBMODULE_COMMAND, LFA_PACKAGES, PNPM_BUILD_COMMAND } from './const.mjs'
+import { BASE_PNPM_I_COMMAND, DEPLOYED_PNPM_I_COMMAND, GIT_SUBMODULE_COMMAND, LFA_PACKAGES, PNPM_BUILD_COMMAND } from './const.mjs'
 import colors from 'ansi-colors'
 import fs from 'fs'
 import path from 'path'
@@ -14,6 +14,8 @@ program
   .option('-v, --verbose', 'Verbose mode', false)
   .option('-r, --reinstall', 'Force reinstall of dependencies', false)
   .option('-s, --skip-submodules', 'Skip initializing/symlinking submodule(s) (e.g. LFA)', false)
+  .option('-c, --copy-submodules', 'Create hard copies of submodule directories rather than symlinks', false)
+  .option('-d, --deployed', 'Run bootstrap in a deployed environment', false)
   .option('-m, --skip-submodule-pull', `Don't pull submodules from git`, false)
   .action(async (options) => {
     const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -65,15 +67,23 @@ program
         fs.mkdirSync(authPkgLfaDir)
       }
 
-      logger.info(`Ensuring LFA package symlinks are setup`)
+      const symlinkMessageInnerText = options.copySubmodules ? 'directories are copied' : 'symlinks are created'
+      logger.info(`Ensuring LFA package ${symlinkMessageInnerText}`)
       const lfaModuleDir = path.join(__dirname, '../3rd-party/auth')
       const lfaModulePkgDir = path.join(lfaModuleDir, '/packages')
       for (const pkg of LFA_PACKAGES) {
         const pkgDir = path.join(authPkgLfaDir, pkg)
         const targetDir = path.join(lfaModulePkgDir, pkg)
         if (!fs.existsSync(pkgDir)) {
-          logger.warn(`Symlink for LFA package ${pkg} was missing, creating now`)
+          const logMessage = options.copySubmodules ? `LFA package ${pkg} wasn't copied to workspace directory, copying now` : `Symlink for LFA package ${pkg} was missing, creating now`
+          logger.warn(logMessage)
           logger.verbose(`${targetDir} -> ${pkgDir}`)
+          if (options.copySubmodules) {
+            const copyTargetPath = path.join(targetDir, '/*')
+            const copyPath = path.join(pkgDir)
+            fs.cpSync(targetDir, pkgDir, { recursive: true })
+            continue
+          }
           fs.symlinkSync(targetDir, pkgDir, 'dir')
         }
       }
@@ -81,14 +91,20 @@ program
       const lfaTsConfig = path.join(lfaModuleDir, 'tsconfig.json')
       const authPkgTsConfig = path.join(authPkgDir, 'tsconfig.json')
       if (!fs.existsSync(authPkgTsConfig)) {
-        logger.warn(`LFA tsconfig.json symlink was missing, creating now`)
+        const logMessage = options.copySubmodules ? `LFA tsconfig.json wasn't copied, copying now` : `LFA tsconfig.json symlink was missing, creating now` 
+        logger.warn(logMessage)
         logger.verbose(`${lfaTsConfig} -> ${authPkgTsConfig}`)
-        fs.symlinkSync(lfaTsConfig, authPkgTsConfig, 'file')
+        if (options.copySubmodules) {
+          fs.cpSync(lfaTsConfig, authPkgTsConfig)
+        } else {
+          fs.symlinkSync(lfaTsConfig, authPkgTsConfig, 'file')
+        }
       }
     }
 
     logger.info(`Installing dependencies`)
-    await runShellCommandWithRealTimeLogging(BASE_PNPM_I_COMMAND, logger, options.reinstall ? ['--force'] : [], spawnOptions)
+    const pnpmICommand = options.deployed ? DEPLOYED_PNPM_I_COMMAND : BASE_PNPM_I_COMMAND
+    await runShellCommandWithRealTimeLogging(pnpmICommand, logger, options.reinstall ? ['--force'] : [], spawnOptions)
 
     logger.info(`Compiling application`)
     await runShellCommandWithRealTimeLogging(PNPM_BUILD_COMMAND, logger, [], spawnOptions)
