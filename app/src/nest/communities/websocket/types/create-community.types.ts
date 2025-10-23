@@ -5,6 +5,7 @@ export interface CreateCommunityPayload {
   community: Community
   teamKeyring: string
   userId: string
+  hcaptchaToken?: string
 }
 
 export interface CreateCommunity {
