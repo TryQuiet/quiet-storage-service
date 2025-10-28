@@ -21,6 +21,7 @@ export function isHCaptchaSiteVerifyResponse(
 }
 export async function verifyHCaptchaToken(
   token: string | undefined,
+  timeoutMs = 5000,
 ): Promise<HCaptchaSiteVerifyResponse> {
   if (token == null) {
     if (ConfigService.getEnv() === Environment.Production) {
@@ -28,9 +29,16 @@ export async function verifyHCaptchaToken(
         success: false,
         'error-codes': ['hCaptcha token required'],
       }
-    } else {
+    } else if (
+      ConfigService.getBool(EnvVars.ALLOW_HCAPTCHA_BYPASS, false) === true
+    ) {
       return {
         success: true,
+      }
+    } else {
+      return {
+        success: false,
+        'error-codes': ['hCaptcha token required'],
       }
     }
   }
@@ -42,16 +50,44 @@ export async function verifyHCaptchaToken(
     secret: hcaptchaSecret,
     response: token,
   })
-  const verifyResponse = await fetch('https://hcaptcha.com/siteverify', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/x-www-form-urlencoded',
-    },
-    body: verifyBody,
-  })
-  const rawVerification: unknown = await verifyResponse.json()
-  if (isHCaptchaSiteVerifyResponse(rawVerification)) {
-    return rawVerification
+  const controller = new AbortController()
+  const to = setTimeout(() => {
+    controller.abort()
+  }, timeoutMs)
+  try {
+    const verifyResponse = await fetch('https://api.hcaptcha.com/siteverify', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      body: verifyBody,
+      signal: controller.signal,
+    })
+
+    if (!verifyResponse.ok) {
+      clearTimeout(to)
+      return {
+        success: false,
+        'error-codes': ['hCaptcha verification request failed'],
+      }
+    }
+
+    const rawVerification: unknown = await verifyResponse.json()
+    if (isHCaptchaSiteVerifyResponse(rawVerification)) {
+      return rawVerification
+    }
+    return { success: false, 'error-codes': ['Invalid hCaptcha response'] }
+  } catch (err: unknown) {
+    const isAbortError =
+      typeof err === 'object' &&
+      err !== null &&
+      'name' in err &&
+      (err as { name?: unknown }).name === 'AbortError'
+    const code = isAbortError
+      ? 'hcaptcha-verify-timeout'
+      : 'hcaptcha-verify-network-error'
+    return { success: false, 'error-codes': [code] }
+  } finally {
+    clearTimeout(to)
   }
-  return { success: false, 'error-codes': ['Invalid hCaptcha response'] }
 }
