@@ -1,6 +1,5 @@
 import { ConfigService } from './config/config.service.js'
 import { EnvVars } from './config/env_vars.js'
-import { Environment } from './config/types.js'
 
 export interface HCaptchaSiteVerifyResponse {
   success: boolean
@@ -24,25 +23,12 @@ export async function verifyHCaptchaToken(
   timeoutMs = 5000,
 ): Promise<HCaptchaSiteVerifyResponse> {
   if (token == null) {
-    if (ConfigService.getEnv() === Environment.Production) {
-      return {
-        success: false,
-        'error-codes': ['hCaptcha token required'],
-      }
-    } else if (
-      ConfigService.getBool(EnvVars.ALLOW_HCAPTCHA_BYPASS, false) === true
-    ) {
-      return {
-        success: true,
-      }
-    } else {
-      return {
-        success: false,
-        'error-codes': ['hCaptcha token required'],
-      }
+    return {
+      success: false,
+      'error-codes': ['hCaptcha token required'],
     }
   }
-  const hcaptchaSecret = ConfigService.getString(EnvVars.HCAPTCHA_SECRET)
+  const hcaptchaSecret = ConfigService.getString(EnvVars.HCAPTCHA_SECRET_KEY)
   if (hcaptchaSecret == null) {
     throw new Error('hCaptcha secret not configured')
   }

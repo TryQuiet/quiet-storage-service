@@ -44,6 +44,19 @@ export function registerCommunitiesAuthHandlers(
         throw new Error('Payload missing from generate public keys message')
       }
 
+      if (config.socket.data.verifiedCaptcha !== true) {
+        _logger.warn(
+          `Attempted to generate public keys without passing captcha verification`,
+        )
+        const errorResponse: GeneratePublicKeysMessage = {
+          ts: DateTime.utc().toMillis(),
+          status: CommunityOperationStatus.ERROR,
+          reason: `Captcha verification required`,
+        }
+        callback(errorResponse)
+        return
+      }
+
       // generate the keys for this community and return to the user
       const keysetWithSecrets = await config.communitiesManager.getServerKeys(
         message.payload.teamId,

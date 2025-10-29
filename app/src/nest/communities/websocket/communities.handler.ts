@@ -21,7 +21,6 @@ import {
   AuthenticationError,
   CommunityNotFoundError,
 } from '../../utils/errors.js'
-import { verifyHCaptchaToken } from '../../utils/captcha.js'
 
 const baseLogger = createLogger('Websocket:Event:Communities')
 
@@ -48,19 +47,18 @@ export function registerCommunitiesHandlers(
   ): Promise<void> {
     _logger.debug(`Handling community create event`)
     try {
-      const hcaptchaToken = message.payload.hcaptchaToken
-      const hcaptchaVerification = await verifyHCaptchaToken(hcaptchaToken)
-      if (!hcaptchaVerification.success) {
-        callback({
+      if (config.socket.data.verifiedCaptcha !== true) {
+        _logger.warn(
+          `Attempted to create community without passing captcha verification`,
+        )
+        const errorResponse: CreateCommunityResponse = {
           ts: DateTime.utc().toMillis(),
           status: CreateCommunityStatus.ERROR,
-          reason: `hCaptcha verification failed: ${hcaptchaVerification[
-            'error-codes'
-          ]?.join(', ')}`,
-        })
+          reason: `Captcha verification required`,
+        }
+        callback(errorResponse)
         return
       }
-
       // Create the community and start syncing the sigchain with this user
       await config.communitiesManager.create(
         message.payload.userId,
