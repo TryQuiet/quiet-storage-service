@@ -15,6 +15,7 @@ import * as uint8arrays from 'uint8arrays'
 import type { AuthConnection } from '../auth/auth.connection.js'
 import { type Keyset, redactKeys } from '@localfirst/crdx'
 import { AllowedServerKeyState } from '../types.js'
+import { CaptchaErrorMessages } from './types/captcha.types.js'
 
 const baseLogger = createLogger('Websocket:Event:Communities:Auth')
 
@@ -51,7 +52,7 @@ export function registerCommunitiesAuthHandlers(
         const errorResponse: GeneratePublicKeysMessage = {
           ts: DateTime.utc().toMillis(),
           status: CommunityOperationStatus.ERROR,
-          reason: `Captcha verification required`,
+          reason: CaptchaErrorMessages.CATCHA_VERIFICATION_REQUIRED,
         }
         callback(errorResponse)
         return

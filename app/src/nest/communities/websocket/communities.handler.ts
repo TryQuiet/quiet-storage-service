@@ -21,6 +21,7 @@ import {
   AuthenticationError,
   CommunityNotFoundError,
 } from '../../utils/errors.js'
+import { CaptchaErrorMessages } from './types/captcha.types.js'
 
 const baseLogger = createLogger('Websocket:Event:Communities')
 
@@ -54,7 +55,7 @@ export function registerCommunitiesHandlers(
         const errorResponse: CreateCommunityResponse = {
           ts: DateTime.utc().toMillis(),
           status: CreateCommunityStatus.ERROR,
-          reason: `Captcha verification required`,
+          reason: CaptchaErrorMessages.CATCHA_VERIFICATION_REQUIRED,
         }
         callback(errorResponse)
         return

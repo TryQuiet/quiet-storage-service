@@ -23,3 +23,7 @@ export interface GetCaptchaSiteKeyResponse
   extends BaseWebsocketMessage<GetCaptchaSiteKeyResponsePayload> {
   payload?: GetCaptchaSiteKeyResponsePayload
 }
+
+export enum CaptchaErrorMessages {
+  CATCHA_VERIFICATION_REQUIRED = 'Captcha verification required',
+}
