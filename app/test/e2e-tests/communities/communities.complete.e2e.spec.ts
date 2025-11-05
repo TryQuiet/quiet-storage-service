@@ -51,7 +51,7 @@ import { SERIALIZER } from '../../../src/nest/app/const.js'
 import {
   CaptchaVerifyMessage,
   HCAPTCHA_TEST_TOKEN,
-} from '3rd-party/qss/app/src/nest/communities/websocket/types/captcha.types.js'
+} from '../../../src/nest/communities/websocket/types/captcha.types.js'
 
 describe('Communities', () => {
   let testClient: TestClient
