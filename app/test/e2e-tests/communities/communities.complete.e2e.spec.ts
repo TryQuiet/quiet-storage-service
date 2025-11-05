@@ -145,7 +145,7 @@ describe('Communities', () => {
 
     it('should validate the connection with captcha', async () => {
       const message: CaptchaVerifyMessage = {
-        ts: DateTime.utc.toMillis(),
+        ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.SENDING,
         payload: {
           token: HCAPTCHA_TEST_TOKEN,
