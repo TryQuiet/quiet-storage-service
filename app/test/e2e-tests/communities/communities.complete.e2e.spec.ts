@@ -157,7 +157,7 @@ describe('Communities', () => {
           message,
           true,
         )
-      expect(response.status).toBeTruthy()
+      expect(response.status).toBe(CommunityOperationStatus.SUCCESS)
     })
 
     it('should get public keys from server', async () => {
