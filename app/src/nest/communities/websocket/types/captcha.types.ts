@@ -25,7 +25,7 @@ export interface GetCaptchaSiteKeyResponse
 }
 
 export enum CaptchaErrorMessages {
-  CATCHA_VERIFICATION_REQUIRED = 'Captcha verification required',
+  CAPTCHA_VERIFICATION_REQUIRED = 'Captcha verification required',
 }
 
 export const HCAPTCHA_TEST_TOKEN = '10000000-aaaa-bbbb-cccc-000000000001'

@@ -52,7 +52,7 @@ export function registerCommunitiesAuthHandlers(
         const errorResponse: GeneratePublicKeysMessage = {
           ts: DateTime.utc().toMillis(),
           status: CommunityOperationStatus.ERROR,
-          reason: CaptchaErrorMessages.CATCHA_VERIFICATION_REQUIRED,
+          reason: CaptchaErrorMessages.CAPTCHA_VERIFICATION_REQUIRED,
         }
         callback(errorResponse)
         return

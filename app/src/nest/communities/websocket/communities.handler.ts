@@ -55,7 +55,7 @@ export function registerCommunitiesHandlers(
         const errorResponse: CreateCommunityResponse = {
           ts: DateTime.utc().toMillis(),
           status: CreateCommunityStatus.ERROR,
-          reason: CaptchaErrorMessages.CATCHA_VERIFICATION_REQUIRED,
+          reason: CaptchaErrorMessages.CAPTCHA_VERIFICATION_REQUIRED,
         }
         callback(errorResponse)
         return
