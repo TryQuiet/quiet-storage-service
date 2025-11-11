@@ -41,6 +41,14 @@ export function registerCaptchaHandlers(
     callback: (response: CaptchaVerifyResponse) => void,
   ): Promise<void> {
     try {
+      if (config.socket.data.verifiedCaptcha === true) {
+        const response: CaptchaVerifyResponse = {
+          ts: DateTime.utc().toMillis(),
+          status: CommunityOperationStatus.SUCCESS,
+        }
+        callback(response)
+        return
+      }
       const hcaptchaResponse = await verifyHCaptchaToken(message.payload.token)
       if (hcaptchaResponse.success) {
         config.socket.data.verifiedCaptcha = true
@@ -58,7 +66,6 @@ export function registerCaptchaHandlers(
         callback(response)
       }
     } catch (error) {
-      _logger.error('Error verifying captcha token', error)
       const response: CaptchaVerifyResponse = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.ERROR,
