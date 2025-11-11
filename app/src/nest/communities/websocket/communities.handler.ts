@@ -21,6 +21,7 @@ import {
   AuthenticationError,
   CommunityNotFoundError,
 } from '../../utils/errors.js'
+import { CaptchaErrorMessages } from './types/captcha.types.js'
 
 const baseLogger = createLogger('Websocket:Event:Communities')
 
@@ -47,6 +48,18 @@ export function registerCommunitiesHandlers(
   ): Promise<void> {
     _logger.debug(`Handling community create event`)
     try {
+      if (config.socket.data.verifiedCaptcha !== true) {
+        _logger.warn(
+          `Attempted to create community without passing captcha verification`,
+        )
+        const errorResponse: CreateCommunityResponse = {
+          ts: DateTime.utc().toMillis(),
+          status: CreateCommunityStatus.ERROR,
+          reason: CaptchaErrorMessages.CAPTCHA_VERIFICATION_REQUIRED,
+        }
+        callback(errorResponse)
+        return
+      }
       // Create the community and start syncing the sigchain with this user
       await config.communitiesManager.create(
         message.payload.userId,

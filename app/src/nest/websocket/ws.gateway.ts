@@ -9,10 +9,10 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets'
-import { Server, Socket } from 'socket.io'
+import { Server } from 'socket.io'
 import { OnModuleDestroy } from '@nestjs/common'
 
-import { BaseHandlerConfig } from './ws.types.js'
+import { BaseHandlerConfig, QuietSocket } from './ws.types.js'
 import { createLogger } from '../app/logger/logger.js'
 import { registerCommunitiesHandlers } from '../communities/websocket/communities.handler.js'
 import { CommunitiesStorageService } from '../communities/storage/communities.storage.service.js'
@@ -21,6 +21,7 @@ import { CommunitiesHandlerConfig } from '../communities/websocket/types/index.j
 import { registerCommunitiesAuthHandlers } from '../communities/websocket/auth.handler.js'
 import { LogEntrySyncStorageService } from '../communities/storage/log-entry-sync.storage.service.js'
 import { registerLogEntrySyncHandlers } from '../communities/websocket/log-entry-sync.handler.js'
+import { registerCaptchaHandlers } from '../communities/websocket/captcha.handler.js'
 
 /**
  * Websocket gateway configuration
@@ -37,7 +38,7 @@ import { registerLogEntrySyncHandlers } from '../communities/websocket/log-entry
 export class WebsocketGateway
   implements
     OnGatewayInit,
-    OnGatewayConnection<Socket>,
+    OnGatewayConnection<QuietSocket>,
     OnGatewayDisconnect,
     OnModuleDestroy
 {
@@ -70,7 +71,7 @@ export class WebsocketGateway
    * @param client Socket connection with a new client
    * @param args Extra arguments to the connection
    */
-  handleConnection(client: Socket, ...args: unknown[]): void {
+  handleConnection(client: QuietSocket, ...args: unknown[]): void {
     const _logger = this.logger.extend(client.id)
     const { sockets } = this.io.sockets
 
@@ -88,7 +89,7 @@ export class WebsocketGateway
    *
    * @param client Socket connection with a new client
    */
-  handleDisconnect(client: Socket): void {
+  handleDisconnect(client: QuietSocket): void {
     const _logger = this.logger.extend(client.id)
     _logger.log(`Client id:${client.id} disconnected`)
   }
@@ -98,7 +99,7 @@ export class WebsocketGateway
    *
    * @param client Socket connection with a new client
    */
-  private _registerEventHandlers(client: Socket): void {
+  private _registerEventHandlers(client: QuietSocket): void {
     const baseConfig: BaseHandlerConfig = {
       socketServer: this.io,
       socket: client,
@@ -113,5 +114,6 @@ export class WebsocketGateway
     registerCommunitiesHandlers(communitiesConfig)
     registerCommunitiesAuthHandlers(communitiesConfig)
     registerLogEntrySyncHandlers(communitiesConfig)
+    registerCaptchaHandlers(communitiesConfig)
   }
 }

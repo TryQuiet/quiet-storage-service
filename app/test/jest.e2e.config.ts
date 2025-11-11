@@ -1,4 +1,6 @@
-import { createJsWithTsEsmPreset, type JestConfigWithTsJest } from 'ts-jest'
+const { createJsWithTsEsmPreset } = require('ts-jest')
+
+type JestConfigWithTsJest = import('ts-jest').JestConfigWithTsJest
 
 const presetConfig = createJsWithTsEsmPreset({
   tsconfig: '<rootDir>/tsconfig.json',
@@ -20,4 +22,4 @@ const jestConfig: JestConfigWithTsJest = {
   },
 }
 
-export default jestConfig
+module.exports = jestConfig

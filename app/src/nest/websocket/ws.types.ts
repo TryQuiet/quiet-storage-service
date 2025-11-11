@@ -1,8 +1,20 @@
-import type { Server, Socket } from 'socket.io'
+import type { DefaultEventsMap, Server, Socket } from 'socket.io'
+
+export interface QuietSocketData {
+  verifiedCaptcha?: boolean
+}
+
+// TODO: lock down events maps to set of known events
+export type QuietSocket = Socket<
+  DefaultEventsMap,
+  DefaultEventsMap,
+  DefaultEventsMap,
+  QuietSocketData
+>
 
 export interface BaseHandlerConfig {
   socketServer: Server
-  socket: Socket
+  socket: QuietSocket
 }
 
 /**
@@ -18,6 +30,9 @@ export enum WebsocketEvents {
   AuthSync = 'auth-sync',
   //// community log entry sync
   LogEntrySync = 'log-entry-sync',
+  // captcha
+  VerifyCaptcha = 'verify-captcha',
+  GetCaptchaSiteKey = 'get-captcha-site-key',
 }
 
 /**

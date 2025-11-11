@@ -37,6 +37,7 @@ import { AuthConnection } from './auth/auth.connection.js'
 import { UtilsModule } from '../utils/utils.module.js'
 import type { Serializer } from '../utils/serialization/serializer.service.js'
 import { SERIALIZER } from '../app/const.js'
+import type { QuietSocket } from '../websocket/ws.types.js'
 
 describe('CommunitiesManagerService', () => {
   let module: TestingModule | undefined = undefined
@@ -79,8 +80,8 @@ describe('CommunitiesManagerService', () => {
       storage,
       dataSyncStorage,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is ok
-      socket: new MockedSocket() as Socket,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- this doesn't get used anywhere in this code
+      socket: new MockedSocket() as QuietSocket,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- test mock is safe here
       socketServer: {} as any,
     }
   })

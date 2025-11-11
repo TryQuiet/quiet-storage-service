@@ -46,4 +46,7 @@ export enum EnvVars {
   REDIS_ENDPOINT = 'REDIS_ENDPOINT',
   REDIS_PORT = 'REDIS_PORT',
   REDIS_ENABLED = 'REDIS_ENABLED',
+
+  // hcaptcha settings
+  HCAPTCHA_SECRET_KEY = 'HCAPTCHA_SECRET_KEY',
 }

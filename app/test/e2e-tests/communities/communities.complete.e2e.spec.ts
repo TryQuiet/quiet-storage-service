@@ -48,6 +48,10 @@ import { LogEntrySyncStorageService } from '../../../src/nest/communities/storag
 import { Serializer } from '../../../src/nest/utils/serialization/serializer.service.js'
 import _ from 'lodash'
 import { SERIALIZER } from '../../../src/nest/app/const.js'
+import {
+  CaptchaVerifyMessage,
+  HCAPTCHA_TEST_TOKEN,
+} from '../../../src/nest/communities/websocket/types/captcha.types.js'
 
 describe('Communities', () => {
   let testClient: TestClient
@@ -137,6 +141,23 @@ describe('Communities', () => {
       expect(testTeam.testUserContext).toBeDefined()
       expect(testTeam.server).toBeUndefined()
       expect(testTeam.serverKeys).toBeUndefined()
+    })
+
+    it('should validate the connection with captcha', async () => {
+      const message: CaptchaVerifyMessage = {
+        ts: DateTime.utc().toMillis(),
+        status: CommunityOperationStatus.SENDING,
+        payload: {
+          token: HCAPTCHA_TEST_TOKEN,
+        },
+      }
+      const response =
+        await testClient.client.sendMessage<CaptchaVerifyMessage>(
+          WebsocketEvents.VerifyCaptcha,
+          message,
+          true,
+        )
+      expect(response.status).toBe(CommunityOperationStatus.SUCCESS)
     })
 
     it('should get public keys from server', async () => {
