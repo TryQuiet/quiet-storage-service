@@ -5,10 +5,7 @@
 import { WebsocketEvents } from '../../websocket/ws.types.js'
 import { createLogger } from '../../app/logger/logger.js'
 import { verifyHCaptchaToken } from '../../utils/captcha.js'
-import {
-  CommunityOperationStatus,
-  type CommunitiesHandlerConfig,
-} from './types/common.types.js'
+import { CommunityOperationStatus, type CommunitiesHandlerConfig } from './types/common.types.js'
 import type {
   CaptchaVerifyMessage,
   CaptchaVerifyResponse,
@@ -25,9 +22,7 @@ const baseLogger = createLogger('Websocket:Event:Communities')
  *
  * @param config Websocket handler config
  */
-export function registerCaptchaHandlers(
-  config: CommunitiesHandlerConfig,
-): void {
+export function registerCaptchaHandlers(config: CommunitiesHandlerConfig): void {
   const _logger = baseLogger.extend(config.socket.id)
   _logger.debug(`Initializing captcha WS event handlers`)
   /**
@@ -38,7 +33,7 @@ export function registerCaptchaHandlers(
    */
   async function handleVerifyCaptcha(
     message: CaptchaVerifyMessage,
-    callback: (response: CaptchaVerifyResponse) => void,
+    callback: (response: CaptchaVerifyResponse) => void
   ): Promise<void> {
     try {
       if (config.socket.data.verifiedCaptcha === true) {
@@ -52,6 +47,8 @@ export function registerCaptchaHandlers(
       const hcaptchaResponse = await verifyHCaptchaToken(message.payload.token)
       if (hcaptchaResponse.success) {
         config.socket.data.verifiedCaptcha = true
+        config.socket.data.usedCaptchaForKeys = false
+        config.socket.data.usedCaptchaForCreateCommunity = false
         const response: CaptchaVerifyResponse = {
           ts: DateTime.utc().toMillis(),
           status: CommunityOperationStatus.SUCCESS,
@@ -77,7 +74,7 @@ export function registerCaptchaHandlers(
 
   function handleGetCaptchaSiteKey(
     message: GetCaptchaSiteKeyMessage,
-    callback: (response: GetCaptchaSiteKeyResponse) => void,
+    callback: (response: GetCaptchaSiteKeyResponse) => void
   ): void {
     try {
       const siteKey = ConfigService.getString('HCAPTCHA_SITE_KEY')

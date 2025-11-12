@@ -2,6 +2,8 @@ import type { DefaultEventsMap, Server, Socket } from 'socket.io'
 
 export interface QuietSocketData {
   verifiedCaptcha?: boolean
+  usedCaptchaForKeys?: boolean
+  usedCaptchaForCreateCommunity?: boolean
 }
 
 // TODO: lock down events maps to set of known events

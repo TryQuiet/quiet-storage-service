@@ -17,10 +17,7 @@ import {
 } from './types/index.js'
 import { Environment } from '../../utils/config/types.js'
 import { ConfigService } from '../../utils/config/config.service.js'
-import {
-  AuthenticationError,
-  CommunityNotFoundError,
-} from '../../utils/errors.js'
+import { AuthenticationError, CommunityNotFoundError } from '../../utils/errors.js'
 import { CaptchaErrorMessages } from './types/captcha.types.js'
 
 const baseLogger = createLogger('Websocket:Event:Communities')
@@ -30,9 +27,7 @@ const baseLogger = createLogger('Websocket:Event:Communities')
  *
  * @param config Websocket handler config
  */
-export function registerCommunitiesHandlers(
-  config: CommunitiesHandlerConfig,
-): void {
+export function registerCommunitiesHandlers(config: CommunitiesHandlerConfig): void {
   const _logger = baseLogger.extend(config.socket.id)
   _logger.debug(`Initializing communities WS event handlers`)
 
@@ -44,14 +39,21 @@ export function registerCommunitiesHandlers(
    */
   async function handleCreateCommunity(
     message: CreateCommunity,
-    callback: (payload: CreateCommunityResponse) => void,
+    callback: (payload: CreateCommunityResponse) => void
   ): Promise<void> {
     _logger.debug(`Handling community create event`)
     try {
       if (config.socket.data.verifiedCaptcha !== true) {
-        _logger.warn(
-          `Attempted to create community without passing captcha verification`,
-        )
+        _logger.warn(`Attempted to create community without passing captcha verification`)
+        const errorResponse: CreateCommunityResponse = {
+          ts: DateTime.utc().toMillis(),
+          status: CreateCommunityStatus.ERROR,
+          reason: CaptchaErrorMessages.CAPTCHA_VERIFICATION_REQUIRED,
+        }
+        callback(errorResponse)
+        return
+      }
+      if (config.socket.data.usedCaptchaForCreateCommunity === true) {
         const errorResponse: CreateCommunityResponse = {
           ts: DateTime.utc().toMillis(),
           status: CreateCommunityStatus.ERROR,
@@ -65,8 +67,9 @@ export function registerCommunitiesHandlers(
         message.payload.userId,
         message.payload.community,
         message.payload.teamKeyring,
-        config.socket,
+        config.socket
       )
+      config.socket.data.usedCaptchaForCreateCommunity = true
 
       // form and return a success response to the user
       let response: CreateCommunityResponse | undefined = undefined
@@ -94,7 +97,7 @@ export function registerCommunitiesHandlers(
    */
   async function handleSignInToCommunity(
     message: CommunitySignInMessage,
-    callback: (payload: CommunitySignInMessage) => void,
+    callback: (payload: CommunitySignInMessage) => void
   ): Promise<void> {
     _logger.debug(`Handling community sign-in event`)
     try {
@@ -104,9 +107,7 @@ export function registerCommunitiesHandlers(
       const { teamId, userId } = message.payload
       // get the community and return an error response if not found
       if ((await config.communitiesManager.get(teamId)) == null) {
-        _logger.warn(
-          `Attempted sign-in to community ${teamId} but no community was initialized for that ID`,
-        )
+        _logger.warn(`Attempted sign-in to community ${teamId} but no community was initialized for that ID`)
         const notFoundResponse: CommunitySignInMessage = {
           ts: DateTime.utc().toMillis(),
           status: CommunityOperationStatus.NOT_FOUND,
@@ -117,9 +118,7 @@ export function registerCommunitiesHandlers(
       }
 
       // start the auth sync connection and return a success response
-      _logger.debug(
-        `Found community for ID ${teamId}, initializing sync connection`,
-      )
+      _logger.debug(`Found community for ID ${teamId}, initializing sync connection`)
       config.communitiesManager.startAuthSyncConnection(userId, teamId, config)
 
       const response: CommunitySignInMessage = {
@@ -130,10 +129,7 @@ export function registerCommunitiesHandlers(
     } catch (e) {
       _logger.error(`Error while processing community sign-in event`, e)
       let reason = `Error while signing in to community`
-      if (
-        e instanceof AuthenticationError ||
-        e instanceof CommunityNotFoundError
-      ) {
+      if (e instanceof AuthenticationError || e instanceof CommunityNotFoundError) {
         reason = e.message
       }
       const errorResponse: CommunitySignInMessage = {
@@ -153,7 +149,7 @@ export function registerCommunitiesHandlers(
    */
   async function handleGetCommunity(
     message: GetCommunity,
-    callback: (payload: GetCommunityResponse) => void,
+    callback: (payload: GetCommunityResponse) => void
   ): Promise<void> {
     if (ConfigService.getEnv() !== Environment.Local) {
       return
@@ -161,9 +157,7 @@ export function registerCommunitiesHandlers(
 
     try {
       // get the community and return a success or error response based on result
-      const managedCommunity = await config.communitiesManager.get(
-        message.payload.id,
-      )
+      const managedCommunity = await config.communitiesManager.get(message.payload.id)
       let response: GetCommunityResponse | undefined = undefined
       if (managedCommunity == null) {
         response = {
@@ -185,10 +179,7 @@ export function registerCommunitiesHandlers(
     } catch (e) {
       _logger.error(`Error while processing update community event`, e)
       let reason = `Error while getting community`
-      if (
-        e instanceof AuthenticationError ||
-        e instanceof CommunityNotFoundError
-      ) {
+      if (e instanceof AuthenticationError || e instanceof CommunityNotFoundError) {
         reason = e.message
       }
       const errorResponse: GetCommunityResponse = {
