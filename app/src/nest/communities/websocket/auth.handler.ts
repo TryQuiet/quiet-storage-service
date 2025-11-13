@@ -24,7 +24,9 @@ const baseLogger = createLogger('Websocket:Event:Communities:Auth')
  *
  * @param config Websocket handler config
  */
-export function registerCommunitiesAuthHandlers(config: CommunitiesHandlerConfig): void {
+export function registerCommunitiesAuthHandlers(
+  config: CommunitiesHandlerConfig,
+): void {
   const _logger = baseLogger.extend(config.socket.id)
   _logger.debug(`Initializing communities auth WS event handlers`)
 
@@ -36,7 +38,7 @@ export function registerCommunitiesAuthHandlers(config: CommunitiesHandlerConfig
    */
   async function handleGeneratePublicKeys(
     message: GeneratePublicKeysMessage,
-    callback: (payload: GeneratePublicKeysMessage) => void
+    callback: (payload: GeneratePublicKeysMessage) => void,
   ): Promise<void> {
     try {
       if (message.payload == null) {
@@ -44,7 +46,9 @@ export function registerCommunitiesAuthHandlers(config: CommunitiesHandlerConfig
       }
 
       if (config.socket.data.verifiedCaptcha !== true) {
-        _logger.warn(`Attempted to generate public keys without passing captcha verification`)
+        _logger.warn(
+          `Attempted to generate public keys without passing captcha verification`,
+        )
         const errorResponse: GeneratePublicKeysMessage = {
           ts: DateTime.utc().toMillis(),
           status: CommunityOperationStatus.ERROR,
@@ -65,7 +69,7 @@ export function registerCommunitiesAuthHandlers(config: CommunitiesHandlerConfig
       // generate the keys for this community and return to the user
       const keysetWithSecrets = await config.communitiesManager.getServerKeys(
         message.payload.teamId,
-        AllowedServerKeyState.NOT_STORED
+        AllowedServerKeyState.NOT_STORED,
       )
       config.socket.data.usedCaptchaForKeys = true
       const response: GeneratePublicKeysMessage = {
@@ -101,7 +105,9 @@ export function registerCommunitiesAuthHandlers(config: CommunitiesHandlerConfig
       }
 
       // get the managed community by ID and return an error if not found
-      const community = await config.communitiesManager.get(message.payload.teamId)
+      const community = await config.communitiesManager.get(
+        message.payload.teamId,
+      )
       if (community == null) {
         throw new Error(`No community found`)
       }
@@ -109,10 +115,14 @@ export function registerCommunitiesAuthHandlers(config: CommunitiesHandlerConfig
       // get the existing auth connection for this user and return an error if not found
       authConnection = community.authConnections?.get(message.payload.userId)
       if (authConnection == null) {
-        throw new Error(`No auth connection was established for this user on this community`)
+        throw new Error(
+          `No auth connection was established for this user on this community`,
+        )
       }
       // push the sync message onto the auth sync connection
-      authConnection.lfaConnection.deliver(uint8arrays.fromString(message.payload.message, 'base64'))
+      authConnection.lfaConnection.deliver(
+        uint8arrays.fromString(message.payload.message, 'base64'),
+      )
     } catch (e) {
       _logger.error(`Error while processing auth sync event`, e)
       authConnection?.lfaConnection.emit('localError', {
