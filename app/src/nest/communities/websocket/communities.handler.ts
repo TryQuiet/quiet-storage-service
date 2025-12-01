@@ -60,6 +60,15 @@ export function registerCommunitiesHandlers(
         callback(errorResponse)
         return
       }
+      if (config.socket.data.usedCaptchaForCreateCommunity === true) {
+        const errorResponse: CreateCommunityResponse = {
+          ts: DateTime.utc().toMillis(),
+          status: CreateCommunityStatus.ERROR,
+          reason: CaptchaErrorMessages.CAPTCHA_VERIFICATION_REQUIRED,
+        }
+        callback(errorResponse)
+        return
+      }
       // Create the community and start syncing the sigchain with this user
       await config.communitiesManager.create(
         message.payload.userId,
@@ -67,6 +76,7 @@ export function registerCommunitiesHandlers(
         message.payload.teamKeyring,
         config.socket,
       )
+      config.socket.data.usedCaptchaForCreateCommunity = true
 
       // form and return a success response to the user
       let response: CreateCommunityResponse | undefined = undefined

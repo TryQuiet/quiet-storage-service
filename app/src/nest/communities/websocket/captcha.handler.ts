@@ -52,6 +52,8 @@ export function registerCaptchaHandlers(
       const hcaptchaResponse = await verifyHCaptchaToken(message.payload.token)
       if (hcaptchaResponse.success) {
         config.socket.data.verifiedCaptcha = true
+        config.socket.data.usedCaptchaForKeys = false
+        config.socket.data.usedCaptchaForCreateCommunity = false
         const response: CaptchaVerifyResponse = {
           ts: DateTime.utc().toMillis(),
           status: CommunityOperationStatus.SUCCESS,

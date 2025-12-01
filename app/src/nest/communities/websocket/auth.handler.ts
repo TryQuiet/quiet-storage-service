@@ -57,12 +57,21 @@ export function registerCommunitiesAuthHandlers(
         callback(errorResponse)
         return
       }
-
+      if (config.socket.data.usedCaptchaForKeys === true) {
+        const errorResponse: GeneratePublicKeysMessage = {
+          ts: DateTime.utc().toMillis(),
+          status: CommunityOperationStatus.ERROR,
+          reason: CaptchaErrorMessages.CAPTCHA_VERIFICATION_REQUIRED,
+        }
+        callback(errorResponse)
+        return
+      }
       // generate the keys for this community and return to the user
       const keysetWithSecrets = await config.communitiesManager.getServerKeys(
         message.payload.teamId,
         AllowedServerKeyState.NOT_STORED,
       )
+      config.socket.data.usedCaptchaForKeys = true
       const response: GeneratePublicKeysMessage = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.SUCCESS,
