@@ -460,6 +460,84 @@ describe('Communities', () => {
         ),
       ).toStrictEqual(logSyncMessage.payload.encEntry?.encrypted.contents)
     })
+
+    it('should have both users in the room', async () => {
+      const rooms = websocketGateway.io.sockets.adapter.rooms
+      const room = rooms.get(testTeam.team.id)
+      expect(room).toBeDefined()
+      expect(room!.size).toBe(2)
+    })
+
+    it('should fanout sent messages to connected users', async () => {
+      let logSyncMessage: LogEntrySyncMessage
+      let logSyncAck: LogEntrySyncMessage | undefined
+      const rawMessage = 'this is a fanned out message'
+      const encryptedMessage = testTeam.team.encrypt(rawMessage, 'member')
+      const signature = testTeam.team.sign(rawMessage)
+      const logSyncPayload: LogEntrySyncPayload = {
+        teamId: testTeam.team.id,
+        hash: sodiumHelper.sodium.crypto_hash(rawMessage, 'base64'),
+        hashedDbId: sodiumHelper.sodium.crypto_hash(
+          sodiumHelper.sodium.randombytes_buf(32),
+          'base64',
+        ),
+        encEntry: {
+          userId: testTeam.testUserContext.user.userId,
+          ts: DateTime.utc().toMillis(),
+          teamId: testTeam.team.id,
+          signature,
+          encrypted: {
+            contents: encryptedMessage.contents,
+            scope: {
+              name: 'member',
+              type: EncryptionScopeType.ROLE,
+              generation: encryptedMessage.recipient.generation,
+            },
+          },
+        },
+      }
+      const serialized = serializer.serialize(logSyncPayload.encEntry)
+      const deserialized = serializer.deserialize(serialized)
+      expect(deserialized).toStrictEqual(logSyncPayload.encEntry)
+      logSyncMessage = {
+        ts: DateTime.utc().toMillis(),
+        status: CommunityOperationStatus.SENDING,
+        payload: logSyncPayload,
+      }
+      // listen for message on second client
+      let secondClientReceivedMessage: boolean = false
+      testClient.client.clientSocket.on(
+        WebsocketEvents.LogEntrySync,
+        (message: LogEntrySyncMessage) => {
+          secondClientReceivedMessage = true
+        },
+      )
+      const secondClientReceivedMessagePromise =
+        new Promise<LogEntrySyncMessage>(resolve => {
+          secondTestClient.client.clientSocket.on(
+            WebsocketEvents.LogEntrySync,
+            (message: LogEntrySyncMessage) => {
+              resolve(message)
+            },
+          )
+        })
+      // send message from first client
+      logSyncAck = await testClient.client.sendMessage<LogEntrySyncMessage>(
+        WebsocketEvents.LogEntrySync,
+        logSyncMessage,
+        true,
+      )
+      // wait for second client to receive message
+      // with timeout
+      const timeoutPromise = new Promise<LogEntrySyncMessage>((_, reject) => {
+        setTimeout(() => {
+          reject(
+            new Error('Timeout waiting for second client to receive message'),
+          )
+        }, 1000)
+      })
+      expect(secondClientReceivedMessage).toBe(false)
+    })
   })
 
   describe('Invalid Sign In Attempt', () => {
