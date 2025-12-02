@@ -52,6 +52,7 @@ import {
   CaptchaVerifyMessage,
   HCAPTCHA_TEST_TOKEN,
 } from '../../../src/nest/communities/websocket/types/captcha.types.js'
+import { WebsocketGateway } from '3rd-party/qss/app/src/nest/websocket/ws.gateway.js'
 
 describe('Communities', () => {
   let testClient: TestClient
@@ -67,6 +68,7 @@ describe('Communities', () => {
 
   let testingModule: TestingModule
   let communitiesManagerService: CommunitiesManagerService
+  let websocketGateway: WebsocketGateway
   let sodiumHelper: SodiumHelper
   let storage: CommunitiesStorageService
   let dataSyncStorage: LogEntrySyncStorageService
@@ -93,6 +95,7 @@ describe('Communities', () => {
     }).compile()
 
     await TestUtils.startServer(testingModule)
+    websocketGateway = testingModule.get<WebsocketGateway>(WebsocketGateway)
     communitiesManagerService = testingModule.get<CommunitiesManagerService>(
       CommunitiesManagerService,
     )
@@ -312,6 +315,11 @@ describe('Communities', () => {
           status: CommunityOperationStatus.SUCCESS,
         } as CommunitySignInMessage),
       )
+    })
+
+    it('the user should be in a room corresponding to their team id after signing in', async () => {
+      const rooms = websocketGateway.io.sockets.adapter.rooms
+      expect(rooms.has(testTeam.team.id)).toBe(true)
     })
 
     it('should validate that the community has been updated with second user', async () => {
