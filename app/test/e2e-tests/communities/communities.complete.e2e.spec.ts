@@ -52,7 +52,7 @@ import {
   CaptchaVerifyMessage,
   HCAPTCHA_TEST_TOKEN,
 } from '../../../src/nest/communities/websocket/types/captcha.types.js'
-import { WebsocketGateway } from '3rd-party/qss/app/src/nest/websocket/ws.gateway.js'
+import { WebsocketGateway } from '../../../src/nest/websocket/ws.gateway.js'
 
 describe('Communities', () => {
   let testClient: TestClient
