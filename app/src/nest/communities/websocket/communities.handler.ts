@@ -131,6 +131,7 @@ export function registerCommunitiesHandlers(
         `Found community for ID ${teamId}, initializing sync connection`,
       )
       config.communitiesManager.startAuthSyncConnection(userId, teamId, config)
+      await config.socket.join(teamId)
 
       const response: CommunitySignInMessage = {
         ts: DateTime.utc().toMillis(),

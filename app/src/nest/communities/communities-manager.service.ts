@@ -399,7 +399,6 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         'Data sync successfully written to the DB',
         dbPayload.cid,
       )
-      // TODO: add fanout logic
     } else {
       this.logger.error('Data sync write to DB was unsuccessful', dbPayload.cid)
     }
