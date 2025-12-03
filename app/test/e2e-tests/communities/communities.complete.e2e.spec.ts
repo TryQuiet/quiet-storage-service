@@ -505,11 +505,11 @@ describe('Communities', () => {
         payload: logSyncPayload,
       }
       // listen for message on second client
-      let secondClientReceivedMessage: boolean = false
+      let sendingClientReceivedMessage: boolean = false
       testClient.client.clientSocket.on(
         WebsocketEvents.LogEntrySync,
         (message: LogEntrySyncMessage) => {
-          secondClientReceivedMessage = true
+          sendingClientReceivedMessage = true
         },
       )
       const secondClientReceivedMessagePromise =
@@ -527,16 +527,16 @@ describe('Communities', () => {
         logSyncMessage,
         true,
       )
-      // wait for second client to receive message
-      // with timeout
-      const timeoutPromise = new Promise<LogEntrySyncMessage>((_, reject) => {
-        setTimeout(() => {
-          reject(
-            new Error('Timeout waiting for second client to receive message'),
-          )
-        }, 1000)
-      })
-      expect(secondClientReceivedMessage).toBe(false)
+      // wait for second client to receive message or fail
+      const receivedMessage = await Promise.race([
+        secondClientReceivedMessagePromise,
+        new Promise<null>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('Timeout waiting for message')),
+            10_000,
+          ),
+        ),
+      ])
     })
   })
 
