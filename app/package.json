@@ -129,6 +129,7 @@
     "eslint-config-prettier": "^10.0.1",
     "eslint-formatter-pretty": "^6.0.1",
     "eslint-plugin-eslint-comments": "^3.2.0",
+    "eslint-plugin-jest": "^29.2.1",
     "eslint-plugin-prettier": "^5.2.3",
     "expect-more-jest": "^5.5.0",
     "figures": "^6.1.0",

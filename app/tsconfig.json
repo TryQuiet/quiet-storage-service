@@ -23,8 +23,9 @@
     "allowJs": false,
   },
   "include": [
-    "src", 
+    "src",
     "scripts",
+    "test"
   ],
   "ts-node": {
     "esm": true,

@@ -33,6 +33,14 @@ export class WebsocketClient {
     )
     await this._waitForConnect()
 
+    this.clientSocket.onAny((...args: unknown[]) => {
+      this.logger.debug(
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions -- testing
+        `WebsocketClient.clientSocket ${this.clientSocket?.id} received event: ${args[0]}`,
+        ...args.slice(1),
+      )
+    })
+
     return this.clientSocket
   }
 
@@ -60,10 +68,10 @@ export class WebsocketClient {
     payload: unknown,
     withAck = false,
   ): Promise<T | undefined> {
-    this.logger.debug(`Sending message`, event)
     if (this.clientSocket == null) {
       throw new Error(`Must run createSocket first!`)
     }
+    this.logger.debug(`Sending message on ${this.clientSocket.id}`, event)
 
     if (withAck) {
       return (await this.clientSocket.emitWithAck(event, payload)) as T

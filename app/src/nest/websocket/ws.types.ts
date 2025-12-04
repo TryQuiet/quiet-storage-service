@@ -32,6 +32,7 @@ export enum WebsocketEvents {
   AuthSync = 'auth-sync',
   //// community log entry sync
   LogEntrySync = 'log-entry-sync',
+  LogEntryFanout = 'log-entry-fanout',
   // captcha
   VerifyCaptcha = 'verify-captcha',
   GetCaptchaSiteKey = 'get-captcha-site-key',
