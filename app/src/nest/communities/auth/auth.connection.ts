@@ -106,7 +106,7 @@ export class AuthConnection extends EventEmitter {
    */
   public start(): void {
     // Set up auth connection event handlers.
-    this.lfaConnection.on('connected', () => {
+    this.lfaConnection.on('connected', async () => {
       try {
         this.logger.debug(
           `Sending sync message because our chain is initialized`,
@@ -115,7 +115,14 @@ export class AuthConnection extends EventEmitter {
         const { team, user } = this.userContext
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- this is valid
         this.lfaConnection.emit('sync', { team, user })
+        const teamId = (team as Team).id
         this._status = AuthStatus.JOINED
+        this.logger.debug(
+          'Joining new socket to room on sign-in',
+          this.config.socket.id,
+          teamId,
+        )
+        await this.config.socket.join(teamId)
       } catch (e) {
         this.logger.error('Error while sending auth sync message', e)
       }

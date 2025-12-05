@@ -56,8 +56,9 @@ export function registerLogEntrySyncHandlers(
 
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions -- testing
       _logger.debug(`Rooms before fanout: ${Array.from(config.socket.rooms)}`)
-      config.socket
+      config.socketServer
         .to(message.payload.teamId)
+        .except(config.socket.id)
         .emit(WebsocketEvents.LogEntryFanout, message)
 
       // form and return a success response to the user

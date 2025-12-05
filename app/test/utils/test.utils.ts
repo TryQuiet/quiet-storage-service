@@ -1,5 +1,5 @@
-import { TestingModule } from '@nestjs/testing/testing-module'
-import { INestApplication } from '@nestjs/common/interfaces'
+import { TestingModule } from '@nestjs/testing'
+import { INestApplication } from '@nestjs/common'
 import Fastify from 'fastify'
 import {
   FastifyAdapter,
@@ -14,6 +14,8 @@ import { createLogger } from '../../src/nest/app/logger/logger.js'
 import { LISTEN_PORT } from '../../src/nest/app/const.js'
 import { QSSClientAuthConnection } from '../../src/client/client-auth-conn.js'
 import { InviteeMemberContext, MemberContext } from '@localfirst/auth'
+import { ConfigService } from '../../src/nest/utils/config/config.service.js'
+import { EnvVars } from '../../src/nest/utils/config/env_vars.js'
 
 export class TestUtils {
   public static clients: Map<string, TestClient> = new Map()
@@ -27,7 +29,6 @@ export class TestUtils {
   public static async startServer(testingModule: TestingModule): Promise<void> {
     this.module = testingModule
     this.adapter = new FastifyAdapter(
-      // @ts-expect-error Type is correct
       Fastify({
         logger: new NestFastifyLogger(),
       }),
@@ -45,7 +46,11 @@ export class TestUtils {
 
   public static async connectClient(username: string): Promise<TestClient> {
     this.logger.log(`Creating and connecting client socket`)
-    const client = this.app.get<WebsocketClient>(WebsocketClient)
+    // TODO: use moduleRef.create
+    const client = new WebsocketClient(
+      ConfigService.getInt(EnvVars.PORT)!,
+      ConfigService.getString(EnvVars.QSS_HOSTNAME)!,
+    )
     this.server = this.module.get<WebsocketGateway>(WebsocketGateway).io
     let serverSocket: ServerSocket | undefined = undefined
     this.server.on('connection', newSocket => {
