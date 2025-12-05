@@ -78,17 +78,7 @@ export function registerCommunitiesHandlers(
       )
       config.socket.data.usedCaptchaForCreateCommunity = true
 
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions -- testing
-      _logger.debug(`Rooms before join: ${Array.from(config.socket.rooms)}`)
-      _logger.debug(
-        `Joining socket to community room ${message.payload.community.teamId}`,
-      )
       await config.socket.join(message.payload.community.teamId)
-      _logger.debug(
-        `Joined socket to community room ${message.payload.community.teamId}`,
-      )
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions -- testing
-      _logger.debug(`Rooms after join: ${Array.from(config.socket.rooms)}`)
 
       // form and return a success response to the user
       let response: CreateCommunityResponse | undefined = undefined

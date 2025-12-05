@@ -422,14 +422,14 @@ describe('Communities', () => {
         )
       })
       testClient.sockets.client.on(
-        WebsocketEvents.LogEntryFanout,
+        WebsocketEvents.LogEntrySync,
         (message: LogEntrySyncMessage) => {
           logger.info('Sending client received fanned out message')
           sendingClientReceivedMessage = true
         },
       )
       secondTestClient.sockets.client.on(
-        WebsocketEvents.LogEntryFanout,
+        WebsocketEvents.LogEntrySync,
         (message: LogEntrySyncMessage) => {
           logger.info('Second client received fanned out message')
           secondClientReceivedMessage = true
