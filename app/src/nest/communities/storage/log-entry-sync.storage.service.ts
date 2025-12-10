@@ -37,7 +37,17 @@ export class LogEntrySyncStorageService implements OnModuleInit {
       const entity = this.payloadToEntity(payload)
       return await this.repository.add(entity)
     } catch (e) {
-      this.logger.error(`Error while writing log sync data to storage`, e)
+      let error: Error
+      if (e instanceof Error) {
+        error = e
+      } else {
+        error = new Error(String(e))
+      }
+      this.logger.info(`Error name: ${error.name}`)
+      if (error.name === 'UniqueConstraintViolationException') {
+        return true
+      }
+      this.logger.error(`Error while writing log sync data to storage`, error)
       return false
     }
   }
