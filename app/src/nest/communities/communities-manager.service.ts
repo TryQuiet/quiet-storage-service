@@ -389,7 +389,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     //       the object to a buffer
     const dbPayload: LogSyncEntry = {
       communityId: payload.teamId,
-      cid: payload.hashedDbId,
+      cid: payload.hash,
       entry: this.serializer.serialize(payload.encEntry),
       receivedAt: DateTime.utc(),
     }
