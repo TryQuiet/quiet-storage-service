@@ -30,28 +30,24 @@ export class PostgresRepo<T extends BasicEntityWithId> {
    *
    * @param entity Entity we are adding to the DB
    * @param upsert If true allow updating an existing record if found
+   * @throws Error if unable to add entity
    * @returns True if successfully added to the DB
    */
   public async add(entity: T, upsert = false): Promise<boolean> {
     // operation string to print in the log message
     const operation = upsert ? 'upserting' : 'adding'
-    try {
-      this.logger.verbose(`${operation} row`, entity)
-      // insert/upsert entity based on options passed in
-      await this.entityManager.transactional(async em => {
-        const repo = em.getRepository(this.entityName)
-        if (!upsert) {
-          await repo.insert(entity)
-        } else {
-          await repo.upsert(entity)
-        }
-        await em.commit()
-      })
-      return true
-    } catch (e) {
-      this.logger.error(`Error while ${operation} row`, e)
-      return false
-    }
+    this.logger.verbose(`${operation} row`, entity)
+    // insert/upsert entity based on options passed in
+    await this.entityManager.transactional(async em => {
+      const repo = em.getRepository(this.entityName)
+      if (!upsert) {
+        await repo.insert(entity)
+      } else {
+        await repo.upsert(entity)
+      }
+      await em.commit()
+    })
+    return true
   }
 
   /**

@@ -1,73 +1,71 @@
-import { jest } from '@jest/globals'
-import { Test, TestingModule } from '@nestjs/testing'
+/* eslint-disable @typescript-eslint/no-unsafe-type-assertion -- I don't have time to fix these rn*/
+/* eslint-disable @typescript-eslint/no-unsafe-member-access -- I don't have time to fix these rn */
+/* eslint-disable @typescript-eslint/no-unsafe-argument -- I don't have time to fix these rn*/
+import { Test, type TestingModule } from '@nestjs/testing'
 import { TestUtils } from '../../utils/test.utils.js'
 import { TeamTestUtils } from '../../utils/team.utils.js'
-import { TestClient, TestTeam } from '../../utils/types.js'
+import type { TestClient, TestTeam } from '../../utils/types.js'
 import { WebsocketEvents } from '../../../src/nest/websocket/ws.types.js'
 import { DateTime } from 'luxon'
 import { createLogger } from '../../../src/nest/app/logger/logger.js'
 import { AppModule } from '../../../src/nest/app/app.module.js'
 import { CommunitiesManagerService } from '../../../src/nest/communities/communities-manager.service.js'
-import { GeneratePublicKeysMessage } from '../../../src/nest/communities/websocket/types/gen-pub-keys.types.js'
+import type { GeneratePublicKeysMessage } from '../../../src/nest/communities/websocket/types/gen-pub-keys.types.js'
 import {
   createDevice,
   createUser,
-  DeviceWithSecrets,
-  generateProof,
-  InviteeMemberContext,
-  InviteResult,
-  LocalUserContext,
-  Server,
+  type DeviceWithSecrets,
+  type InviteResult,
+  type LocalUserContext,
+  type Server,
 } from '@localfirst/auth'
 import {
-  LogSyncEntry,
-  Community,
-  EncryptedAndSignedPayload,
+  type Community,
+  type EncryptedAndSignedPayload,
   EncryptionScopeType,
 } from '../../../src/nest/communities/types.js'
 import { SodiumHelper } from '../../../src/nest/encryption/sodium.helper.js'
 import * as uint8arrays from 'uint8arrays'
-import { Keyset, redactUser } from '@localfirst/crdx'
+import type { Keyset } from '@localfirst/crdx'
 import { CommunityOperationStatus } from '../../../src/nest/communities/websocket/types/common.types.js'
 import {
-  CreateCommunity,
-  CreateCommunityResponse,
+  type CreateCommunity,
+  type CreateCommunityResponse,
   CreateCommunityStatus,
 } from '../../../src/nest/communities/websocket/types/create-community.types.js'
 import { CommunitiesStorageService } from '../../../src/nest/communities/storage/communities.storage.service.js'
-import { CommunitySignInMessage } from '../../../src/nest/communities/websocket/types/community-sign-in.types.js'
-import waitForExpect from 'wait-for-expect'
-import { QSSClientAuthConnection } from '../../../src/client/client-auth-conn.js'
+import type { CommunitySignInMessage } from '../../../src/nest/communities/websocket/types/community-sign-in.types.js'
 import { ClientEvents } from '../../../src/client/ws.client.events.js'
 import { ServerKeyManagerService } from '../../../src/nest/encryption/server-key-manager.service.js'
-import {
+import type {
   LogEntrySyncMessage,
   LogEntrySyncPayload,
 } from '../../../src/nest/communities/websocket/types/log-entry-sync.types.js'
 import { LogEntrySyncStorageService } from '../../../src/nest/communities/storage/log-entry-sync.storage.service.js'
-import { Serializer } from '../../../src/nest/utils/serialization/serializer.service.js'
+import type { Serializer } from '../../../src/nest/utils/serialization/serializer.service.js'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- necessary?
 import _ from 'lodash'
 import { SERIALIZER } from '../../../src/nest/app/const.js'
 import {
-  CaptchaVerifyMessage,
+  type CaptchaVerifyMessage,
   HCAPTCHA_TEST_TOKEN,
 } from '../../../src/nest/communities/websocket/types/captcha.types.js'
+import { WebsocketGateway } from '../../../src/nest/websocket/ws.gateway.js'
+import { waitFor } from '../../utils/waitFor.js'
 
 describe('Communities', () => {
   let testClient: TestClient
   let secondTestClient: TestClient
   let invalidTestClient: TestClient
-  let authConnection: QSSClientAuthConnection
-  let secondAuthConnection: QSSClientAuthConnection
-  let invalidAuthConnection: QSSClientAuthConnection
-  let clientContext: LocalUserContext
   let secondClientContext: LocalUserContext
   let invalidClientContext: LocalUserContext
   let invite: InviteResult
 
   let testingModule: TestingModule
   let communitiesManagerService: CommunitiesManagerService
+  let websocketGateway: WebsocketGateway
   let sodiumHelper: SodiumHelper
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- keeping for future convenience
   let storage: CommunitiesStorageService
   let dataSyncStorage: LogEntrySyncStorageService
   let serializer: Serializer
@@ -93,6 +91,7 @@ describe('Communities', () => {
     }).compile()
 
     await TestUtils.startServer(testingModule)
+    websocketGateway = testingModule.get<WebsocketGateway>(WebsocketGateway)
     communitiesManagerService = testingModule.get<CommunitiesManagerService>(
       CommunitiesManagerService,
     )
@@ -157,7 +156,8 @@ describe('Communities', () => {
           message,
           true,
         )
-      expect(response.status).toBe(CommunityOperationStatus.SUCCESS)
+      expect(response).toBeDefined()
+      expect(response!.status).toBe(CommunityOperationStatus.SUCCESS)
     })
 
     it('should get public keys from server', async () => {
@@ -240,7 +240,7 @@ describe('Communities', () => {
         expect.objectContaining({
           ts: expect.any(Number),
           status: CreateCommunityStatus.SUCCESS,
-        } as CreateCommunityResponse),
+        } satisfies CreateCommunityResponse),
       )
     })
 
@@ -261,13 +261,22 @@ describe('Communities', () => {
     it('should start an auth connection with QSS and successfully authorize', async () => {
       testClient.authConnection = await TestUtils.startAuthConnection(
         testTeam.team.id,
-        { ...testTeam.testUserContext, team: testTeam.team },
+        {
+          ...testTeam.testUserContext,
+          team: testTeam.team,
+        },
       )
-      let authorized: boolean = false
+      let authorized = false
+
       testClient.authConnection.on(ClientEvents.AuthJoined, () => {
         authorized = true
       })
-      await waitForExpect(() => expect(authorized).toBe(true), 30_000)
+      await waitFor(
+        () => {
+          expect(authorized).toBe(true)
+        },
+        { timeout: 30_000 },
+      )
     })
   })
 
@@ -284,12 +293,11 @@ describe('Communities', () => {
         userId: prospectiveUser.userId,
         deviceName: SECOND_DEVICE_NAME,
       })
-      const inviteProof = generateProof(invite.seed)
+
       secondClientContext = {
         user: prospectiveUser,
         device: prospectiveDevice,
-        invitationSeed: invite.seed,
-      } as InviteeMemberContext
+      }
 
       const message: CommunitySignInMessage = {
         ts: DateTime.utc().toMillis(),
@@ -310,8 +318,14 @@ describe('Communities', () => {
         expect.objectContaining({
           ts: expect.any(Number),
           status: CommunityOperationStatus.SUCCESS,
-        } as CommunitySignInMessage),
+        } satisfies CommunitySignInMessage),
       )
+    })
+
+    it('the user should be in a room corresponding to their team id after signing in', () => {
+      // eslint-disable-next-line @typescript-eslint/prefer-destructuring -- false positive?
+      const { rooms } = websocketGateway.io.sockets.adapter
+      expect(rooms.has(testTeam.team.id)).toBe(true)
     })
 
     it('should validate that the community has been updated with second user', async () => {
@@ -331,36 +345,113 @@ describe('Communities', () => {
     it('should start an auth connection with QSS and successfully authorize the second user', async () => {
       secondTestClient.authConnection = await TestUtils.startAuthConnection(
         testTeam.team.id,
-        { ...secondClientContext, invitationSeed: invite.seed },
+        {
+          ...secondClientContext,
+          invitationSeed: invite.seed,
+        },
       )
-      let authorized: boolean = false
+      let authorized = false
       secondTestClient.authConnection.on(ClientEvents.AuthJoined, () => {
         authorized = true
       })
-      await waitForExpect(() => expect(authorized).toBe(true), 30_000)
+      await waitFor(
+        () => {
+          expect(authorized).toBe(true)
+        },
+        { timeout: 30_000 },
+      )
     })
 
     it('should validate that the sigchain is updated for QSS and the original user', async () => {
-      await waitForExpect(async () => {
-        const managedCommunity = await communitiesManagerService.get(
-          testTeam.team.id,
-        )
-        expect(managedCommunity).toBeDefined()
-        expect(
-          managedCommunity!.sigChain.team.memberByDeviceId(
-            secondClientContext.device.deviceId,
-          ),
-        ).toBeDefined()
-        expect(
-          testTeam.team.memberByDeviceId(secondClientContext.device.deviceId),
-        ).toBeDefined()
-      }, 15_000)
+      await waitFor(
+        async () => {
+          const managedCommunity = await communitiesManagerService.get(
+            testTeam.team.id,
+          )
+          expect(managedCommunity).toBeDefined()
+
+          expect(
+            managedCommunity!.sigChain.team.memberByDeviceId(
+              secondClientContext.device.deviceId,
+            ),
+          ).toBeDefined()
+
+          expect(
+            testTeam.team.memberByDeviceId(secondClientContext.device.deviceId),
+          ).toBeDefined()
+        },
+        { timeout: 15_000 },
+      )
     })
   })
 
   describe('Data Sync', () => {
     let logSyncMessage: LogEntrySyncMessage
     let logSyncAck: LogEntrySyncMessage | undefined
+    let sendingClientReceivedMessage = false
+    let secondClientReceivedMessage = false
+
+    beforeAll(() => {
+      testClient.sockets.client.onAny((...args: unknown[]) => {
+        logger.debug(
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions -- testing
+          `testClient.sockets.client ${testClient.sockets.client.id} received event: ${args[0]}`,
+          ...args.slice(1),
+        )
+      })
+      secondTestClient.sockets.client.onAny((...args: unknown[]) => {
+        logger.debug(
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions -- testing
+          `secondTestClient.sockets.client ${secondTestClient.sockets.client.id} received event: ${args[0]}`,
+          ...args.slice(1),
+        )
+      })
+
+      testClient.client.clientSocket?.onAny((...args: unknown[]) => {
+        logger.debug(
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions -- testing
+          `testClient.client.clientSocket ${testClient.client.clientSocket?.id} received event: ${args[0]}`,
+          ...args.slice(1),
+        )
+      })
+      secondTestClient.client.clientSocket?.onAny((...args: unknown[]) => {
+        logger.debug(
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions -- testing
+          `secondTestClient.client.clientSocket ${secondTestClient.client.clientSocket?.id} received event: ${args[0]}`,
+          ...args.slice(1),
+        )
+      })
+      testClient.sockets.client.on(
+        WebsocketEvents.LogEntrySync,
+        (message: LogEntrySyncMessage) => {
+          logger.info('Sending client received fanned out message')
+          sendingClientReceivedMessage = true
+        },
+      )
+      secondTestClient.sockets.client.on(
+        WebsocketEvents.LogEntrySync,
+        (message: LogEntrySyncMessage) => {
+          logger.info('Second client received fanned out message')
+          secondClientReceivedMessage = true
+        },
+      )
+    })
+
+    it('should have both users in the teams socketio room', () => {
+      // eslint-disable-next-line @typescript-eslint/prefer-destructuring -- false positive?
+      const { rooms } = websocketGateway.io.sockets.adapter
+      const room = rooms.get(testTeam.team.id)
+      expect(room).toBeDefined()
+      expect(room!.size).toBe(2)
+
+      logger.info('Room members:', Array.from(room!))
+      logger.info('Test client socket id:', testClient.sockets.client.id)
+      logger.info(
+        'Second test client socket id:',
+        secondTestClient.sockets.client.id,
+      )
+    })
+
     it('client should send a data sync message', async () => {
       const rawMessage = 'this is a message'
       const encryptedMessage = testTeam.team.encrypt(rawMessage, 'member')
@@ -395,6 +486,7 @@ describe('Communities', () => {
         status: CommunityOperationStatus.SENDING,
         payload: logSyncPayload,
       }
+
       logSyncAck = await testClient.client.sendMessage<LogEntrySyncMessage>(
         WebsocketEvents.LogEntrySync,
         logSyncMessage,
@@ -423,34 +515,45 @@ describe('Communities', () => {
         )
       expect(storedSyncContents).not.toBeNull()
       expect(storedSyncContents!.length).toBe(1)
-      const contents = storedSyncContents![0]
-      expect(contents.cid).toBe(logSyncMessage.payload.hashedDbId)
+      const [contents] = storedSyncContents!
+      expect(contents.cid).toBe(logSyncMessage.payload.hash)
       expect(contents.communityId).toBe(testTeam.team.id)
+
       const deserializedContents = serializer.deserialize(
         contents.entry,
       ) as EncryptedAndSignedPayload
       expect(deserializedContents).toEqual(
         expect.objectContaining({
-          userId: logSyncMessage.payload.encEntry!.userId,
-          ts: logSyncMessage.payload.encEntry!.ts,
-          teamId: logSyncMessage.payload.encEntry!.teamId,
-          signature: logSyncMessage.payload.encEntry!.signature,
+          userId: logSyncMessage.payload.encEntry.userId,
+          ts: logSyncMessage.payload.encEntry.ts,
+          teamId: logSyncMessage.payload.encEntry.teamId,
+          signature: logSyncMessage.payload.encEntry.signature,
           encrypted: expect.objectContaining({
             contents: expect.any(Buffer),
             scope: {
-              name: logSyncMessage.payload.encEntry!.encrypted.scope.name,
-              type: logSyncMessage.payload.encEntry!.encrypted.scope.type,
+              name: logSyncMessage.payload.encEntry.encrypted.scope.name,
+              type: logSyncMessage.payload.encEntry.encrypted.scope.type,
               generation:
-                logSyncMessage.payload.encEntry!.encrypted.scope.generation,
+                logSyncMessage.payload.encEntry.encrypted.scope.generation,
             },
           }),
         }),
       )
+
       expect(
         serializer.bufferToUint8array(
           deserializedContents.encrypted.contents as Buffer,
         ),
-      ).toStrictEqual(logSyncMessage.payload.encEntry?.encrypted.contents)
+      ).toStrictEqual(logSyncMessage.payload.encEntry.encrypted.contents)
+    })
+
+    it('should have fanned out log entry to second user', () => {
+      logger.info('sendingClientReceivedMessage', sendingClientReceivedMessage)
+      logger.info('secondClientReceivedMessage', secondClientReceivedMessage)
+
+      expect(!sendingClientReceivedMessage && secondClientReceivedMessage).toBe(
+        true,
+      )
     })
   })
 
@@ -464,7 +567,7 @@ describe('Communities', () => {
       invalidClientContext = {
         user: invalidUser,
         device: invalidDevice,
-      } as LocalUserContext
+      }
 
       const message: CommunitySignInMessage = {
         ts: DateTime.utc().toMillis(),
@@ -486,7 +589,7 @@ describe('Communities', () => {
         expect.objectContaining({
           ts: expect.any(Number),
           status: CommunityOperationStatus.SUCCESS,
-        } as CommunitySignInMessage),
+        } satisfies CommunitySignInMessage),
       )
     })
 
@@ -509,34 +612,46 @@ describe('Communities', () => {
     it('should start an auth connection with QSS and fail to authorize the invalid user', async () => {
       secondTestClient.authConnection = await TestUtils.startAuthConnection(
         testTeam.team.id,
-        { ...invalidClientContext, invitationSeed: 'foobar' },
+        {
+          ...invalidClientContext,
+          invitationSeed: 'foobar',
+        },
       )
-      let authorized: boolean = false
-      let disconnected: boolean = false
+      let authorized = false
+      let disconnected = false
       secondTestClient.authConnection.on(ClientEvents.AuthJoined, () => {
         authorized = true
       })
       secondTestClient.authConnection.on(ClientEvents.AuthDisconnected, () => {
         disconnected = true
       })
-      await waitForExpect(() => expect(disconnected).toBe(true), 30_000)
+
+      await waitFor(
+        () => {
+          expect(disconnected).toBe(true)
+        },
+        { timeout: 30_000 },
+      )
       expect(authorized).toBe(false)
     })
 
     it(`should validate that the invalid client's auth connection should be closed and removed from QSS`, async () => {
-      await waitForExpect(async () => {
-        const managedCommunity = await communitiesManagerService.get(
-          testTeam.team.id,
-        )
-        expect(managedCommunity).toBeDefined()
-        expect(managedCommunity!.authConnections).toBeDefined()
-        expect(managedCommunity!.authConnections!.size).toBe(2)
-        expect(
-          managedCommunity!.authConnections!.has(
-            invalidClientContext.user.userId,
-          ),
-        ).toBe(false)
-      }, 15_000)
+      await waitFor(
+        async () => {
+          const managedCommunity = await communitiesManagerService.get(
+            testTeam.team.id,
+          )
+          expect(managedCommunity).toBeDefined()
+          expect(managedCommunity!.authConnections).toBeDefined()
+          expect(managedCommunity!.authConnections!.size).toBe(2)
+          expect(
+            managedCommunity!.authConnections!.has(
+              invalidClientContext.user.userId,
+            ),
+          ).toBe(false)
+        },
+        { timeout: 15_000 },
+      )
     })
 
     it('should validate that the sigchains on QSS and the original client do not include the invalid user', async () => {
@@ -544,11 +659,13 @@ describe('Communities', () => {
         testTeam.team.id,
       )
       expect(managedCommunity).toBeDefined()
+
       expect(() =>
         managedCommunity!.sigChain.team.memberByDeviceId(
           invalidClientContext.device.deviceId,
         ),
       ).toThrow()
+
       expect(() =>
         testTeam.team.memberByDeviceId(invalidClientContext.device.deviceId),
       ).toThrow()

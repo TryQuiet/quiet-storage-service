@@ -54,6 +54,12 @@ export function registerLogEntrySyncHandlers(
         throw new Error('Failed to write log entry sync message to the DB')
       }
 
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions -- testing
+      config.socketServer
+        .to(message.payload.teamId)
+        .except(config.socket.id)
+        .emit(WebsocketEvents.LogEntrySync, message)
+
       // form and return a success response to the user
       let response: LogEntrySyncResponseMessage | undefined = undefined
       response = {

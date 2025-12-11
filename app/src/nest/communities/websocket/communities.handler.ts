@@ -78,6 +78,8 @@ export function registerCommunitiesHandlers(
       )
       config.socket.data.usedCaptchaForCreateCommunity = true
 
+      await config.socket.join(message.payload.community.teamId)
+
       // form and return a success response to the user
       let response: CreateCommunityResponse | undefined = undefined
       response = {

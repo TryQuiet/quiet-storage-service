@@ -389,7 +389,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     //       the object to a buffer
     const dbPayload: LogSyncEntry = {
       communityId: payload.teamId,
-      cid: payload.hashedDbId,
+      cid: payload.hash,
       entry: this.serializer.serialize(payload.encEntry),
       receivedAt: DateTime.utc(),
     }
@@ -399,7 +399,6 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         'Data sync successfully written to the DB',
         dbPayload.cid,
       )
-      // TODO: add fanout logic
     } else {
       this.logger.error('Data sync write to DB was unsuccessful', dbPayload.cid)
     }
