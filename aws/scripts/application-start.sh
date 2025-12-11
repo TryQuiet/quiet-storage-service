@@ -7,7 +7,8 @@ then
   sudo pm2 --name QSS start pnpm -- start:prod
 elif [ $ENVIRONMENT == "Development" ]
 then
-  sudo pm2 --name QSS start pnpm -- start:dev
+  # sudo pm2 --name QSS start pnpm -- start:dev
+  pm2 restart QSS --cron-restart 0
 else
   echo "Unknown environment: $ENVIRONMENT"
   exit 1
