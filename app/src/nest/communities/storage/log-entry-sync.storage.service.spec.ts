@@ -47,7 +47,7 @@ describe('LogEntrySyncStorageService', () => {
     expect(await logSyncStorageService?.addLogEntry(data)).toBe(true)
   })
 
-  it('should fail to write a log entry to postgres on duplicate ID', async () => {
+  it('should succeed but not write a log entry to postgres on duplicate ID', async () => {
     const cid = sodiumHelper!.sodium.to_hex(
       sodiumHelper!.sodium.randombytes_buf(32),
     )
@@ -65,7 +65,7 @@ describe('LogEntrySyncStorageService', () => {
       communityId: 'communityId',
       receivedAt: DateTime.utc(),
     }
-    expect(await logSyncStorageService?.addLogEntry(dupeIdData)).toBe(false)
+    expect(await logSyncStorageService?.addLogEntry(dupeIdData)).toBe(true)
   })
 
   it('should write and then get an array of all records for a community ID', async () => {

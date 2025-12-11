@@ -516,7 +516,7 @@ describe('Communities', () => {
       expect(storedSyncContents).not.toBeNull()
       expect(storedSyncContents!.length).toBe(1)
       const [contents] = storedSyncContents!
-      expect(contents.cid).toBe(logSyncMessage.payload.hashedDbId)
+      expect(contents.cid).toBe(logSyncMessage.payload.hash)
       expect(contents.communityId).toBe(testTeam.team.id)
 
       const deserializedContents = serializer.deserialize(

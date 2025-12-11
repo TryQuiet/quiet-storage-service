@@ -444,7 +444,7 @@ describe('CommunitiesManagerService', () => {
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(1)
       const contents = storedSyncContents![0]
-      expect(contents.cid).toBe(payload.hashedDbId)
+      expect(contents.cid).toBe(payload.hash)
       expect(contents.communityId).toBe(testTeam.team.id)
       const deserializedContents = serializer!.deserialize(
         contents.entry,
