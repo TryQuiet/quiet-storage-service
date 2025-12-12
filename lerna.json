@@ -7,7 +7,9 @@
       "allowBranch": ["chore/better-deploys"],
       "conventionalCommits": true,
       "createRelease": "github",
-      "changelogPreset": "conventionalcommits"
+      "changelogPreset": "conventionalcommits",
+      "conventionalPrerelease": true,
+      "changelog": true
     }
   }
 }

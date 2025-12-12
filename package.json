@@ -32,7 +32,7 @@
     "start:client:dev": "pnpm run --filter app start:client:dev",
     "run:app": "pnpm run --filter app ",
     "prepare": "husky",
-    "publish": "lerna version --force-publish"
+    "publish": "lerna version --force-publish -m \"chore(release): publish %s\""
   },
   "devDependencies": {
     "@herbcaudill/random": "^0.3.0",
