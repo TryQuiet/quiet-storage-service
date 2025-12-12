@@ -9,7 +9,9 @@
       "createRelease": "github",
       "changelogPreset": "conventionalcommits",
       "conventionalPrerelease": true,
-      "changelog": true
+      "changelog": true,
+      "forcePublish": true,
+      "message": "chore(release): publish %s"
     }
   }
 }
