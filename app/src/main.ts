@@ -10,7 +10,6 @@ const logger = createLogger('Main')
 
 /**
  * Initialize the QSS Nest app and start the server
- * test
  */
 async function bootstrap(): Promise<void> {
   logger.log(`Bootstrapping QSS`)
@@ -21,7 +20,7 @@ async function bootstrap(): Promise<void> {
   const qss = context.get<QSSService>(QSSService)
   await qss.init()
   await qss.start()
-  logger.log(`Done bootstrapping QSS test`)
+  logger.log(`Done bootstrapping QSS`)
 }
 
 bootstrap().catch((reason: unknown) => {
