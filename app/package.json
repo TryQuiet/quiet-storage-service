@@ -1,6 +1,6 @@
 {
   "name": "app",
-  "version": "1.0.0-alpha.26",
+  "version": "1.0.0-alpha.41",
   "description": "",
   "author": "",
   "private": true,
@@ -13,6 +13,7 @@
   "main": "./dist/src/main.js",
   "exports": "./dist/src/main.js",
   "scripts": {
+    "preversion": "git add -A src",
     "build": "nest build",
     "bootstrap:deployed": "pnpm run build:submodules:deployed && yes | pnpm i --frozen-lockfile --child-concurrency 10 --stream && pnpm run build && yes | pnpm i --frozen-lockfile --prod --child-concurrency 10 --stream",
     "format": "prettier \"./(src|test)/**/*.ts\" --check",

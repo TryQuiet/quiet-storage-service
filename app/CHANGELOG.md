@@ -1,27 +1,9 @@
-# app
+# Change Log
 
-## 1.0.0-alpha.0
+All notable changes to this project will be documented in this file. See
+[Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
-### Major Changes
+## 1.0.0-alpha.41 (2025-12-12)
 
-- d4a7498: - Updates web server to use Fastify and socket.io
-  - Adds websocket integration
-  - Adds better environment configuration
-  - Adds Postgres/RDS support
-  - Adds Community operations via socket connections
-  - Adds DB migrations
-  - Adds better logging
-  - Adds E2EE on socket connections
-  - Adds basic client tool:
-
-## 1.0.0-alpha.23
-
-### Major Changes
-
-- - Reorganize code
-  - Add bootstrapper
-  - Standardize websocket message formats
-  - Remove websocket keypair encryption
-  - Initialize sigchains and auth syncing with clients
-  - Expanded e2e tests
-  - Add dockerization for testing in Quiet
+- Update handling of changelogs and publishing/deploys
+  ([cc2ea16](https://github.com/TryQuiet/quiet-storage-service/commit/cc2ea16))
