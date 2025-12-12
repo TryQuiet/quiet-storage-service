@@ -11,7 +11,8 @@
       "conventionalPrerelease": true,
       "changelog": true,
       "forcePublish": true,
-      "message": "chore(release): publish %s"
+      "message": "chore(release): publish %s",
+      "push": true
     }
   }
 }

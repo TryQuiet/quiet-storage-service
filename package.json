@@ -1,6 +1,6 @@
 {
   "name": "quiet-storage-service",
-  "version": "1.0.0-alpha.40",
+  "version": "1.0.0-alpha.41",
   "description": "",
   "author": "",
   "private": true,
@@ -32,7 +32,8 @@
     "start:client:dev": "pnpm run --filter app start:client:dev",
     "run:app": "pnpm run --filter app ",
     "prepare": "husky",
-    "publish": "lerna version"
+    "publish": "lerna version",
+    "postpublish": "node copy-changelog.cjs && git add . && git commit -m 'Update app package CHANGELOG.md' && git push"
   },
   "devDependencies": {
     "@herbcaudill/random": "^0.3.0",
