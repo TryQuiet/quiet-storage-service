@@ -101,6 +101,10 @@ export class AuthConnection extends EventEmitter {
     return this._status
   }
 
+  public get socketId(): string {
+    return this.config.socket.id
+  }
+
   /**
    * Start the auth sync connection and handle connection events
    */

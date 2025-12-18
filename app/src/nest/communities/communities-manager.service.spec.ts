@@ -428,7 +428,11 @@ describe('CommunitiesManagerService', () => {
       let error: Error | undefined = undefined
       let written = false
       try {
-        written = await manager!.processIncomingLogEntrySyncMessage(payload)
+        // TOOD: fix the error below. In production, we require the client socket to ensure the connected user has permissions, add the socket reference matching the socket used in the auth connection above
+        written = await manager!.processIncomingLogEntrySyncMessage(
+          payload,
+          wsConfig!.socket,
+        )
       } catch (e) {
         error = e as Error
       }
@@ -505,7 +509,10 @@ describe('CommunitiesManagerService', () => {
       let error: Error | undefined = undefined
       let written = false
       try {
-        written = await manager!.processIncomingLogEntrySyncMessage(payload)
+        written = await manager!.processIncomingLogEntrySyncMessage(
+          payload,
+          wsConfig!.socket,
+        )
       } catch (e) {
         error = e as Error
       }
@@ -563,7 +570,10 @@ describe('CommunitiesManagerService', () => {
       let error: Error | undefined = undefined
       let written = false
       try {
-        written = await manager!.processIncomingLogEntrySyncMessage(payload)
+        written = await manager!.processIncomingLogEntrySyncMessage(
+          payload,
+          wsConfig!.socket,
+        )
       } catch (e) {
         error = e as Error
       }
@@ -621,7 +631,10 @@ describe('CommunitiesManagerService', () => {
       let error: Error | undefined = undefined
       let written = false
       try {
-        written = await manager!.processIncomingLogEntrySyncMessage(payload)
+        written = await manager!.processIncomingLogEntrySyncMessage(
+          payload,
+          wsConfig!.socket,
+        )
       } catch (e) {
         error = e as Error
       }
@@ -654,7 +667,10 @@ describe('CommunitiesManagerService', () => {
       let error: Error | undefined = undefined
       let written = false
       try {
-        written = await manager!.processIncomingLogEntrySyncMessage(payload)
+        written = await manager!.processIncomingLogEntrySyncMessage(
+          payload,
+          wsConfig!.socket,
+        )
       } catch (e) {
         error = e as Error
       }
@@ -713,7 +729,10 @@ describe('CommunitiesManagerService', () => {
       let error: Error | undefined = undefined
       let written = false
       try {
-        written = await manager!.processIncomingLogEntrySyncMessage(payload)
+        written = await manager!.processIncomingLogEntrySyncMessage(
+          payload,
+          wsConfig!.socket,
+        )
       } catch (e) {
         error = e as Error
       }

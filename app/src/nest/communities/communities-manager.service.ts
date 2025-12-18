@@ -42,7 +42,10 @@ import { Socket } from 'socket.io'
 import { AuthDisconnectedPayload, AuthEvents } from './auth/auth.events.js'
 import { DateTime } from 'luxon'
 import { LogEntrySyncStorageService } from './storage/log-entry-sync.storage.service.js'
-import { LogEntrySyncPayload } from './websocket/types/log-entry-sync.types.js'
+import {
+  LogEntryPullPayload,
+  LogEntrySyncPayload,
+} from './websocket/types/log-entry-sync.types.js'
 import { Serializer } from '../utils/serialization/serializer.service.js'
 
 @Injectable()
@@ -380,9 +383,16 @@ export class CommunitiesManagerService implements OnModuleDestroy {
    */
   public async processIncomingLogEntrySyncMessage(
     payload: LogEntrySyncPayload,
+    socket: Socket,
   ): Promise<boolean> {
     const managedCommunity = await this.get(payload.teamId)
-    this._validateIncomingSyncMessage(payload, managedCommunity)
+    this._validateSyncPermission(
+      payload.encEntry.userId,
+      payload.teamId,
+      managedCommunity,
+      socket,
+    )
+    this._validateIncomingSyncMessage(payload)
 
     // convert the message payload to a form writable to the DB
     // NOTE: the entry field is a binary column in postgres so we must losslessly serialize
@@ -390,6 +400,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     const dbPayload: LogSyncEntry = {
       communityId: payload.teamId,
       cid: payload.hash,
+      hashedDbId: payload.hashedDbId,
       entry: this.serializer.serialize(payload.encEntry),
       receivedAt: DateTime.utc(),
     }
@@ -407,32 +418,80 @@ export class CommunitiesManagerService implements OnModuleDestroy {
   }
 
   /**
+   *
+   * @param payload LogEntryPullPayload
+   * @param socket The reference to the client socket
+   * @returns LogSyncEntry[] matching the payload request
+   * @throws When client does not have permission to access the requested entries
+   */
+  public async getLogEntriesForPullMessage(
+    payload: LogEntryPullPayload,
+    socket: Socket,
+  ): Promise<LogEntrySyncPayload[]> {
+    const managedCommunity = await this.get(payload.teamId)
+    this._validateSyncPermission(
+      payload.teamId,
+      payload.userId,
+      managedCommunity,
+      socket,
+    )
+
+    if (payload.startTs == null) {
+      throw new Error(`startTs must be provided in log entry pull message`)
+    }
+
+    const entries = await this.logEntrySyncStorage.getLogEntriesForCommunity(
+      payload.teamId,
+      payload.startTs,
+    )
+
+    if (entries == null) return []
+
+    return entries.map(entry => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- we know this is the correct type
+      const deserialized = this.serializer.deserialize(
+        entry.entry,
+      ) as LogEntrySyncPayload['encEntry']
+      return {
+        teamId: payload.teamId,
+        hash: entry.cid,
+        hashedDbId: entry.hashedDbId,
+        encEntry: deserialized,
+      }
+    })
+  }
+
+  /**
    * Validate that this user can write a sync entry to this community
    *
    * @param payload Data sync payload containing the encrypted oplog entry we are writing to the DB
    * @param managedCommunity Community this data sync is associated with
    */
-  private _validateIncomingSyncMessage(
-    payload: LogEntrySyncPayload,
+  private _validateSyncPermission(
+    userId: string,
+    teamId: string,
     managedCommunity: ManagedCommunity | undefined,
+    socket: Socket,
   ): void {
     if (managedCommunity == null) {
-      throw new CommunityNotFoundError(payload.teamId)
+      throw new CommunityNotFoundError(teamId)
     }
 
     // check if we have an auth connection for this user before anything else to make sure
     // they have signed in already
     if (
       managedCommunity.authConnections == null ||
-      !managedCommunity.authConnections.has(payload.encEntry.userId)
+      !managedCommunity.authConnections.has(userId)
     ) {
       throw new AuthenticationError(`User hasn't signed in to this community`)
     }
 
-    const authConnection = managedCommunity.authConnections.get(
-      payload.encEntry.userId,
-    )!
-
+    const authConnection = managedCommunity.authConnections.get(userId)!
+    if (authConnection.socketId !== socket.id) {
+      throw new AuthenticationError(
+        `Socket ID associated with userId does not match authenticated connection`,
+      )
+    }
     // validate that the user has successfully authenticated on this community
     switch (authConnection.status) {
       // if the user has just attempted to sign in we may not have validated that they are part of the community
@@ -457,7 +516,9 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         )
         break
     }
+  }
 
+  private _validateIncomingSyncMessage(payload: LogEntrySyncPayload): void {
     // validate that the user ID on the signature matches the one on the entry
     if (payload.encEntry.userId !== payload.encEntry.signature.author.name) {
       const entryUserId = payload.encEntry.userId ?? 'USER_ID_UNDEFINED'

@@ -10,6 +10,8 @@ import {
   CommunityOperationStatus,
 } from './types/index.js'
 import type {
+  LogEntryPullMessage,
+  LogEntryPullResponseMessage,
   LogEntrySyncMessage,
   LogEntrySyncResponseMessage,
 } from './types/log-entry-sync.types.js'
@@ -48,6 +50,7 @@ export function registerLogEntrySyncHandlers(
       const success =
         await config.communitiesManager.processIncomingLogEntrySyncMessage(
           message.payload,
+          config.socket,
         )
 
       if (!success) {
@@ -80,7 +83,8 @@ export function registerLogEntrySyncHandlers(
         e instanceof AuthenticationError ||
         e instanceof CommunityNotFoundError
       ) {
-        reason = e.message
+        const { message: errorMessage } = e
+        reason = errorMessage
       }
 
       const errorResponse: LogEntrySyncResponseMessage = {
@@ -97,6 +101,47 @@ export function registerLogEntrySyncHandlers(
     }
   }
 
+  async function handleLogEntryPull(
+    message: LogEntryPullMessage,
+    callback: (payload: LogEntryPullResponseMessage) => void,
+  ): Promise<void> {
+    _logger.debug(`Handling community log entry pull message`)
+    try {
+      const payload =
+        await config.communitiesManager.getLogEntriesForPullMessage(
+          message.payload,
+          config.socket,
+        )
+
+      // form and return a success response to the user
+      const response: LogEntryPullResponseMessage = {
+        ts: DateTime.utc().toMillis(),
+        status: CommunityOperationStatus.SUCCESS,
+        payload,
+      }
+      callback(response)
+    } catch (e) {
+      _logger.error(`Error while processing log entry pull event`, e)
+      let reason = `Error while handling log entry pull message`
+      if (
+        e instanceof AuthenticationError ||
+        e instanceof CommunityNotFoundError
+      ) {
+        const { message: errorMessage } = e
+        reason = errorMessage
+      }
+
+      const errorResponse: LogEntryPullResponseMessage = {
+        ts: DateTime.utc().toMillis(),
+        status: CommunityOperationStatus.ERROR,
+        reason,
+        payload: [],
+      }
+      callback(errorResponse)
+    }
+  }
+
   // register event handlers on this socket
   config.socket.on(WebsocketEvents.LogEntrySync, handleLogEntrySync)
+  config.socket.on(WebsocketEvents.LogEntryPull, handleLogEntryPull)
 }

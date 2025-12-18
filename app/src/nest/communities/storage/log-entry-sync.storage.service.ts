@@ -84,6 +84,7 @@ export class LogEntrySyncStorageService implements OnModuleInit {
       id: payload.cid,
       communityId: payload.communityId,
       entry: payload.entry,
+      hashedDbId: payload.hashedDbId,
       receivedAt: payload.receivedAt.toUTC().toISO(),
       createdAt: DateTime.utc().toISO(),
     })
@@ -95,6 +96,7 @@ export class LogEntrySyncStorageService implements OnModuleInit {
       communityId: entity.communityId,
       entry: entity.entry,
       cid: entity.id,
+      hashedDbId: entity.hashedDbId,
       receivedAt: DateTime.fromJSDate(new Date(entity.receivedAt)).toUTC(),
     }
   }

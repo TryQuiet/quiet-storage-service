@@ -30,3 +30,29 @@ export interface LogEntrySyncResponseMessage
   reason?: string
   payload: LogEntrySyncResponsePayload
 }
+
+export interface LogEntryPullPayload {
+  teamId: string
+  userId: string
+  startTs?: number
+  endTs?: number
+  limit?: number
+  hash?: string
+  hashedDbId?: string
+}
+
+export interface LogEntryPullMessage
+  extends BaseWebsocketMessage<LogEntryPullPayload> {
+  ts: number
+  status: CommunityOperationStatus
+  reason?: string
+  payload: LogEntryPullPayload
+}
+
+export interface LogEntryPullResponseMessage
+  extends BaseWebsocketMessage<LogEntrySyncPayload[]> {
+  ts: number
+  status: CommunityOperationStatus
+  reason?: string
+  payload: LogEntrySyncPayload[]
+}

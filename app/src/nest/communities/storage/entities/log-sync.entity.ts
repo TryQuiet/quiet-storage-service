@@ -13,6 +13,13 @@ export class LogEntrySync extends BasicEntityWithId {
   })
   communityId!: string // this is the LFA team ID and matches the id field on the Community table
 
+  @Property({
+    type: 'string',
+    columnType: 'varchar',
+    fieldName: 'hashed_db_id',
+  })
+  hashedDbId!: string // this is the hashed orbitdb ID for the log database
+
   @Property({ type: 'bytea', columnType: 'bytea' })
   entry!: Buffer // this is an encrypted log entity from orbitdb as a hex string
 
