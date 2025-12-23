@@ -40,6 +40,7 @@ describe('LogEntrySyncStorageService', () => {
       cid: sodiumHelper!.sodium.to_hex(
         sodiumHelper!.sodium.randombytes_buf(32),
       ),
+      hashedDbId: 'hashedDbId',
       entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
       communityId: 'communityId',
       receivedAt: DateTime.utc(),
@@ -55,6 +56,7 @@ describe('LogEntrySyncStorageService', () => {
       cid,
       entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
       communityId: 'communityId',
+      hashedDbId: 'hashedDbId',
       receivedAt: DateTime.utc(),
     }
     expect(await logSyncStorageService?.addLogEntry(data)).toBe(true)
@@ -62,6 +64,7 @@ describe('LogEntrySyncStorageService', () => {
     const dupeIdData: LogSyncEntry = {
       cid,
       entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
+      hashedDbId: 'hashedDbId',
       communityId: 'communityId',
       receivedAt: DateTime.utc(),
     }
@@ -70,48 +73,27 @@ describe('LogEntrySyncStorageService', () => {
 
   it('should write and then get an array of all records for a community ID', async () => {
     const filterTs = DateTime.utc().toMillis() - 500
-    const payloads: LogSyncEntry[] = [
-      {
+    const payloads: LogSyncEntry[] = []
+    for (let i = 0; i < 4; i += 1) {
+      payloads.push({
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
+        hashedDbId: 'hashedDbId1',
         entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'communityId',
         receivedAt: DateTime.utc(),
-      },
-      {
-        cid: sodiumHelper!.sodium.to_hex(
-          sodiumHelper!.sodium.randombytes_buf(32),
-        ),
-        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
-        communityId: 'communityId',
-        receivedAt: DateTime.utc(),
-      },
-      {
-        cid: sodiumHelper!.sodium.to_hex(
-          sodiumHelper!.sodium.randombytes_buf(32),
-        ),
-        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
-        communityId: 'communityId',
-        receivedAt: DateTime.utc(),
-      },
-      {
-        cid: sodiumHelper!.sodium.to_hex(
-          sodiumHelper!.sodium.randombytes_buf(32),
-        ),
-        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
-        communityId: 'communityId',
-        receivedAt: DateTime.utc(),
-      },
-      {
-        cid: sodiumHelper!.sodium.to_hex(
-          sodiumHelper!.sodium.randombytes_buf(32),
-        ),
-        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
-        communityId: 'otherId',
-        receivedAt: DateTime.utc(),
-      },
-    ]
+      })
+    }
+    payloads.push({
+      cid: sodiumHelper!.sodium.to_hex(
+        sodiumHelper!.sodium.randombytes_buf(32),
+      ),
+      hashedDbId: 'hashedDbId1',
+      entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
+      communityId: 'otherId',
+      receivedAt: DateTime.utc(),
+    })
     for (const payload of payloads) {
       expect(await logSyncStorageService?.addLogEntry(payload)).toBe(true)
     }
@@ -128,48 +110,36 @@ describe('LogEntrySyncStorageService', () => {
 
   it('should write and then get an array of records for a community ID that match the filter timestamp', async () => {
     const filterTs = DateTime.utc().toMillis() - 10_000
-    const payloads: LogSyncEntry[] = [
-      {
+    const payloads: LogSyncEntry[] = []
+    for (let i = 0; i < 3; i += 1) {
+      payloads.push({
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
+        hashedDbId: 'hashedDbId1',
         entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'communityId',
         receivedAt: DateTime.utc().minus({ days: 1 }),
-      },
-      {
-        cid: sodiumHelper!.sodium.to_hex(
-          sodiumHelper!.sodium.randombytes_buf(32),
-        ),
-        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
-        communityId: 'communityId',
-        receivedAt: DateTime.utc().minus({ days: 1 }),
-      },
-      {
-        cid: sodiumHelper!.sodium.to_hex(
-          sodiumHelper!.sodium.randombytes_buf(32),
-        ),
-        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
-        communityId: 'communityId',
-        receivedAt: DateTime.utc().minus({ days: 1 }),
-      },
-      {
-        cid: sodiumHelper!.sodium.to_hex(
-          sodiumHelper!.sodium.randombytes_buf(32),
-        ),
-        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
-        communityId: 'communityId',
-        receivedAt: DateTime.utc(),
-      },
-      {
-        cid: sodiumHelper!.sodium.to_hex(
-          sodiumHelper!.sodium.randombytes_buf(32),
-        ),
-        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
-        communityId: 'otherId',
-        receivedAt: DateTime.utc().minus({ days: 1 }),
-      },
-    ]
+      })
+    }
+    payloads.push({
+      cid: sodiumHelper!.sodium.to_hex(
+        sodiumHelper!.sodium.randombytes_buf(32),
+      ),
+      hashedDbId: 'hashedDbId1',
+      entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
+      communityId: 'communityId',
+      receivedAt: DateTime.utc(),
+    })
+    payloads.push({
+      cid: sodiumHelper!.sodium.to_hex(
+        sodiumHelper!.sodium.randombytes_buf(32),
+      ),
+      hashedDbId: 'hashedDbId1',
+      entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
+      communityId: 'otherId',
+      receivedAt: DateTime.utc().minus({ days: 1 }),
+    })
     for (const payload of payloads) {
       expect(await logSyncStorageService?.addLogEntry(payload)).toBe(true)
     }
@@ -191,48 +161,36 @@ describe('LogEntrySyncStorageService', () => {
 
   it('should return no records when filtering for a community ID that has no records', async () => {
     const filterTs = DateTime.utc().minus({ days: 100 }).toMillis()
-    const payloads: LogSyncEntry[] = [
-      {
+    const payloads: LogSyncEntry[] = []
+    for (let i = 0; i < 3; i += 1) {
+      payloads.push({
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
+        hashedDbId: 'hashedDbId1',
         entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'communityId',
         receivedAt: DateTime.utc().minus({ days: 1 }),
-      },
-      {
-        cid: sodiumHelper!.sodium.to_hex(
-          sodiumHelper!.sodium.randombytes_buf(32),
-        ),
-        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
-        communityId: 'communityId',
-        receivedAt: DateTime.utc().minus({ days: 1 }),
-      },
-      {
-        cid: sodiumHelper!.sodium.to_hex(
-          sodiumHelper!.sodium.randombytes_buf(32),
-        ),
-        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
-        communityId: 'communityId',
-        receivedAt: DateTime.utc().minus({ days: 1 }),
-      },
-      {
-        cid: sodiumHelper!.sodium.to_hex(
-          sodiumHelper!.sodium.randombytes_buf(32),
-        ),
-        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
-        communityId: 'communityId',
-        receivedAt: DateTime.utc(),
-      },
-      {
-        cid: sodiumHelper!.sodium.to_hex(
-          sodiumHelper!.sodium.randombytes_buf(32),
-        ),
-        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
-        communityId: 'otherId',
-        receivedAt: DateTime.utc().minus({ days: 1 }),
-      },
-    ]
+      })
+    }
+    payloads.push({
+      cid: sodiumHelper!.sodium.to_hex(
+        sodiumHelper!.sodium.randombytes_buf(32),
+      ),
+      hashedDbId: 'hashedDbId1',
+      entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
+      communityId: 'communityId',
+      receivedAt: DateTime.utc(),
+    })
+    payloads.push({
+      cid: sodiumHelper!.sodium.to_hex(
+        sodiumHelper!.sodium.randombytes_buf(32),
+      ),
+      hashedDbId: 'hashedDbId1',
+      entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
+      communityId: 'otherId',
+      receivedAt: DateTime.utc().minus({ days: 1 }),
+    })
     for (const payload of payloads) {
       expect(await logSyncStorageService?.addLogEntry(payload)).toBe(true)
     }

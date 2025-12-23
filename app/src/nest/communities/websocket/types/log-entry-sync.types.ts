@@ -34,11 +34,13 @@ export interface LogEntrySyncResponseMessage
 export interface LogEntryPullPayload {
   teamId: string
   userId: string
+  direction?: 'forward' | 'backward'
   startTs?: number
   endTs?: number
   limit?: number
   hash?: string
   hashedDbId?: string
+  cursor?: string
 }
 
 export interface LogEntryPullMessage
@@ -49,10 +51,16 @@ export interface LogEntryPullMessage
   payload: LogEntryPullPayload
 }
 
+export interface LogEntryPullResponsePayload {
+  cursor?: string
+  hasNextPage: boolean
+  entries: Buffer[]
+}
+
 export interface LogEntryPullResponseMessage
-  extends BaseWebsocketMessage<LogEntrySyncPayload[]> {
+  extends BaseWebsocketMessage<LogEntryPullResponsePayload> {
   ts: number
   status: CommunityOperationStatus
   reason?: string
-  payload: LogEntrySyncPayload[]
+  payload: LogEntryPullResponsePayload
 }

@@ -107,17 +107,15 @@ export function registerLogEntrySyncHandlers(
   ): Promise<void> {
     _logger.debug(`Handling community log entry pull message`)
     try {
-      const payload =
-        await config.communitiesManager.getLogEntriesForPullMessage(
-          message.payload,
-          config.socket,
-        )
+      const result = await config.communitiesManager.getPaginatedLogEntries(
+        message.payload,
+        config.socket,
+      )
 
-      // form and return a success response to the user
       const response: LogEntryPullResponseMessage = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.SUCCESS,
-        payload,
+        payload: { ...result },
       }
       callback(response)
     } catch (e) {
@@ -135,7 +133,7 @@ export function registerLogEntrySyncHandlers(
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.ERROR,
         reason,
-        payload: [],
+        payload: { entries: [], hasNextPage: false },
       }
       callback(errorResponse)
     }

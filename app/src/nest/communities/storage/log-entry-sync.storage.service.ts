@@ -8,7 +8,7 @@ import { LogSyncEntry } from '../types.js'
 import { LogEntrySync as LogEntrySyncEntity } from './entities/log-sync.entity.js'
 import { PostgresClient } from '../../storage/postgres/postgres.client.js'
 import { PostgresRepo } from '../../storage/postgres/postgres.repo.js'
-import { MikroORM } from '@mikro-orm/postgresql'
+import { Cursor, MikroORM } from '@mikro-orm/postgresql'
 import { DateTime } from 'luxon'
 
 @Injectable()
@@ -71,6 +71,65 @@ export class LogEntrySyncStorageService implements OnModuleInit {
       return undefined
     }
     return result.map(entity => this.entityToPayload(entity))
+  }
+
+  public async getPaginatedLogEntries(
+    communityId: string,
+    limit: number,
+    filter: {
+      startTs: number
+      endTs?: number
+      hashedDbId?: string
+      hash?: string
+      direction?: 'forward' | 'backward'
+    },
+    cursor?: string,
+  ): Promise<Cursor<LogEntrySyncEntity>> {
+    const startDateTime = DateTime.fromMillis(filter.startTs).toISO()
+    const endDateTime =
+      filter.endTs != null
+        ? DateTime.fromMillis(filter.endTs).toISO()
+        : undefined
+    this.logger.log(
+      `Getting paged log entries for community ID ${communityId} and starting datetime ${startDateTime}`,
+    )
+    const filters = [
+      ...(filter.hash != null ? [{ id: { $eq: filter.hash } }] : []),
+      { communityId: { $eq: communityId } },
+      ...(filter.hashedDbId != null
+        ? [{ hashedDbId: { $eq: filter.hashedDbId } }]
+        : []),
+      {
+        receivedAt: {
+          $gte: startDateTime,
+          ...(endDateTime != null ? { $lte: endDateTime } : {}),
+        },
+      },
+    ]
+    const repo = this.repository.entityManager.getRepository(LogEntrySyncEntity)
+    if (filter.direction === 'backward') {
+      const page = await repo.findByCursor(
+        { $and: filters },
+        {
+          before: cursor,
+          last: limit,
+          includeCount: true,
+          orderBy: { receivedAt: 'ASC', id: 'ASC' },
+        },
+      )
+      return page
+    } else {
+      const page = await repo.findByCursor(
+        { $and: filters },
+        {
+          after: cursor,
+          first: limit,
+          includeCount: true,
+          orderBy: { receivedAt: 'ASC', id: 'ASC' },
+        },
+      )
+      return page
+    }
   }
 
   public async clearRepository(): Promise<void> {

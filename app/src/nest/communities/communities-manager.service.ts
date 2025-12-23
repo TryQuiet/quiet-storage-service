@@ -1,3 +1,5 @@
+/* eslint-disable complexity -- will fix later*/
+/* eslint-disable max-lines -- will fix later */
 /**
  * Manages community-related operations
  */
@@ -47,6 +49,7 @@ import {
   LogEntrySyncPayload,
 } from './websocket/types/log-entry-sync.types.js'
 import { Serializer } from '../utils/serialization/serializer.service.js'
+import type { LogEntrySync as LogEntrySyncEntity } from './storage/entities/log-sync.entity.js'
 
 @Injectable()
 export class CommunitiesManagerService implements OnModuleDestroy {
@@ -417,17 +420,14 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     return written
   }
 
-  /**
-   *
-   * @param payload LogEntryPullPayload
-   * @param socket The reference to the client socket
-   * @returns LogSyncEntry[] matching the payload request
-   * @throws When client does not have permission to access the requested entries
-   */
-  public async getLogEntriesForPullMessage(
+  public async getPaginatedLogEntries(
     payload: LogEntryPullPayload,
     socket: Socket,
-  ): Promise<LogEntrySyncPayload[]> {
+  ): Promise<{
+    entries: Buffer[]
+    cursor?: string
+    hasNextPage: boolean
+  }> {
     const managedCommunity = await this.get(payload.teamId)
     this._validateSyncPermission(
       payload.teamId,
@@ -440,25 +440,92 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       throw new Error(`startTs must be provided in log entry pull message`)
     }
 
-    const entries = await this.logEntrySyncStorage.getLogEntriesForCommunity(
-      payload.teamId,
-      payload.startTs,
-    )
+    const maxBytes = 1000 * 1000 * 0.8 // maximum 1MB with 10% buffer
+    const entries: LogEntrySyncEntity[] = []
+    let cursor = payload.cursor
+    let hasNextPage = false
+    let usedBytes = 0
+    let nextCursor = payload.cursor
+    let hitSizeLimit = false
 
-    if (entries == null) return []
+    while (true) {
+      const page = await this.logEntrySyncStorage.getPaginatedLogEntries(
+        payload.teamId,
+        Math.min(payload.limit ?? 200, 200), // TODO: track p50 entry size to optimize page size dynamically
+        {
+          startTs: payload.startTs,
+          endTs: payload.endTs,
+          hashedDbId: payload.hashedDbId,
+          hash: payload.hash,
+        },
+        nextCursor,
+      )
 
-    return entries.map(entry => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- we know this is the correct type
-      const deserialized = this.serializer.deserialize(
-        entry.entry,
-      ) as LogEntrySyncPayload['encEntry']
-      return {
-        teamId: payload.teamId,
-        hash: entry.cid,
-        hashedDbId: entry.hashedDbId,
-        encEntry: deserialized,
+      if (page.items.length === 0) {
+        if (entries.length === 0) {
+          return { entries: [], hasNextPage: false }
+        }
+        hasNextPage = false
+        break
       }
-    })
+
+      for (let i = 0; i < page.items.length; i += 1) {
+        const entry = page.items[i]
+        const entryBytes = entry.entry.length
+        const candidateCursor =
+          i < page.items.length - 1 ? page.from(entry) : page.endCursor
+        const candidateHasNextPage =
+          i < page.items.length - 1 ? true : page.hasNextPage
+        const metadataBytes = Buffer.byteLength(
+          JSON.stringify({
+            cursor: candidateCursor,
+            hasNextPage: candidateHasNextPage,
+          }),
+        )
+
+        if (
+          entries.length > 0 &&
+          usedBytes + entryBytes + metadataBytes > maxBytes
+        ) {
+          hasNextPage = true
+          hitSizeLimit = true
+          break
+        }
+
+        entries.push(entry)
+        usedBytes += entryBytes
+        cursor = candidateCursor ?? undefined
+        hasNextPage = candidateHasNextPage
+
+        if (usedBytes + metadataBytes >= maxBytes) {
+          hitSizeLimit = true
+          break
+        }
+
+        if (payload.limit != null && entries.length >= payload.limit) {
+          break
+        }
+      }
+
+      if (hitSizeLimit || !page.hasNextPage) {
+        if (!hitSizeLimit && !page.hasNextPage) {
+          hasNextPage = false
+        }
+        break
+      }
+
+      nextCursor = page.endCursor ?? undefined
+      if (nextCursor == null) {
+        hasNextPage = false
+        break
+      }
+    }
+
+    return {
+      entries: entries.map(entry => entry.entry),
+      cursor,
+      hasNextPage,
+    }
   }
 
   /**
