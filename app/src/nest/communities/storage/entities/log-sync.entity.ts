@@ -17,6 +17,7 @@ export class LogEntrySync extends BasicEntityWithId {
     type: 'string',
     columnType: 'varchar',
     fieldName: 'hashed_db_id',
+    nullable: true,
   })
   hashedDbId!: string // this is the hashed orbitdb ID for the log database
 

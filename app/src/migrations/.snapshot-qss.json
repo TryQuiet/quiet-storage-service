@@ -66,6 +66,16 @@
           "length": -1,
           "mappedType": "string"
         },
+        "hashed_db_id": {
+          "name": "hashed_db_id",
+          "type": "varchar",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": -1,
+          "mappedType": "string"
+        },
         "entry": {
           "name": "entry",
           "type": "bytea",
