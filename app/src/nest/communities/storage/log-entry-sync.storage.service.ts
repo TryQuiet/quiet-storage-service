@@ -75,8 +75,8 @@ export class LogEntrySyncStorageService implements OnModuleInit {
 
   public async getPaginatedLogEntries(
     communityId: string,
-    limit: number,
     filter: {
+      limit?: number
       startTs: number
       endTs?: number
       hashedDbId?: string
@@ -112,7 +112,7 @@ export class LogEntrySyncStorageService implements OnModuleInit {
         { $and: filters },
         {
           before: cursor,
-          last: limit,
+          last: filter.limit,
           includeCount: true,
           orderBy: { receivedAt: 'ASC', id: 'ASC' },
         },
@@ -123,7 +123,7 @@ export class LogEntrySyncStorageService implements OnModuleInit {
         { $and: filters },
         {
           after: cursor,
-          first: limit,
+          first: filter.limit,
           includeCount: true,
           orderBy: { receivedAt: 'ASC', id: 'ASC' },
         },

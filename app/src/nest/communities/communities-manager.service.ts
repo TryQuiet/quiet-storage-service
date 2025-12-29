@@ -440,19 +440,20 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       throw new Error(`startTs must be provided in log entry pull message`)
     }
 
-    const maxBytes = 1000 * 1000 * 0.8 // maximum 1MB with 10% buffer
+    const maxBytes = 1000 * 1000 * 0.8 // maximum 1MB with 20% buffer
     const entries: LogEntrySyncEntity[] = []
     let cursor = payload.cursor
     let hasNextPage = false
     let usedBytes = 0
     let nextCursor = payload.cursor
     let hitSizeLimit = false
+    let hitLimit = false
 
     while (true) {
       const page = await this.logEntrySyncStorage.getPaginatedLogEntries(
         payload.teamId,
-        Math.min(payload.limit ?? 200, 200), // TODO: track p50 entry size to optimize page size dynamically
         {
+          limit: Math.min(payload.limit ?? 200, 200), // TODO: track p50 entry size to optimize page size dynamically
           startTs: payload.startTs,
           endTs: payload.endTs,
           hashedDbId: payload.hashedDbId,
@@ -503,8 +504,13 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         }
 
         if (payload.limit != null && entries.length >= payload.limit) {
+          hitLimit = true
           break
         }
+      }
+
+      if (hitLimit) {
+        break
       }
 
       if (hitSizeLimit || !page.hasNextPage) {

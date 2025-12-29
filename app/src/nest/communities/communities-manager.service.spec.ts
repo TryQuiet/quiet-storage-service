@@ -38,6 +38,9 @@ import { UtilsModule } from '../utils/utils.module.js'
 import type { Serializer } from '../utils/serialization/serializer.service.js'
 import { SERIALIZER } from '../app/const.js'
 import type { QuietSocket } from '../websocket/ws.types.js'
+import { createLogger } from '../app/logger/logger.js'
+
+const logger = createLogger('Test:CommunitiesManagerService')
 
 describe('CommunitiesManagerService', () => {
   let module: TestingModule | undefined = undefined
@@ -748,6 +751,278 @@ describe('CommunitiesManagerService', () => {
         )
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(0)
+    })
+  })
+
+  describe('getPaginatedLogEntries', () => {
+    const setupAuth = async (testTeam: TestTeam): Promise<void> => {
+      const sigChain = await testTeamUtils!.createSigchainFromTestTeam(testTeam)
+      const authConnection = new AuthConnection(
+        testTeam.team.id,
+        sigChain.sigchain,
+        {
+          communitiesManager: manager!,
+          socket: wsConfig!.socket as Socket,
+        },
+      )
+
+      Object.defineProperty(authConnection, '_status', {
+        get: jest.fn((): AuthStatus => AuthStatus.JOINED),
+        configurable: true,
+      })
+
+      manager!.get = async (
+        teamId: string,
+        forceFetchFromStorage = false,
+        // eslint-disable-next-line @typescript-eslint/require-await -- just matching the real function
+      ): Promise<ManagedCommunity> => {
+        const authConnections = new Map<string, AuthConnection>()
+        authConnections.set(testTeam.team.id, authConnection)
+        return {
+          teamId,
+          sigChain: sigChain.sigchain,
+          authConnections,
+        }
+      }
+    }
+
+    const addLogEntries = async (options: {
+      teamId: string
+      hashedDbId: string
+      startMs: number
+      count: number
+      size?: number
+      cidPrefix: string
+    }): Promise<
+      Array<{
+        cid: string
+        entry: Buffer
+        receivedAtMs: number
+        hashedDbId: string
+      }>
+    > => {
+      const {
+        teamId,
+        hashedDbId,
+        startMs,
+        count,
+        size = 32,
+        cidPrefix,
+      } = options
+      const entries = []
+      for (let i = 0; i < count; i += 1) {
+        const receivedAtMs = startMs + i * 1000
+        const entry = Buffer.alloc(size, i)
+        const cid = `${cidPrefix}-${i}`
+        await dataSyncStorage!.addLogEntry({
+          cid,
+          hashedDbId,
+          communityId: teamId,
+          entry,
+          receivedAt: DateTime.fromMillis(receivedAtMs).toUTC(),
+        })
+        entries.push({
+          cid,
+          entry,
+          receivedAtMs,
+          hashedDbId,
+        })
+      }
+      return entries
+    }
+
+    it('paginates large entries and continues with cursor', async () => {
+      const testTeam = await testTeamUtils!.createTestTeam()
+      await setupAuth(testTeam)
+      const startMs = DateTime.utc().toMillis()
+      const entries = await addLogEntries({
+        teamId: testTeam.team.id,
+        hashedDbId: 'hashed-db-large',
+        startMs,
+        count: 3,
+        size: 500_000,
+        cidPrefix: 'large-entry',
+      })
+
+      const basePayload = {
+        teamId: testTeam.team.id,
+        userId: testTeam.testUserContext.user.userId,
+        startTs: startMs - 1000,
+      }
+
+      const firstPage = await manager!.getPaginatedLogEntries(
+        basePayload,
+        wsConfig!.socket as Socket,
+      )
+      expect(firstPage.entries).toHaveLength(1)
+      expect(firstPage.entries[0]).toEqual(entries[0].entry)
+      expect(firstPage.cursor).toBeDefined()
+      expect(firstPage.hasNextPage).toBe(true)
+
+      const secondPage = await manager!.getPaginatedLogEntries(
+        { ...basePayload, cursor: firstPage.cursor },
+        wsConfig!.socket as Socket,
+      )
+      expect(secondPage.entries).toHaveLength(1)
+      expect(secondPage.entries[0]).toEqual(entries[1].entry)
+      expect(secondPage.cursor).toBeDefined()
+      expect(secondPage.hasNextPage).toBe(true)
+
+      const thirdPage = await manager!.getPaginatedLogEntries(
+        { ...basePayload, cursor: secondPage.cursor },
+        wsConfig!.socket as Socket,
+      )
+      expect(thirdPage.entries).toHaveLength(1)
+      expect(thirdPage.entries[0]).toEqual(entries[2].entry)
+      expect(thirdPage.hasNextPage).toBe(false)
+    })
+
+    it('filters entries by time range', async () => {
+      const testTeam = await testTeamUtils!.createTestTeam()
+      await setupAuth(testTeam)
+      const startMs = DateTime.utc().toMillis()
+      const entries = await addLogEntries({
+        teamId: testTeam.team.id,
+        hashedDbId: 'hashed-db-time',
+        startMs,
+        count: 3,
+        cidPrefix: 'time-entry',
+      })
+
+      const result = await manager!.getPaginatedLogEntries(
+        {
+          teamId: testTeam.team.id,
+          userId: testTeam.testUserContext.user.userId,
+          startTs: startMs + 500,
+          endTs: startMs + 1500,
+        },
+        wsConfig!.socket as Socket,
+      )
+
+      expect(result.entries).toHaveLength(1)
+      expect(result.entries[0]).toEqual(entries[1].entry)
+      expect(result.hasNextPage).toBe(false)
+    })
+
+    it('filters entries by hashedDbId', async () => {
+      const testTeam = await testTeamUtils!.createTestTeam()
+      await setupAuth(testTeam)
+      const startMs = DateTime.utc().toMillis()
+      const hashedEntries = await addLogEntries({
+        teamId: testTeam.team.id,
+        hashedDbId: 'hashed-db-a',
+        startMs,
+        count: 2,
+        cidPrefix: 'hash-db-a',
+      })
+      await addLogEntries({
+        teamId: testTeam.team.id,
+        hashedDbId: 'hashed-db-b',
+        startMs: startMs + 5000,
+        count: 1,
+        cidPrefix: 'hash-db-b',
+      })
+
+      const result = await manager!.getPaginatedLogEntries(
+        {
+          teamId: testTeam.team.id,
+          userId: testTeam.testUserContext.user.userId,
+          startTs: startMs,
+          hashedDbId: 'hashed-db-a',
+        },
+        wsConfig!.socket as Socket,
+      )
+
+      expect(result.entries).toHaveLength(2)
+      expect(result.entries[0]).toEqual(hashedEntries[0].entry)
+      expect(result.entries[1]).toEqual(hashedEntries[1].entry)
+    })
+
+    it('fetches a single entry by hash', async () => {
+      const testTeam = await testTeamUtils!.createTestTeam()
+      await setupAuth(testTeam)
+      const startMs = DateTime.utc().toMillis()
+      const entries = await addLogEntries({
+        teamId: testTeam.team.id,
+        hashedDbId: 'hashed-db-single',
+        startMs,
+        count: 3,
+        cidPrefix: 'single-hash',
+      })
+
+      const result = await manager!.getPaginatedLogEntries(
+        {
+          teamId: testTeam.team.id,
+          userId: testTeam.testUserContext.user.userId,
+          startTs: startMs,
+          hash: entries[1].cid,
+        },
+        wsConfig!.socket as Socket,
+      )
+
+      expect(result.entries).toHaveLength(1)
+      expect(result.entries[0]).toEqual(entries[1].entry)
+      expect(result.hasNextPage).toBe(false)
+    })
+
+    it('returns up to the requested limit from a single page', async () => {
+      const testTeam = await testTeamUtils!.createTestTeam()
+      await setupAuth(testTeam)
+      const startMs = DateTime.utc().toMillis()
+      const entries = await addLogEntries({
+        teamId: testTeam.team.id,
+        hashedDbId: 'hashed-db-limit',
+        startMs,
+        count: 3,
+        cidPrefix: 'limit-entry',
+      })
+
+      const result = await manager!.getPaginatedLogEntries(
+        {
+          teamId: testTeam.team.id,
+          userId: testTeam.testUserContext.user.userId,
+          startTs: startMs,
+          limit: 2,
+        },
+        wsConfig!.socket as Socket,
+      )
+
+      expect(result.entries).toHaveLength(2)
+      expect(result.entries[0]).toEqual(entries[0].entry)
+      expect(result.entries[1]).toEqual(entries[1].entry)
+      expect(result.hasNextPage).toBe(true)
+    })
+
+    it('saturates a given socket message with max size', async () => {
+      const testTeam = await testTeamUtils!.createTestTeam()
+      await setupAuth(testTeam)
+      const startMs = DateTime.utc().toMillis()
+      // add enough entries to exceed max socket size of 1MB
+      const entries = await addLogEntries({
+        teamId: testTeam.team.id,
+        hashedDbId: 'hashed-db-saturate',
+        startMs,
+        count: 100,
+        size: 20_000,
+        cidPrefix: 'saturate-entry',
+      })
+      const result = await manager!.getPaginatedLogEntries(
+        {
+          teamId: testTeam.team.id,
+          userId: testTeam.testUserContext.user.userId,
+          startTs: startMs,
+        },
+        wsConfig!.socket as Socket,
+      )
+      expect(result.entries.length).toBeLessThan(entries.length)
+      expect(result.hasNextPage).toBe(true)
+      // verify that the total size is less than or equal to MAX_SOCKET_MESSAGE_SIZE
+      const totalSize = result.entries.reduce(
+        (acc, entry) => acc + entry.length,
+        0,
+      )
+      logger.info(`Total size of entries sent: ${totalSize} bytes`)
+      expect(totalSize).toBeLessThanOrEqual(1000 * 1000)
     })
   })
 })
