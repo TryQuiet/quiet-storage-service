@@ -430,8 +430,8 @@ export class CommunitiesManagerService implements OnModuleDestroy {
   }> {
     const managedCommunity = await this.get(payload.teamId)
     this._validateSyncPermission(
-      payload.teamId,
       payload.userId,
+      payload.teamId,
       managedCommunity,
       socket,
     )
@@ -442,6 +442,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
 
     const maxBytes = 1000 * 1000 * 0.8 // maximum 1MB with 20% buffer
     const entries: LogEntrySyncEntity[] = []
+    const deserializedEntries: LogEntrySyncPayload[] = []
     let cursor = payload.cursor
     let hasNextPage = false
     let usedBytes = 0
@@ -471,10 +472,15 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       }
 
       for (let i = 0; i < page.items.length; i += 1) {
-        const entry = page.items[i]
-        const entryBytes = entry.entry.length
+        const {
+          communityId,
+          id,
+          hashedDbId,
+          entry: entryBuffer,
+        } = page.items[i]
+        const entryBytes = entryBuffer.length
         const candidateCursor =
-          i < page.items.length - 1 ? page.from(entry) : page.endCursor
+          i < page.items.length - 1 ? page.from(page.items[i]) : page.endCursor
         const candidateHasNextPage =
           i < page.items.length - 1 ? true : page.hasNextPage
         const metadataBytes = Buffer.byteLength(
@@ -493,7 +499,17 @@ export class CommunitiesManagerService implements OnModuleDestroy {
           break
         }
 
-        entries.push(entry)
+        entries.push(page.items[i])
+        const deserializedEntry: LogEntrySyncPayload = {
+          teamId: communityId,
+          hash: id,
+          hashedDbId,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- testing
+          encEntry: this.serializer.deserialize(
+            entryBuffer,
+          ) as LogEntrySyncPayload['encEntry'],
+        }
+        deserializedEntries.push(deserializedEntry)
         usedBytes += entryBytes
         cursor = candidateCursor ?? undefined
         hasNextPage = candidateHasNextPage
@@ -526,6 +542,19 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         break
       }
     }
+    this.logger.debug(
+      `Returning ${entries.length} log entries, hasNextPage=${hasNextPage}`,
+    )
+    this.logger.debug(`Total bytes returned: ${usedBytes}`)
+    const sizeOfDeserializedEntries = Buffer.byteLength(
+      JSON.stringify(deserializedEntries),
+    )
+    this.logger.debug(
+      `Total bytes of deserialized entries: ${sizeOfDeserializedEntries}`,
+    )
+    this.logger.debug(
+      `Deserialized entries are ${sizeOfDeserializedEntries / usedBytes}x larger`,
+    )
 
     return {
       entries: entries.map(entry => entry.entry),

@@ -21,8 +21,6 @@ import type { CommunitiesHandlerConfig } from './websocket/types/common.types.js
 import _ from 'lodash'
 import { StoredKeyRingType } from '../encryption/types.js'
 import { CommunitiesStorageService } from './storage/communities.storage.service.js'
-// @ts-expect-error -- no types
-import MockedSocket from 'socket.io-mock'
 import type { Socket } from 'socket.io'
 import type { KeysetWithSecrets } from '@localfirst/crdx'
 import type { CompoundError } from '../utils/errors.js'
@@ -53,6 +51,7 @@ describe('CommunitiesManagerService', () => {
   let sodiumHelper: SodiumHelper | undefined = undefined
   let serializer: Serializer | undefined = undefined
   let wsConfig: CommunitiesHandlerConfig | undefined = undefined
+  let mockedSocket: QuietSocket | undefined = undefined
 
   beforeEach(async () => {
     jest.mock('../src/nest/communities/auth/auth.connection.js')
@@ -78,12 +77,20 @@ describe('CommunitiesManagerService', () => {
     sodiumHelper = module.get<SodiumHelper>(SodiumHelper)
     serializer = module.get<Serializer>(SERIALIZER)
     testTeamUtils = new TeamTestUtils(serverKeyManager)
+    mockedSocket = {
+      id: 'test-socket',
+      data: {},
+      on: jest.fn().mockReturnThis(),
+      emit: jest.fn(),
+      join: jest.fn(async (room: string) => {
+        /* empty */
+      }),
+    } as unknown as QuietSocket
     wsConfig = {
       communitiesManager: manager,
       storage,
       dataSyncStorage,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is ok
-      socket: new MockedSocket() as QuietSocket,
+      socket: mockedSocket,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- test mock is safe here
       socketServer: {} as any,
     }
@@ -102,6 +109,55 @@ describe('CommunitiesManagerService', () => {
     expect(testTeamUtils).toBeDefined()
     expect(serverKeyManager).toBeDefined()
   })
+
+  const generateDataSyncPayload = (
+    testTeam: TestTeam,
+    overrides?: {
+      hash?: string
+      hashedDbId?: string
+      ts?: number
+      contents?: Uint8Array
+    },
+  ): LogEntrySyncPayload => {
+    const rawMessage = 'this is a message'
+    const encryptedMessage = testTeam.team.encrypt(rawMessage, 'member')
+    const signature = testTeam.team.sign(rawMessage)
+    const dataSyncPayload: LogEntrySyncPayload = {
+      teamId: testTeam.team.id,
+      hash: sodiumHelper!.sodium.crypto_hash(rawMessage, 'base64'),
+      hashedDbId: sodiumHelper!.sodium.crypto_hash(
+        sodiumHelper!.sodium.randombytes_buf(32),
+        'base64',
+      ),
+      encEntry: {
+        userId: testTeam.testUserContext.user.userId,
+        ts: DateTime.utc().toMillis(),
+        teamId: testTeam.team.id,
+        signature,
+        encrypted: {
+          contents: encryptedMessage.contents,
+          scope: {
+            name: 'member',
+            type: EncryptionScopeType.ROLE,
+            generation: encryptedMessage.recipient.generation,
+          },
+        },
+      },
+    }
+    if (overrides?.hash != null) {
+      dataSyncPayload.hash = overrides.hash
+    }
+    if (overrides?.hashedDbId != null) {
+      dataSyncPayload.hashedDbId = overrides.hashedDbId
+    }
+    if (overrides?.ts != null) {
+      dataSyncPayload.encEntry.ts = overrides.ts
+    }
+    if (overrides?.contents != null) {
+      dataSyncPayload.encEntry.encrypted.contents = overrides.contents
+    }
+    return dataSyncPayload
+  }
 
   describe('create', () => {
     it('should create a new managed community', async () => {
@@ -362,37 +418,6 @@ describe('CommunitiesManagerService', () => {
   })
 
   describe('processIncomingSyncMessage', () => {
-    const generateDataSyncPayload = (
-      testTeam: TestTeam,
-    ): LogEntrySyncPayload => {
-      const rawMessage = 'this is a message'
-      const encryptedMessage = testTeam.team.encrypt(rawMessage, 'member')
-      const signature = testTeam.team.sign(rawMessage)
-      const dataSyncPayload: LogEntrySyncPayload = {
-        teamId: testTeam.team.id,
-        hash: sodiumHelper!.sodium.crypto_hash(rawMessage, 'base64'),
-        hashedDbId: sodiumHelper!.sodium.crypto_hash(
-          sodiumHelper!.sodium.randombytes_buf(32),
-          'base64',
-        ),
-        encEntry: {
-          userId: testTeam.testUserContext.user.userId,
-          ts: DateTime.utc().toMillis(),
-          teamId: testTeam.team.id,
-          signature,
-          encrypted: {
-            contents: encryptedMessage.contents,
-            scope: {
-              name: 'member',
-              type: EncryptionScopeType.ROLE,
-              generation: encryptedMessage.recipient.generation,
-            },
-          },
-        },
-      }
-      return dataSyncPayload
-    }
-
     it('should write a sync message to the database', async () => {
       const testTeam = await testTeamUtils!.createTestTeam()
       const sigChain = await testTeamUtils!.createSigchainFromTestTeam(testTeam)
@@ -402,7 +427,7 @@ describe('CommunitiesManagerService', () => {
         testTeam.testUserContext.user.userId,
         sigChain.sigchain,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is ok
-        { communitiesManager: manager!, socket: new MockedSocket() as Socket },
+        { communitiesManager: manager!, socket: wsConfig!.socket as Socket },
       )
 
       Object.defineProperty(authConnection, '_status', {
@@ -431,7 +456,6 @@ describe('CommunitiesManagerService', () => {
       let error: Error | undefined = undefined
       let written = false
       try {
-        // TOOD: fix the error below. In production, we require the client socket to ensure the connected user has permissions, add the socket reference matching the socket used in the auth connection above
         written = await manager!.processIncomingLogEntrySyncMessage(
           payload,
           wsConfig!.socket,
@@ -483,7 +507,7 @@ describe('CommunitiesManagerService', () => {
         testTeam.testUserContext.user.userId,
         sigChain.sigchain,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is ok
-        { communitiesManager: manager!, socket: new MockedSocket() as Socket },
+        { communitiesManager: manager!, socket: wsConfig!.socket as Socket },
       )
 
       Object.defineProperty(authConnection, '_status', {
@@ -544,7 +568,7 @@ describe('CommunitiesManagerService', () => {
         testTeam.testUserContext.user.userId,
         sigChain.sigchain,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is ok
-        { communitiesManager: manager!, socket: new MockedSocket() as Socket },
+        { communitiesManager: manager!, socket: wsConfig!.socket as Socket },
       )
 
       Object.defineProperty(authConnection, '_status', {
@@ -605,7 +629,7 @@ describe('CommunitiesManagerService', () => {
         testTeam.testUserContext.user.userId,
         sigChain.sigchain,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is ok
-        { communitiesManager: manager!, socket: new MockedSocket() as Socket },
+        { communitiesManager: manager!, socket: wsConfig!.socket as Socket },
       )
 
       Object.defineProperty(authConnection, '_status', {
@@ -703,7 +727,7 @@ describe('CommunitiesManagerService', () => {
         testTeam.testUserContext.user.userId,
         sigChain.sigchain,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is ok
-        { communitiesManager: manager!, socket: new MockedSocket() as Socket },
+        { communitiesManager: manager!, socket: wsConfig!.socket as Socket },
       )
 
       Object.defineProperty(authConnection, '_status', {
@@ -758,7 +782,7 @@ describe('CommunitiesManagerService', () => {
     const setupAuth = async (testTeam: TestTeam): Promise<void> => {
       const sigChain = await testTeamUtils!.createSigchainFromTestTeam(testTeam)
       const authConnection = new AuthConnection(
-        testTeam.team.id,
+        testTeam.testUserContext.user.userId,
         sigChain.sigchain,
         {
           communitiesManager: manager!,
@@ -777,7 +801,10 @@ describe('CommunitiesManagerService', () => {
         // eslint-disable-next-line @typescript-eslint/require-await -- just matching the real function
       ): Promise<ManagedCommunity> => {
         const authConnections = new Map<string, AuthConnection>()
-        authConnections.set(testTeam.team.id, authConnection)
+        authConnections.set(
+          testTeam.testUserContext.user.userId,
+          authConnection,
+        )
         return {
           teamId,
           sigChain: sigChain.sigchain,
@@ -787,7 +814,7 @@ describe('CommunitiesManagerService', () => {
     }
 
     const addLogEntries = async (options: {
-      teamId: string
+      testTeam: TestTeam
       hashedDbId: string
       startMs: number
       count: number
@@ -802,21 +829,29 @@ describe('CommunitiesManagerService', () => {
       }>
     > => {
       const {
-        teamId,
+        testTeam,
         hashedDbId,
         startMs,
         count,
         size = 32,
         cidPrefix,
       } = options
+      const teamId = testTeam.team.id
       const entries = []
       for (let i = 0; i < count; i += 1) {
         const receivedAtMs = startMs + i * 1000
-        const entry = Buffer.alloc(size, i)
         const cid = `${cidPrefix}-${i}`
-        await dataSyncStorage!.addLogEntry({
-          cid,
+        const contents =
+          size > 0 ? new Uint8Array(size).fill(i) : new Uint8Array()
+        const payload = generateDataSyncPayload(testTeam, {
+          hash: cid,
           hashedDbId,
+          contents,
+        })
+        const entry = serializer!.serialize(payload.encEntry)
+        await dataSyncStorage!.addLogEntry({
+          cid: payload.hash,
+          hashedDbId: payload.hashedDbId,
           communityId: teamId,
           entry,
           receivedAt: DateTime.fromMillis(receivedAtMs).toUTC(),
@@ -836,7 +871,7 @@ describe('CommunitiesManagerService', () => {
       await setupAuth(testTeam)
       const startMs = DateTime.utc().toMillis()
       const entries = await addLogEntries({
-        teamId: testTeam.team.id,
+        testTeam,
         hashedDbId: 'hashed-db-large',
         startMs,
         count: 3,
@@ -882,7 +917,7 @@ describe('CommunitiesManagerService', () => {
       await setupAuth(testTeam)
       const startMs = DateTime.utc().toMillis()
       const entries = await addLogEntries({
-        teamId: testTeam.team.id,
+        testTeam,
         hashedDbId: 'hashed-db-time',
         startMs,
         count: 3,
@@ -909,14 +944,14 @@ describe('CommunitiesManagerService', () => {
       await setupAuth(testTeam)
       const startMs = DateTime.utc().toMillis()
       const hashedEntries = await addLogEntries({
-        teamId: testTeam.team.id,
+        testTeam,
         hashedDbId: 'hashed-db-a',
         startMs,
         count: 2,
         cidPrefix: 'hash-db-a',
       })
       await addLogEntries({
-        teamId: testTeam.team.id,
+        testTeam,
         hashedDbId: 'hashed-db-b',
         startMs: startMs + 5000,
         count: 1,
@@ -943,7 +978,7 @@ describe('CommunitiesManagerService', () => {
       await setupAuth(testTeam)
       const startMs = DateTime.utc().toMillis()
       const entries = await addLogEntries({
-        teamId: testTeam.team.id,
+        testTeam,
         hashedDbId: 'hashed-db-single',
         startMs,
         count: 3,
@@ -970,7 +1005,7 @@ describe('CommunitiesManagerService', () => {
       await setupAuth(testTeam)
       const startMs = DateTime.utc().toMillis()
       const entries = await addLogEntries({
-        teamId: testTeam.team.id,
+        testTeam,
         hashedDbId: 'hashed-db-limit',
         startMs,
         count: 3,
@@ -999,7 +1034,7 @@ describe('CommunitiesManagerService', () => {
       const startMs = DateTime.utc().toMillis()
       // add enough entries to exceed max socket size of 1MB
       const entries = await addLogEntries({
-        teamId: testTeam.team.id,
+        testTeam,
         hashedDbId: 'hashed-db-saturate',
         startMs,
         count: 100,
