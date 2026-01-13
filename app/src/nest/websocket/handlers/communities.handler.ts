@@ -2,7 +2,7 @@
  * Communities websocket event handlers
  */
 
-import { WebsocketEvents } from '../../websocket/ws.types.js'
+import { WebsocketEvents } from '../ws.types.js'
 import { DateTime } from 'luxon'
 import { createLogger } from '../../app/logger/logger.js'
 import {

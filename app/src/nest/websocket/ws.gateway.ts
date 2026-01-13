@@ -14,14 +14,18 @@ import { OnModuleDestroy } from '@nestjs/common'
 
 import { BaseHandlerConfig, QuietSocket } from './ws.types.js'
 import { createLogger } from '../app/logger/logger.js'
-import { registerCommunitiesHandlers } from '../communities/websocket/communities.handler.js'
+import { registerCommunitiesHandlers } from './handlers/communities.handler.js'
 import { CommunitiesStorageService } from '../communities/storage/communities.storage.service.js'
 import { CommunitiesManagerService } from '../communities/communities-manager.service.js'
-import { CommunitiesHandlerConfig } from '../communities/websocket/types/index.js'
-import { registerCommunitiesAuthHandlers } from '../communities/websocket/auth.handler.js'
+import {
+  CommunitiesHandlerConfig,
+  LogEntrySyncHandlerConfig,
+} from './handlers/types/index.js'
+import { registerCommunitiesAuthHandlers } from './handlers/auth.handler.js'
 import { LogEntrySyncStorageService } from '../communities/storage/log-entry-sync.storage.service.js'
-import { registerLogEntrySyncHandlers } from '../communities/websocket/log-entry-sync.handler.js'
-import { registerCaptchaHandlers } from '../communities/websocket/captcha.handler.js'
+import { registerLogEntrySyncHandlers } from './handlers/log-entry-sync.handler.js'
+import { registerCaptchaHandlers } from './handlers/captcha.handler.js'
+import { LogEntrySyncManager } from '../communities/sync/log-entry-sync.service.js'
 
 /**
  * Websocket gateway configuration
@@ -52,6 +56,7 @@ export class WebsocketGateway
     private readonly communityStorageService: CommunitiesStorageService,
     private readonly communitiesDataStorageService: LogEntrySyncStorageService,
     private readonly communitiesManager: CommunitiesManagerService,
+    private readonly logEntrySyncManager: LogEntrySyncManager,
   ) {}
 
   afterInit(): void {
@@ -111,9 +116,14 @@ export class WebsocketGateway
       dataSyncStorage: this.communitiesDataStorageService,
       communitiesManager: this.communitiesManager,
     }
+
+    const syncConfig: LogEntrySyncHandlerConfig = {
+      ...baseConfig,
+      syncManager: this.logEntrySyncManager,
+    }
     registerCommunitiesHandlers(communitiesConfig)
     registerCommunitiesAuthHandlers(communitiesConfig)
-    registerLogEntrySyncHandlers(communitiesConfig)
     registerCaptchaHandlers(communitiesConfig)
+    registerLogEntrySyncHandlers(syncConfig)
   }
 }

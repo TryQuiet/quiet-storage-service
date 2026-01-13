@@ -10,7 +10,7 @@ import { DateTime } from 'luxon'
 import { createLogger } from '../../../src/nest/app/logger/logger.js'
 import { AppModule } from '../../../src/nest/app/app.module.js'
 import { CommunitiesManagerService } from '../../../src/nest/communities/communities-manager.service.js'
-import type { GeneratePublicKeysMessage } from '../../../src/nest/communities/websocket/types/gen-pub-keys.types.js'
+import type { GeneratePublicKeysMessage } from '../../../src/nest/websocket/handlers/types/gen-pub-keys.types.js'
 import {
   createDevice,
   createUser,
@@ -27,20 +27,20 @@ import {
 import { SodiumHelper } from '../../../src/nest/encryption/sodium.helper.js'
 import * as uint8arrays from 'uint8arrays'
 import type { Keyset } from '@localfirst/crdx'
-import { CommunityOperationStatus } from '../../../src/nest/communities/websocket/types/common.types.js'
+import { CommunityOperationStatus } from '../../../src/nest/websocket/handlers/types/common.types.js'
 import {
   type CreateCommunity,
   type CreateCommunityResponse,
   CreateCommunityStatus,
-} from '../../../src/nest/communities/websocket/types/create-community.types.js'
+} from '../../../src/nest/websocket/handlers/types/create-community.types.js'
 import { CommunitiesStorageService } from '../../../src/nest/communities/storage/communities.storage.service.js'
-import type { CommunitySignInMessage } from '../../../src/nest/communities/websocket/types/community-sign-in.types.js'
+import type { CommunitySignInMessage } from '../../../src/nest/websocket/handlers/types/community-sign-in.types.js'
 import { ClientEvents } from '../../../src/client/ws.client.events.js'
 import { ServerKeyManagerService } from '../../../src/nest/encryption/server-key-manager.service.js'
 import type {
   LogEntrySyncMessage,
   LogEntrySyncPayload,
-} from '../../../src/nest/communities/websocket/types/log-entry-sync.types.js'
+} from '../../../src/nest/websocket/handlers/types/log-entry-sync.types.js'
 import { LogEntrySyncStorageService } from '../../../src/nest/communities/storage/log-entry-sync.storage.service.js'
 import type { Serializer } from '../../../src/nest/utils/serialization/serializer.service.js'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- necessary?
@@ -49,7 +49,7 @@ import { SERIALIZER } from '../../../src/nest/app/const.js'
 import {
   type CaptchaVerifyMessage,
   HCAPTCHA_TEST_TOKEN,
-} from '../../../src/nest/communities/websocket/types/captcha.types.js'
+} from '../../../src/nest/websocket/handlers/types/captcha.types.js'
 import { WebsocketGateway } from '../../../src/nest/websocket/ws.gateway.js'
 import { waitFor } from '../../utils/waitFor.js'
 

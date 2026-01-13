@@ -1,4 +1,4 @@
-import type { BaseWebsocketMessage } from '../../../websocket/ws.types.js'
+import type { BaseWebsocketMessage } from '../../ws.types.js'
 import type { CommunityOperationStatus } from './common.types.js'
 
 export interface AuthSyncMessagePayload {

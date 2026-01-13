@@ -2,12 +2,12 @@
  * Communities data sync websocket event handlers
  */
 
-import { WebsocketEvents } from '../../websocket/ws.types.js'
+import { WebsocketEvents } from '../ws.types.js'
 import { DateTime } from 'luxon'
 import { createLogger } from '../../app/logger/logger.js'
 import {
-  type CommunitiesHandlerConfig,
   CommunityOperationStatus,
+  type LogEntrySyncHandlerConfig,
 } from './types/index.js'
 import type {
   LogEntryPullMessage,
@@ -29,7 +29,7 @@ const baseLogger = createLogger('Websocket:Event:Communities:LogEntrySync')
  * @param config Websocket handler config
  */
 export function registerLogEntrySyncHandlers(
-  config: CommunitiesHandlerConfig,
+  config: LogEntrySyncHandlerConfig,
 ): void {
   const _logger = baseLogger.extend(config.socket.id)
   _logger.debug(`Initializing communities log entry sync WS event handlers`)
@@ -48,7 +48,7 @@ export function registerLogEntrySyncHandlers(
     try {
       // Check that the user has authenticated on this community and then write to the DB
       const success =
-        await config.communitiesManager.processIncomingLogEntrySyncMessage(
+        await config.syncManager.processIncomingLogEntrySyncMessage(
           message.payload,
           config.socket,
         )
@@ -107,7 +107,7 @@ export function registerLogEntrySyncHandlers(
   ): Promise<void> {
     _logger.debug(`Handling community log entry pull message`)
     try {
-      const result = await config.communitiesManager.getPaginatedLogEntries(
+      const result = await config.syncManager.getPaginatedLogEntries(
         message.payload,
         config.socket,
       )

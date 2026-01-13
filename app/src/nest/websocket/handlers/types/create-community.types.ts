@@ -1,5 +1,5 @@
-import type { BaseWebsocketMessage } from '../../../websocket/ws.types.js'
-import type { Community } from '../../types.js'
+import type { BaseWebsocketMessage } from '../../ws.types.js'
+import type { Community } from '../../../communities/types.js'
 
 export interface CreateCommunityPayload {
   community: Community

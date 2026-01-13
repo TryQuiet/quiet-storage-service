@@ -7,7 +7,7 @@ import {
   type GetCommunity,
   type GetCommunityResponse,
   type GeneratePublicKeysMessage,
-} from '../../../nest/communities/websocket/types/index.js'
+} from '../../../nest/websocket/handlers/types/index.js'
 import { createLogger } from '../../../nest/app/logger/logger.js'
 import { isBase64, isHexadecimal } from 'class-validator'
 import { DateTime } from 'luxon'
