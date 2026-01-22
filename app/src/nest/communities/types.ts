@@ -44,6 +44,7 @@ export interface ManagedCommunity {
 
 export interface LogSyncEntry {
   cid: string
+  hashedDbId: string
   communityId: string
   entry: Buffer
   receivedAt: DateTime

@@ -2,14 +2,16 @@
  * Communities data sync websocket event handlers
  */
 
-import { WebsocketEvents } from '../../websocket/ws.types.js'
+import { WebsocketEvents } from '../ws.types.js'
 import { DateTime } from 'luxon'
 import { createLogger } from '../../app/logger/logger.js'
 import {
-  type CommunitiesHandlerConfig,
   CommunityOperationStatus,
+  type LogEntrySyncHandlerConfig,
 } from './types/index.js'
 import type {
+  LogEntryPullMessage,
+  LogEntryPullResponseMessage,
   LogEntrySyncMessage,
   LogEntrySyncResponseMessage,
 } from './types/log-entry-sync.types.js'
@@ -27,7 +29,7 @@ const baseLogger = createLogger('Websocket:Event:Communities:LogEntrySync')
  * @param config Websocket handler config
  */
 export function registerLogEntrySyncHandlers(
-  config: CommunitiesHandlerConfig,
+  config: LogEntrySyncHandlerConfig,
 ): void {
   const _logger = baseLogger.extend(config.socket.id)
   _logger.debug(`Initializing communities log entry sync WS event handlers`)
@@ -46,8 +48,9 @@ export function registerLogEntrySyncHandlers(
     try {
       // Check that the user has authenticated on this community and then write to the DB
       const success =
-        await config.communitiesManager.processIncomingLogEntrySyncMessage(
+        await config.syncManager.processIncomingLogEntrySyncMessage(
           message.payload,
+          config.socket,
         )
 
       if (!success) {
@@ -80,7 +83,8 @@ export function registerLogEntrySyncHandlers(
         e instanceof AuthenticationError ||
         e instanceof CommunityNotFoundError
       ) {
-        reason = e.message
+        const { message: errorMessage } = e
+        reason = errorMessage
       }
 
       const errorResponse: LogEntrySyncResponseMessage = {
@@ -97,6 +101,45 @@ export function registerLogEntrySyncHandlers(
     }
   }
 
+  async function handleLogEntryPull(
+    message: LogEntryPullMessage,
+    callback: (payload: LogEntryPullResponseMessage) => void,
+  ): Promise<void> {
+    _logger.debug(`Handling community log entry pull message`)
+    try {
+      const result = await config.syncManager.getPaginatedLogEntries(
+        message.payload,
+        config.socket,
+      )
+
+      const response: LogEntryPullResponseMessage = {
+        ts: DateTime.utc().toMillis(),
+        status: CommunityOperationStatus.SUCCESS,
+        payload: { ...result },
+      }
+      callback(response)
+    } catch (e) {
+      _logger.error(`Error while processing log entry pull event`, e)
+      let reason = `Error while handling log entry pull message`
+      if (
+        e instanceof AuthenticationError ||
+        e instanceof CommunityNotFoundError
+      ) {
+        const { message: errorMessage } = e
+        reason = errorMessage
+      }
+
+      const errorResponse: LogEntryPullResponseMessage = {
+        ts: DateTime.utc().toMillis(),
+        status: CommunityOperationStatus.ERROR,
+        reason,
+        payload: { entries: [], hasNextPage: false },
+      }
+      callback(errorResponse)
+    }
+  }
+
   // register event handlers on this socket
   config.socket.on(WebsocketEvents.LogEntrySync, handleLogEntrySync)
+  config.socket.on(WebsocketEvents.LogEntryPull, handleLogEntryPull)
 }

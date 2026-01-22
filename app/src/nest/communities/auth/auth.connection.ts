@@ -19,7 +19,7 @@ import * as uint8arrays from 'uint8arrays'
 import {
   type AuthSyncMessage,
   CommunityOperationStatus,
-} from '../websocket/types/index.js'
+} from '../../websocket/handlers/types/index.js'
 import type { QuietLogger } from '../../app/logger/types.js'
 import { type AuthConnectionConfig, AuthStatus } from './types.js'
 import EventEmitter from 'events'
@@ -99,6 +99,10 @@ export class AuthConnection extends EventEmitter {
 
   public get status(): AuthStatus {
     return this._status
+  }
+
+  public get socketId(): string {
+    return this.config.socket.id
   }
 
   /**

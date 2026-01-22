@@ -2,7 +2,7 @@
  * Auth websocket event handlers
  */
 
-import { WebsocketEvents } from '../../websocket/ws.types.js'
+import { WebsocketEvents } from '../ws.types.js'
 import { DateTime } from 'luxon'
 import { createLogger } from '../../app/logger/logger.js'
 import {
@@ -12,9 +12,9 @@ import {
   type CommunitiesHandlerConfig,
 } from './types/index.js'
 import * as uint8arrays from 'uint8arrays'
-import type { AuthConnection } from '../auth/auth.connection.js'
+import type { AuthConnection } from '../../communities/auth/auth.connection.js'
 import { type Keyset, redactKeys } from '@localfirst/crdx'
-import { AllowedServerKeyState } from '../types.js'
+import { AllowedServerKeyState } from '../../communities/types.js'
 import { CaptchaErrorMessages } from './types/captcha.types.js'
 
 const baseLogger = createLogger('Websocket:Event:Communities:Auth')

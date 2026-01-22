@@ -6,6 +6,7 @@ import { CommunitiesManagerService } from './communities-manager.service.js'
 import { FastifyModule } from '../app/qss/fastify.module.js'
 import { LogEntrySyncStorageService } from './storage/log-entry-sync.storage.service.js'
 import { UtilsModule } from '../utils/utils.module.js'
+import { LogEntrySyncManager } from './sync/log-entry-sync.service.js'
 
 @Module({
   imports: [UtilsModule, StorageModule, EncryptionModule, FastifyModule],
@@ -13,11 +14,13 @@ import { UtilsModule } from '../utils/utils.module.js'
     CommunitiesStorageService,
     LogEntrySyncStorageService,
     CommunitiesManagerService,
+    LogEntrySyncManager,
   ],
   exports: [
     CommunitiesStorageService,
     LogEntrySyncStorageService,
     CommunitiesManagerService,
+    LogEntrySyncManager,
   ],
 })
 export class CommunitiesModule {}
