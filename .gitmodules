@@ -1,6 +1,6 @@
 [submodule "3rd-party/auth"]
 	path = 3rd-party/auth
 	url = https://github.com/TryQuiet/auth.git
-	branch = main
+	branch = feat/3058-allow-key-override
 [submodule "3rd-party/qss"]
 	branch = main
