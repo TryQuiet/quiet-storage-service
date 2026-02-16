@@ -106,6 +106,7 @@ export class LogEntrySyncManager implements OnModuleDestroy {
 
     const maxBytes = 1000 * 1000 * 0.8 // maximum 1MB with 20% buffer
     const entries: LogEntrySyncEntity[] = []
+    /* eslint-disable-next-line @typescript-eslint/prefer-destructuring -- sigh */
     let cursor = payload.cursor
     let hasNextPage = false
     let usedBytes = 0

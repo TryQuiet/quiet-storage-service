@@ -289,7 +289,7 @@ describe('LogEntrySyncManager', () => {
       const storedSyncContents =
         await dataSyncStorage!.getLogEntriesForCommunity(
           testTeam.team.id,
-          payload.encEntry.ts - 10_000,
+          payload.encEntry.ts - 20_000,
         )
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(1)
