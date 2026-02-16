@@ -45,7 +45,9 @@ export class TeamTestUtils {
       deviceName: deviceName,
     })
     const testUserContext: LocalUserContext = { user, device }
-    const team = createTeam(teamName, testUserContext) as Team
+    const team = createTeam(teamName, testUserContext, undefined, {
+      selfAssignableRoles: ['member'],
+    }) as Team
     team.addRole('member')
     team.addMemberRole(user.userId, 'member')
 
