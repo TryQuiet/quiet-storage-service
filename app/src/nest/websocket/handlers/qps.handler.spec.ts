@@ -225,9 +225,7 @@ describe('QPS WebSocket Handlers', () => {
     })
 
     it('should return ERROR when service throws', async () => {
-      mockQpsService.sendPush.mockRejectedValue(
-        new Error('unexpected error'),
-      )
+      mockQpsService.sendPush.mockRejectedValue(new Error('unexpected error'))
 
       const callback = jest.fn()
       const handler = handlers.get(WebsocketEvents.QPSSendPush)!

@@ -59,8 +59,13 @@ export const registerDevice = async (
         throw new Error('No response from server')
       }
 
-      if (response.status !== CommunityOperationStatus.SUCCESS || response.payload?.ucan == null) {
-        throw new Error(`Registration failed: ${response.reason ?? 'unknown error'}`)
+      if (
+        response.status !== CommunityOperationStatus.SUCCESS ||
+        response.payload?.ucan == null
+      ) {
+        throw new Error(
+          `Registration failed: ${response.reason ?? 'unknown error'}`,
+        )
       }
 
       return response.payload.ucan
@@ -156,11 +161,15 @@ export const sendPushNotification = async (
       }
 
       if (response.status === CommunityOperationStatus.NOT_FOUND) {
-        throw new Error(`Device token is no longer valid: ${response.reason ?? 'unknown error'}`)
+        throw new Error(
+          `Device token is no longer valid: ${response.reason ?? 'unknown error'}`,
+        )
       }
 
       if (response.status !== CommunityOperationStatus.SUCCESS) {
-        throw new Error(`Push notification failed: ${response.reason ?? 'unknown error'}`)
+        throw new Error(
+          `Push notification failed: ${response.reason ?? 'unknown error'}`,
+        )
       }
 
       return true

@@ -29,10 +29,8 @@ export interface SendPushPayload {
   data?: Record<string, string>
 }
 
-export interface SendPushMessage
-  extends BaseWebsocketMessage<SendPushPayload> {
+export interface SendPushMessage extends BaseWebsocketMessage<SendPushPayload> {
   payload: SendPushPayload
 }
 
-export interface SendPushResponse
-  extends BaseWebsocketMessage<undefined> {}
+export interface SendPushResponse extends BaseWebsocketMessage<undefined> {}
