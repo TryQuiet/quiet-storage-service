@@ -10,7 +10,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets'
 import { Server } from 'socket.io'
-import { OnModuleDestroy } from '@nestjs/common'
+import { Inject, OnModuleDestroy, Optional } from '@nestjs/common'
 
 import { BaseHandlerConfig, QuietSocket } from './ws.types.js'
 import { createLogger } from '../app/logger/logger.js'
@@ -20,12 +20,15 @@ import { CommunitiesManagerService } from '../communities/communities-manager.se
 import {
   CommunitiesHandlerConfig,
   LogEntrySyncHandlerConfig,
+  QPSHandlerConfig,
 } from './handlers/types/index.js'
 import { registerCommunitiesAuthHandlers } from './handlers/auth.handler.js'
 import { LogEntrySyncStorageService } from '../communities/storage/log-entry-sync.storage.service.js'
 import { registerLogEntrySyncHandlers } from './handlers/log-entry-sync.handler.js'
 import { registerCaptchaHandlers } from './handlers/captcha.handler.js'
+import { registerQpsHandlers } from './handlers/qps.handler.js'
 import { LogEntrySyncManager } from '../communities/sync/log-entry-sync.service.js'
+import { QPSService } from '../qps/qps.service.js'
 
 /**
  * Websocket gateway configuration
@@ -57,6 +60,7 @@ export class WebsocketGateway
     private readonly communitiesDataStorageService: LogEntrySyncStorageService,
     private readonly communitiesManager: CommunitiesManagerService,
     private readonly logEntrySyncManager: LogEntrySyncManager,
+    @Optional() @Inject(QPSService) private readonly qpsService?: QPSService,
   ) {}
 
   afterInit(): void {
@@ -125,5 +129,13 @@ export class WebsocketGateway
     registerCommunitiesAuthHandlers(communitiesConfig)
     registerCaptchaHandlers(communitiesConfig)
     registerLogEntrySyncHandlers(syncConfig)
+
+    if (this.qpsService != null) {
+      const qpsConfig: QPSHandlerConfig = {
+        ...baseConfig,
+        qpsService: this.qpsService,
+      }
+      registerQpsHandlers(qpsConfig)
+    }
   }
 }

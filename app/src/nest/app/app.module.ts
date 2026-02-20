@@ -9,7 +9,6 @@ import { CommunitiesModule } from '../communities/communities.module.js'
 import { HealthModule } from '../rest/health/health.module.js'
 import { AWSModule } from '../utils/aws/aws.module.js'
 import { UtilsModule } from '../utils/utils.module.js'
-
 @Module({
   imports: [
     UtilsModule,

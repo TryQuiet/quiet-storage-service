@@ -36,6 +36,9 @@ export enum WebsocketEvents {
   // captcha
   VerifyCaptcha = 'verify-captcha',
   GetCaptchaSiteKey = 'get-captcha-site-key',
+  // QPS (push notifications)
+  QPSRegisterDevice = 'register-device-token',
+  QPSSendPush = 'qps-send-push',
 }
 
 /**

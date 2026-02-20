@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QPS Demo Client</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+    }
+    h1 { color: #7c3aed; margin-bottom: 8px; }
+    .subtitle { color: #888; margin-bottom: 24px; }
+    .card {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .card h2 { margin-top: 0; font-size: 14px; color: #888; text-transform: uppercase; }
+    label { display: block; margin-bottom: 8px; font-size: 14px; color: #aaa; }
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #333;
+      border-radius: 4px;
+      background: #0f0f23;
+      color: #eee;
+      font-family: monospace;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    textarea { min-height: 100px; resize: vertical; }
+    button {
+      background: #7c3aed;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+    button:hover { background: #6d28d9; }
+    button:disabled { background: #444; cursor: not-allowed; }
+    button.secondary { background: #374151; }
+    button.secondary:hover { background: #4b5563; }
+    .status {
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    .status.success { background: #064e3b; color: #6ee7b7; }
+    .status.error { background: #7f1d1d; color: #fca5a5; }
+    .status.info { background: #1e3a5f; color: #93c5fd; }
+    .token-display {
+      word-break: break-all;
+      font-family: monospace;
+      font-size: 11px;
+      background: #0f0f23;
+      padding: 8px;
+      border-radius: 4px;
+      max-height: 80px;
+      overflow-y: auto;
+    }
+    .log {
+      background: #0f0f23;
+      padding: 12px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .log-entry { margin-bottom: 4px; }
+    .log-entry.error { color: #fca5a5; }
+    .log-entry.success { color: #6ee7b7; }
+    .log-entry.info { color: #93c5fd; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>QPS Demo Client</h1>
+  <p class="subtitle">Test Firebase Cloud Messaging integration</p>
+
+  <!-- Step 1: Configuration -->
+  <div class="card" id="config-card">
+    <h2>1. Firebase Configuration</h2>
+    <label>Firebase Config (JSON from Firebase Console)</label>
+    <textarea id="firebase-config" placeholder='{
+  "apiKey": "...",
+  "authDomain": "...",
+  "projectId": "...",
+  "storageBucket": "...",
+  "messagingSenderId": "...",
+  "appId": "..."
+}'></textarea>
+    <label>VAPID Key (Cloud Messaging → Web Push certificates)</label>
+    <input type="text" id="vapid-key" placeholder="BLxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+    <label>QPS Server URL</label>
+    <input type="text" id="qps-url" value="http://localhost:3000">
+    <button onclick="initializeFirebase()">Initialize Firebase</button>
+  </div>
+
+  <!-- Step 2: Get FCM Token -->
+  <div class="card hidden" id="token-card">
+    <h2>2. FCM Device Token</h2>
+    <div id="token-status"></div>
+    <button onclick="requestToken()">Request Notification Permission & Token</button>
+    <div id="fcm-token-display" class="hidden">
+      <label>FCM Token:</label>
+      <div class="token-display" id="fcm-token"></div>
+    </div>
+  </div>
+
+  <!-- Step 3: Register with QPS -->
+  <div class="card hidden" id="register-card">
+    <h2>3. Register with QPS</h2>
+    <label>Bundle ID</label>
+    <input type="text" id="bundle-id" value="com.tryquiet.quiet">
+    <button onclick="registerDevice()">Register Device</button>
+    <div id="ucan-display" class="hidden">
+      <label>UCAN Token:</label>
+      <div class="token-display" id="ucan-token"></div>
+    </div>
+  </div>
+
+  <!-- Step 4: Send Push -->
+  <div class="card hidden" id="push-card">
+    <h2>4. Send Test Push</h2>
+    <label>Title (optional)</label>
+    <input type="text" id="push-title" value="Test Notification">
+    <label>Body (optional)</label>
+    <input type="text" id="push-body" value="Hello from QPS Demo!">
+    <button onclick="sendPush()">Send Push Notification</button>
+    <button class="secondary" onclick="sendSilentPush()">Send Silent Push</button>
+  </div>
+
+  <!-- Log -->
+  <div class="card">
+    <h2>Log</h2>
+    <div class="log" id="log"></div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js';
+
+    let messaging = null;
+    let fcmToken = null;
+    let ucanToken = null;
+
+    // Make functions available globally
+    window.initializeFirebase = initializeFirebase;
+    window.requestToken = requestToken;
+    window.registerDevice = registerDevice;
+    window.sendPush = sendPush;
+    window.sendSilentPush = sendSilentPush;
+
+    function log(message, type = 'info') {
+      const logDiv = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logDiv.insertBefore(entry, logDiv.firstChild);
+    }
+
+    function showCard(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+
+    function showStatus(containerId, message, type) {
+      const container = document.getElementById(containerId);
+      let status = container.querySelector('.status');
+      if (!status) {
+        status = document.createElement('div');
+        status.className = 'status';
+        container.insertBefore(status, container.querySelector('button'));
+      }
+      status.className = `status ${type}`;
+      status.textContent = message;
+    }
+
+    async function initializeFirebase() {
+      try {
+        const configText = document.getElementById('firebase-config').value;
+        const config = JSON.parse(configText);
+
+        log('Initializing Firebase...');
+        const app = initializeApp(config);
+        messaging = getMessaging(app);
+
+        // Listen for foreground messages
+        onMessage(messaging, (payload) => {
+          console.log('[Demo] Foreground message received:', payload);
+          log(`Push received! Title: "${payload.notification?.title || '(none)'}", Body: "${payload.notification?.body || '(none)'}"`, 'success');
+
+          // Show browser notification for foreground messages (SW doesn't show them when page is focused)
+          if (Notification.permission === 'granted') {
+            const title = payload.notification?.title || payload.data?.title || 'New Message';
+            const body = payload.notification?.body || payload.data?.body || '';
+            new Notification(title, { body, icon: '/favicon.ico' });
+          }
+        });
+
+        log('Firebase initialized successfully', 'success');
+        showCard('token-card');
+
+        // Save config to localStorage
+        localStorage.setItem('firebase-config', configText);
+        localStorage.setItem('vapid-key', document.getElementById('vapid-key').value);
+        localStorage.setItem('qps-url', document.getElementById('qps-url').value);
+
+      } catch (error) {
+        log(`Firebase initialization failed: ${error.message}`, 'error');
+      }
+    }
+
+    async function requestToken() {
+      try {
+        const vapidKey = document.getElementById('vapid-key').value;
+        if (!vapidKey) {
+          throw new Error('VAPID key is required');
+        }
+
+        log('Requesting notification permission...');
+        const permission = await Notification.requestPermission();
+
+        if (permission !== 'granted') {
+          throw new Error(`Notification permission ${permission}`);
+        }
+
+        log('Permission granted, setting up service worker...');
+
+        // Register service worker and wait for it to be ready
+        await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        const registration = await navigator.serviceWorker.ready;
+
+        log('Getting FCM token...');
+
+        // Add timeout to detect hanging
+        const tokenPromise = getToken(messaging, {
+          vapidKey: vapidKey,
+          serviceWorkerRegistration: registration
+        });
+
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('getToken timed out - try Chrome or Firefox')), 10000);
+        });
+
+        fcmToken = await Promise.race([tokenPromise, timeoutPromise]);
+
+        if (!fcmToken) {
+          throw new Error('Failed to get FCM token');
+        }
+
+        log(`FCM token obtained (${fcmToken.length} chars)`, 'success');
+        document.getElementById('fcm-token').textContent = fcmToken;
+        document.getElementById('fcm-token-display').classList.remove('hidden');
+        showCard('register-card');
+
+      } catch (error) {
+        log(`Failed to get token: ${error.message}`, 'error');
+        showStatus('token-card', error.message, 'error');
+      }
+    }
+
+    async function registerDevice() {
+      try {
+        if (!fcmToken) {
+          throw new Error('No FCM token available');
+        }
+
+        const qpsUrl = document.getElementById('qps-url').value;
+        const bundleId = document.getElementById('bundle-id').value;
+
+        log(`Registering with QPS at ${qpsUrl}...`);
+
+        const response = await fetch(`${qpsUrl}/v1/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            deviceToken: fcmToken,
+            bundleId: bundleId
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || `HTTP ${response.status}`);
+        }
+
+        ucanToken = data.ucan;
+        log(`Registered successfully, UCAN obtained (${ucanToken.length} chars)`, 'success');
+        document.getElementById('ucan-token').textContent = ucanToken;
+        document.getElementById('ucan-display').classList.remove('hidden');
+        showCard('push-card');
+
+      } catch (error) {
+        log(`Registration failed: ${error.message}`, 'error');
+      }
+    }
+
+    async function sendPush() {
+      await doSendPush(false);
+    }
+
+    async function sendSilentPush() {
+      await doSendPush(true);
+    }
+
+    async function doSendPush(silent) {
+      try {
+        if (!ucanToken) {
+          throw new Error('No UCAN token available');
+        }
+
+        const qpsUrl = document.getElementById('qps-url').value;
+        const title = silent ? undefined : document.getElementById('push-title').value;
+        const body = silent ? undefined : document.getElementById('push-body').value;
+
+        log(`Sending ${silent ? 'silent ' : ''}push notification...`);
+
+        const payload = { ucan: ucanToken };
+        if (title) payload.title = title;
+        if (body) payload.body = body;
+        if (silent) payload.data = { type: 'silent', timestamp: Date.now().toString() };
+
+        const response = await fetch(`${qpsUrl}/v1/push`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || `HTTP ${response.status}`);
+        }
+
+        log('Push notification sent successfully!', 'success');
+
+      } catch (error) {
+        log(`Push failed: ${error.message}`, 'error');
+      }
+    }
+
+    // Restore saved config on load
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedConfig = localStorage.getItem('firebase-config');
+      const savedVapid = localStorage.getItem('vapid-key');
+      const savedUrl = localStorage.getItem('qps-url');
+
+      if (savedConfig) document.getElementById('firebase-config').value = savedConfig;
+      if (savedVapid) document.getElementById('vapid-key').value = savedVapid;
+      if (savedUrl) document.getElementById('qps-url').value = savedUrl;
+
+      log('QPS Demo Client ready. Configure Firebase to begin.');
+    });
+  </script>
+</body>
+</html>
