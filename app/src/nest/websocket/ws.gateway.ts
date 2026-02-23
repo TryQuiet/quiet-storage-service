@@ -55,6 +55,7 @@ export class WebsocketGateway
   // Socket.io Server instance
   @WebSocketServer() io: Server
 
+  // eslint-disable-next-line @typescript-eslint/max-params -- NestJS requires constructor injection
   constructor(
     private readonly communityStorageService: CommunitiesStorageService,
     private readonly communitiesDataStorageService: LogEntrySyncStorageService,

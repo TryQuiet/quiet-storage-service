@@ -1,5 +1,6 @@
 import type { BaseHandlerConfig, BaseWebsocketMessage } from '../../ws.types.js'
 import type { QPSService } from '../../../qps/qps.service.js'
+import type { CommunityOperationStatus } from './common.types.js'
 
 export interface QPSHandlerConfig extends BaseHandlerConfig {
   qpsService: QPSService
@@ -20,7 +21,9 @@ export interface RegisterDeviceResponsePayload {
 }
 
 export interface RegisterDeviceResponse
-  extends BaseWebsocketMessage<RegisterDeviceResponsePayload> {}
+  extends BaseWebsocketMessage<RegisterDeviceResponsePayload> {
+  status: CommunityOperationStatus
+}
 
 export interface SendPushPayload {
   ucan: string
@@ -33,4 +36,6 @@ export interface SendPushMessage extends BaseWebsocketMessage<SendPushPayload> {
   payload: SendPushPayload
 }
 
-export interface SendPushResponse extends BaseWebsocketMessage<undefined> {}
+export interface SendPushResponse extends BaseWebsocketMessage<undefined> {
+  status: CommunityOperationStatus
+}

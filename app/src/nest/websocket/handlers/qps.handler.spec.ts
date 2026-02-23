@@ -45,12 +45,12 @@ describe('QPS WebSocket Handlers', () => {
   })
 
   it('should register both event handlers', () => {
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
     expect(mockSocket.on).toHaveBeenCalledWith(
       WebsocketEvents.QPSRegisterDevice,
       expect.any(Function),
     )
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
     expect(mockSocket.on).toHaveBeenCalledWith(
       WebsocketEvents.QPSSendPush,
       expect.any(Function),
@@ -75,7 +75,7 @@ describe('QPS WebSocket Handlers', () => {
         callback,
       )
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
       expect(mockQpsService.registerDevice).toHaveBeenCalledWith(
         'fcm-token',
         'com.test.app',
@@ -158,7 +158,7 @@ describe('QPS WebSocket Handlers', () => {
         callback,
       )
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
       expect(mockQpsService.sendPush).toHaveBeenCalledWith(
         'valid-ucan',
         'Test',
