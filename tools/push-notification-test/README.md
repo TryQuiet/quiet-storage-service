@@ -73,28 +73,45 @@ export FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE 
 
 ## Usage
 
-1. **Initialize Firebase**: Paste your Firebase config JSON and VAPID key, then click "Initialize Firebase"
+1. **Initialize**: Paste your Firebase config JSON, VAPID key, and QPS server URL, then click "Initialize"
+   - This opens a WebSocket connection to QPS and initializes Firebase
 
 2. **Get FCM Token**: Click "Request Notification Permission & Token"
    - Allow notifications when prompted
    - An FCM device token will be generated
 
 3. **Register with QPS**: Click "Register Device"
-   - This calls `POST /v1/register` with your FCM token
+   - Sends a `register-device-token` WebSocket event with your FCM token
    - You'll receive a UCAN token for authorization
 
 4. **Send Test Push**: Enter a title/body and click "Send Push Notification"
-   - This calls `POST /v1/push` with your UCAN
+   - Sends a `qps-send-push` WebSocket event with your UCAN
    - You should receive a push notification!
 
+## How It Works
+
+QPS uses Socket.io WebSocket events for all operations (not HTTP):
+
+| Event | Direction | Description |
+|-------|-----------|-------------|
+| `register-device-token` | client → server | Register FCM device token, returns UCAN |
+| `qps-send-push` | client → server | Send push notification using UCAN |
+
+Both events use acknowledgment callbacks. The response `status` field will be `success`, `error`, or `not found` (device token expired).
+
 ## Troubleshooting
+
+### "WebSocket connection failed"
+- Make sure the QPS server is running
+- Check the server URL (default: `http://localhost:3000`)
+- CORS is configured to allow all origins in development
 
 ### "Service Worker registration failed"
 - The demo must be served over HTTPS or from localhost
 - Make sure `firebase-messaging-sw.js` is in the same directory
 
 ### "Failed to get FCM token" or timeout
-- **Use Chrome or Firefox** - some Chromium-based browsers (Brave, etc.) have issues with push notifications
+- **Use Chrome or Firefox** — some Chromium-based browsers (Brave, etc.) have issues with push notifications
 - Check that your VAPID key is correct (the public key from Web Push certificates, starts with "B")
 - Ensure notifications are allowed in browser settings
 - Check `chrome://gcm-internals/` for GCM connection status
@@ -102,6 +119,9 @@ export FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE 
 ### "Registration failed: Push service not available"
 - QPS server needs Firebase credentials configured
 - Check that `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY` are set
+
+### "Device token no longer valid — re-register"
+- The FCM token has expired or been revoked; click "Register Device" again after getting a fresh token
 
 ### "Push notification not received"
 - Background notifications only work when the page is not focused
@@ -120,5 +140,4 @@ export FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE 
 
 - FCM tokens can expire or be invalidated; you may need to re-register
 - The service worker must be served from the root path (or specify a scope)
-- CORS must allow requests from localhost to your QPS server
 - This demo stores config in localStorage for convenience

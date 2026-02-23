@@ -85,6 +85,17 @@
     .log-entry.success { color: #6ee7b7; }
     .log-entry.info { color: #93c5fd; }
     .hidden { display: none; }
+    .conn-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #555;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .conn-indicator.connected { background: #6ee7b7; }
+    .conn-indicator.error { background: #fca5a5; }
   </style>
 </head>
 <body>
@@ -93,7 +104,7 @@
 
   <!-- Step 1: Configuration -->
   <div class="card" id="config-card">
-    <h2>1. Firebase Configuration</h2>
+    <h2>1. Configuration</h2>
     <label>Firebase Config (JSON from Firebase Console)</label>
     <textarea id="firebase-config" placeholder='{
   "apiKey": "...",
@@ -105,9 +116,13 @@
 }'></textarea>
     <label>VAPID Key (Cloud Messaging → Web Push certificates)</label>
     <input type="text" id="vapid-key" placeholder="BLxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
-    <label>QPS Server URL</label>
+    <label>QPS Server URL (WebSocket)</label>
     <input type="text" id="qps-url" value="http://localhost:3000">
-    <button onclick="initializeFirebase()">Initialize Firebase</button>
+    <button onclick="initialize()">Initialize</button>
+    <div id="conn-status" style="font-size:13px; color:#888; margin-top:4px;">
+      <span class="conn-indicator" id="conn-dot"></span>
+      <span id="conn-label">Not connected</span>
+    </div>
   </div>
 
   <!-- Step 2: Get FCM Token -->
@@ -150,17 +165,21 @@
     <div class="log" id="log"></div>
   </div>
 
+  <!-- socket.io client -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
     import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js';
 
     let messaging = null;
+    let socket = null;
     let fcmToken = null;
     let ucanToken = null;
 
     // Make functions available globally
-    window.initializeFirebase = initializeFirebase;
+    window.initialize = initialize;
     window.requestToken = requestToken;
     window.registerDevice = registerDevice;
     window.sendPush = sendPush;
@@ -190,11 +209,68 @@
       status.textContent = message;
     }
 
-    async function initializeFirebase() {
+    function setConnStatus(state, label) {
+      const dot = document.getElementById('conn-dot');
+      const lbl = document.getElementById('conn-label');
+      dot.className = `conn-indicator ${state}`;
+      lbl.textContent = label;
+    }
+
+    async function connectSocket(qpsUrl) {
+      // Disconnect any existing socket
+      if (socket != null) {
+        socket.disconnect();
+        socket = null;
+      }
+
+      log(`Connecting to QPS at ${qpsUrl}...`);
+      setConnStatus('', 'Connecting...');
+
+      socket = window.io(qpsUrl, {
+        transports: ['websocket'],
+        timeout: 10_000,
+      });
+
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Connection timed out'));
+        }, 10_000);
+
+        socket.once('connect', () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+
+        socket.once('connect_error', (err) => {
+          clearTimeout(timeout);
+          reject(new Error(`WebSocket connection failed: ${err.message}`));
+        });
+      });
+
+      socket.on('disconnect', (reason) => {
+        log(`Disconnected from QPS: ${reason}`, 'error');
+        setConnStatus('error', `Disconnected: ${reason}`);
+      });
+
+      socket.on('reconnect', () => {
+        log('Reconnected to QPS', 'success');
+        setConnStatus('connected', `Connected (${socket.id})`);
+      });
+
+      setConnStatus('connected', `Connected (${socket.id})`);
+      log(`Connected to QPS (socket ${socket.id})`, 'success');
+    }
+
+    async function initialize() {
       try {
         const configText = document.getElementById('firebase-config').value;
         const config = JSON.parse(configText);
+        const qpsUrl = document.getElementById('qps-url').value;
 
+        // Connect WebSocket to QPS
+        await connectSocket(qpsUrl);
+
+        // Initialize Firebase
         log('Initializing Firebase...');
         const app = initializeApp(config);
         messaging = getMessaging(app);
@@ -204,7 +280,6 @@
           console.log('[Demo] Foreground message received:', payload);
           log(`Push received! Title: "${payload.notification?.title || '(none)'}", Body: "${payload.notification?.body || '(none)'}"`, 'success');
 
-          // Show browser notification for foreground messages (SW doesn't show them when page is focused)
           if (Notification.permission === 'granted') {
             const title = payload.notification?.title || payload.data?.title || 'New Message';
             const body = payload.notification?.body || payload.data?.body || '';
@@ -218,10 +293,11 @@
         // Save config to localStorage
         localStorage.setItem('firebase-config', configText);
         localStorage.setItem('vapid-key', document.getElementById('vapid-key').value);
-        localStorage.setItem('qps-url', document.getElementById('qps-url').value);
+        localStorage.setItem('qps-url', qpsUrl);
 
       } catch (error) {
-        log(`Firebase initialization failed: ${error.message}`, 'error');
+        setConnStatus('error', 'Connection failed');
+        log(`Initialization failed: ${error.message}`, 'error');
       }
     }
 
@@ -241,13 +317,11 @@
 
         log('Permission granted, setting up service worker...');
 
-        // Register service worker and wait for it to be ready
         await navigator.serviceWorker.register('/firebase-messaging-sw.js');
         const registration = await navigator.serviceWorker.ready;
 
         log('Getting FCM token...');
 
-        // Add timeout to detect hanging
         const tokenPromise = getToken(messaging, {
           vapidKey: vapidKey,
           serviceWorkerRegistration: registration
@@ -279,28 +353,27 @@
         if (!fcmToken) {
           throw new Error('No FCM token available');
         }
-
-        const qpsUrl = document.getElementById('qps-url').value;
-        const bundleId = document.getElementById('bundle-id').value;
-
-        log(`Registering with QPS at ${qpsUrl}...`);
-
-        const response = await fetch(`${qpsUrl}/v1/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            deviceToken: fcmToken,
-            bundleId: bundleId
-          })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || `HTTP ${response.status}`);
+        if (socket == null || !socket.connected) {
+          throw new Error('Not connected to QPS — re-initialize');
         }
 
-        ucanToken = data.ucan;
+        const bundleId = document.getElementById('bundle-id').value;
+
+        log(`Registering device with QPS...`);
+
+        const message = {
+          ts: Date.now(),
+          status: 'sending',
+          payload: { deviceToken: fcmToken, bundleId },
+        };
+
+        const response = await socket.emitWithAck('register-device-token', message);
+
+        if (response.status !== 'success' || response.payload?.ucan == null) {
+          throw new Error(response.reason ?? 'Registration failed');
+        }
+
+        ucanToken = response.payload.ucan;
         log(`Registered successfully, UCAN obtained (${ucanToken.length} chars)`, 'success');
         document.getElementById('ucan-token').textContent = ucanToken;
         document.getElementById('ucan-display').classList.remove('hidden');
@@ -324,8 +397,10 @@
         if (!ucanToken) {
           throw new Error('No UCAN token available');
         }
+        if (socket == null || !socket.connected) {
+          throw new Error('Not connected to QPS — re-initialize');
+        }
 
-        const qpsUrl = document.getElementById('qps-url').value;
         const title = silent ? undefined : document.getElementById('push-title').value;
         const body = silent ? undefined : document.getElementById('push-body').value;
 
@@ -336,15 +411,19 @@
         if (body) payload.body = body;
         if (silent) payload.data = { type: 'silent', timestamp: Date.now().toString() };
 
-        const response = await fetch(`${qpsUrl}/v1/push`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        const message = {
+          ts: Date.now(),
+          status: 'sending',
+          payload,
+        };
 
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || `HTTP ${response.status}`);
+        const response = await socket.emitWithAck('qps-send-push', message);
+
+        if (response.status === 'not found') {
+          throw new Error(`Device token no longer valid: ${response.reason ?? 'unknown'} — re-register`);
+        }
+        if (response.status !== 'success') {
+          throw new Error(response.reason ?? 'Push failed');
         }
 
         log('Push notification sent successfully!', 'success');
@@ -364,8 +443,9 @@
       if (savedVapid) document.getElementById('vapid-key').value = savedVapid;
       if (savedUrl) document.getElementById('qps-url').value = savedUrl;
 
-      log('QPS Demo Client ready. Configure Firebase to begin.');
+      log('QPS Demo Client ready. Configure and initialize to begin.');
     });
   </script>
+
 </body>
 </html>
