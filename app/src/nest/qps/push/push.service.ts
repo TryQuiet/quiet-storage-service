@@ -2,8 +2,6 @@
  * Push notification service using Firebase Cloud Messaging
  *
  * FCM handles push notifications for both iOS (via APNs) and Android.
- * When Firebase credentials are not configured, the service operates in mock mode
- * for testing and development purposes.
  */
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common'
 import admin from 'firebase-admin'
@@ -15,22 +13,12 @@ import {
   type PushResult,
   PushErrorCode,
 } from './push.types.js'
-import { Environment } from '../../utils/config/types.js'
-
-/**
- * Environments where mock mode is allowed
- */
-const MOCK_ALLOWED_ENVIRONMENTS: Environment[] = [
-  Environment.Local,
-  Environment.Test,
-]
 
 @Injectable()
 export class PushService implements OnModuleInit, OnModuleDestroy {
   private app: admin.app.App | undefined
   private messaging: admin.messaging.Messaging | undefined
   private available = false
-  private mockMode = false
 
   private readonly logger = createLogger(PushService.name)
 
@@ -45,21 +33,14 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Check if push service is available (either real FCM or mock mode)
+   * Check if push service is available
    */
   isAvailable(): boolean {
     return this.available
   }
 
   /**
-   * Check if running in mock mode
-   */
-  isMockMode(): boolean {
-    return this.mockMode
-  }
-
-  /**
-   * Send a push notification to a device via FCM (or simulate in mock mode)
+   * Send a push notification to a device via FCM
    *
    * @param deviceToken The FCM device token
    * @param payload The notification payload
@@ -74,47 +55,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    // Mock mode - simulate successful push
-    if (this.mockMode) {
-      return this.sendMock(deviceToken, payload)
-    }
-
-    // Real FCM mode
     return await this.sendFcm(deviceToken, payload)
-  }
-
-  /**
-   * Mock implementation for testing without Firebase credentials
-   */
-  private sendMock(deviceToken: string, payload: PushPayload): PushResult {
-    // Simulate some error cases for testing
-    if (deviceToken === 'invalid-token') {
-      this.logger.debug(`[MOCK] Simulating invalid token error`)
-      return {
-        success: false,
-        error: 'Device token is invalid (mock)',
-        errorCode: PushErrorCode.FCM_INVALID_REGISTRATION,
-      }
-    }
-
-    if (deviceToken === 'expired-token') {
-      this.logger.debug(`[MOCK] Simulating expired token error`)
-      return {
-        success: false,
-        error: 'Device token is no longer registered (mock)',
-        errorCode: PushErrorCode.FCM_NOT_REGISTERED,
-      }
-    }
-
-    // Log the mock notification for debugging
-    this.logger.log(`[MOCK] Push notification sent to device: ${deviceToken}`)
-    this.logger.debug(`[MOCK] Payload:`, {
-      title: payload.title,
-      body: payload.body,
-      data: payload.data,
-    })
-
-    return { success: true }
   }
 
   /**
@@ -189,7 +130,6 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Initialize the FCM client with configuration from environment
-   * Falls back to mock mode if credentials are not configured
    */
   private initialize(): void {
     const projectId = ConfigService.getString(EnvVars.FIREBASE_PROJECT_ID)
@@ -197,25 +137,11 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     const privateKey = ConfigService.getString(EnvVars.FIREBASE_PRIVATE_KEY)
 
     if (projectId == null || clientEmail == null || privateKey == null) {
-      const currentEnv = ConfigService.getEnv()
-      const mockAllowed = MOCK_ALLOWED_ENVIRONMENTS.includes(currentEnv)
-
-      if (mockAllowed) {
-        this.logger.warn(
-          `FCM credentials not configured - running in MOCK mode. ` +
-            `Push notifications will be simulated but not actually sent.`,
-        )
-        this.mockMode = true
-        this.available = true
-      } else {
-        this.logger.error(
-          `FCM credentials not configured and mock mode is not allowed in ${currentEnv} environment. ` +
-            `Push notifications will be unavailable. ` +
-            `Please configure FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY.`,
-        )
-        this.mockMode = false
-        this.available = false
-      }
+      this.logger.error(
+        `FCM credentials not configured. Push notifications will be unavailable. ` +
+          `Please configure FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY.`,
+      )
+      this.available = false
       return
     }
 
@@ -239,29 +165,11 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
 
       this.messaging = this.app.messaging()
       this.available = true
-      this.mockMode = false
 
       this.logger.log(`FCM client initialized for project ${projectId}`)
     } catch (error) {
       this.logger.error(`Failed to initialize FCM client`, error)
-
-      const currentEnv = ConfigService.getEnv()
-      const mockAllowed = MOCK_ALLOWED_ENVIRONMENTS.includes(currentEnv)
-
-      if (mockAllowed) {
-        this.logger.warn(
-          `Falling back to MOCK mode due to FCM initialization failure`,
-        )
-        this.mockMode = true
-        this.available = true
-      } else {
-        this.logger.error(
-          `FCM initialization failed and mock mode is not allowed in ${currentEnv} environment. ` +
-            `Push notifications will be unavailable.`,
-        )
-        this.mockMode = false
-        this.available = false
-      }
+      this.available = false
     }
   }
 
