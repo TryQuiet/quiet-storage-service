@@ -76,7 +76,7 @@
   "packageManager": "pnpm@10.6.0",
   "pnpm": {
     "overrides": {
-      "fast-xml-parser": ">=5.3.4",
+      "fast-xml-parser": ">=5.3.5",
       "esbuild": ">=0.25.0"
     }
   }
