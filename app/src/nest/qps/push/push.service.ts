@@ -152,6 +152,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
           payload: {
             aps: {
               contentAvailable: true,
+              mutableContent: true,
             },
           },
         },
