@@ -28,6 +28,7 @@
     "start:bare": "pnpm run --filter app start:bare",
     "start:dev": "pnpm run --filter app start:dev",
     "start:prod": "pnpm run --filter app start:prod",
+    "start:debug": "pnpm run --filter app start:debug",
     "start:client": "pnpm run --filter app start:client",
     "start:client:dev": "pnpm run --filter app start:client:dev",
     "run:app": "pnpm run --filter app ",
@@ -72,5 +73,11 @@
     "npm": ">=10.9.2",
     "pnpm": "10.6.0"
   },
-  "packageManager": "pnpm@10.6.0"
+  "packageManager": "pnpm@10.6.0",
+  "pnpm": {
+    "overrides": {
+      "fast-xml-parser": ">=5.3.5",
+      "esbuild": ">=0.25.0"
+    }
+  }
 }

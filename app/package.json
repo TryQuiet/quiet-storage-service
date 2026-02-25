@@ -56,9 +56,9 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@aws-sdk/client-lambda": "^3.865.0",
-    "@aws-sdk/client-secrets-manager": "^3.864.0",
-    "@aws-sdk/rds-signer": "^3.864.0",
+    "@aws-sdk/client-lambda": "^3.981.0",
+    "@aws-sdk/client-secrets-manager": "^3.981.0",
+    "@aws-sdk/rds-signer": "^3.981.0",
     "@dotenvx/dotenvx": "^1.36.0",
     "@localfirst/auth": "workspace:*",
     "@localfirst/crdx": "workspace:*",
@@ -103,7 +103,9 @@
     "uint8arrays": "^5.1.0",
     "winston": "^3.17.0",
     "winston-aws-cloudwatch": "^3.0.0",
-    "winston-daily-rotate-file": "^5.0.0"
+    "winston-daily-rotate-file": "^5.0.0",
+    "@ucans/ucans": "^0.12.0",
+    "firebase-admin": "^13.6.0"
   },
   "devDependencies": {
     "@babel/preset-typescript": "^7.27.0",

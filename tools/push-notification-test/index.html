@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QPS Demo Client</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+    }
+    h1 { color: #7c3aed; margin-bottom: 8px; }
+    .subtitle { color: #888; margin-bottom: 24px; }
+    .card {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .card h2 { margin-top: 0; font-size: 14px; color: #888; text-transform: uppercase; }
+    label { display: block; margin-bottom: 8px; font-size: 14px; color: #aaa; }
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #333;
+      border-radius: 4px;
+      background: #0f0f23;
+      color: #eee;
+      font-family: monospace;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    textarea { min-height: 100px; resize: vertical; }
+    button {
+      background: #7c3aed;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+    button:hover { background: #6d28d9; }
+    button:disabled { background: #444; cursor: not-allowed; }
+    button.secondary { background: #374151; }
+    button.secondary:hover { background: #4b5563; }
+    .status {
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    .status.success { background: #064e3b; color: #6ee7b7; }
+    .status.error { background: #7f1d1d; color: #fca5a5; }
+    .status.info { background: #1e3a5f; color: #93c5fd; }
+    .token-display {
+      word-break: break-all;
+      font-family: monospace;
+      font-size: 11px;
+      background: #0f0f23;
+      padding: 8px;
+      border-radius: 4px;
+      max-height: 80px;
+      overflow-y: auto;
+    }
+    .log {
+      background: #0f0f23;
+      padding: 12px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .log-entry { margin-bottom: 4px; }
+    .log-entry.error { color: #fca5a5; }
+    .log-entry.success { color: #6ee7b7; }
+    .log-entry.info { color: #93c5fd; }
+    .hidden { display: none; }
+    .conn-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #555;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .conn-indicator.connected { background: #6ee7b7; }
+    .conn-indicator.error { background: #fca5a5; }
+  </style>
+</head>
+<body>
+  <h1>QPS Demo Client</h1>
+  <p class="subtitle">Test Firebase Cloud Messaging integration</p>
+
+  <!-- Step 1: Configuration -->
+  <div class="card" id="config-card">
+    <h2>1. Configuration</h2>
+    <label>Firebase Config (JSON from Firebase Console)</label>
+    <textarea id="firebase-config" placeholder='{
+  "apiKey": "...",
+  "authDomain": "...",
+  "projectId": "...",
+  "storageBucket": "...",
+  "messagingSenderId": "...",
+  "appId": "..."
+}'></textarea>
+    <label>VAPID Key (Cloud Messaging → Web Push certificates)</label>
+    <input type="text" id="vapid-key" placeholder="BLxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+    <label>QPS Server URL (WebSocket)</label>
+    <input type="text" id="qps-url" value="http://localhost:3000">
+    <button onclick="initialize()">Initialize</button>
+    <div id="conn-status" style="font-size:13px; color:#888; margin-top:4px;">
+      <span class="conn-indicator" id="conn-dot"></span>
+      <span id="conn-label">Not connected</span>
+    </div>
+  </div>
+
+  <!-- Step 2: Get FCM Token -->
+  <div class="card hidden" id="token-card">
+    <h2>2. FCM Device Token</h2>
+    <div id="token-status"></div>
+    <button onclick="requestToken()">Request Notification Permission & Token</button>
+    <div id="fcm-token-display" class="hidden">
+      <label>FCM Token:</label>
+      <div class="token-display" id="fcm-token"></div>
+    </div>
+  </div>
+
+  <!-- Step 3: Register with QPS -->
+  <div class="card hidden" id="register-card">
+    <h2>3. Register with QPS</h2>
+    <label>Bundle ID</label>
+    <input type="text" id="bundle-id" value="com.tryquiet.quiet">
+    <button onclick="registerDevice()">Register Device</button>
+    <div id="ucan-display" class="hidden">
+      <label>UCAN Token:</label>
+      <div class="token-display" id="ucan-token"></div>
+    </div>
+  </div>
+
+  <!-- Step 4: Send Push -->
+  <div class="card hidden" id="push-card">
+    <h2>4. Send Test Push</h2>
+    <label>Title (optional)</label>
+    <input type="text" id="push-title" value="Test Notification">
+    <label>Body (optional)</label>
+    <input type="text" id="push-body" value="Hello from QPS Demo!">
+    <button onclick="sendPush()">Send Push Notification</button>
+    <button class="secondary" onclick="sendSilentPush()">Send Silent Push</button>
+  </div>
+
+  <!-- Log -->
+  <div class="card">
+    <h2>Log</h2>
+    <div class="log" id="log"></div>
+  </div>
+
+  <!-- socket.io client -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js';
+
+    let messaging = null;
+    let socket = null;
+    let fcmToken = null;
+    let ucanToken = null;
+
+    // Make functions available globally
+    window.initialize = initialize;
+    window.requestToken = requestToken;
+    window.registerDevice = registerDevice;
+    window.sendPush = sendPush;
+    window.sendSilentPush = sendSilentPush;
+
+    function log(message, type = 'info') {
+      const logDiv = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logDiv.insertBefore(entry, logDiv.firstChild);
+    }
+
+    function showCard(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+
+    function showStatus(containerId, message, type) {
+      const container = document.getElementById(containerId);
+      let status = container.querySelector('.status');
+      if (!status) {
+        status = document.createElement('div');
+        status.className = 'status';
+        container.insertBefore(status, container.querySelector('button'));
+      }
+      status.className = `status ${type}`;
+      status.textContent = message;
+    }
+
+    function setConnStatus(state, label) {
+      const dot = document.getElementById('conn-dot');
+      const lbl = document.getElementById('conn-label');
+      dot.className = `conn-indicator ${state}`;
+      lbl.textContent = label;
+    }
+
+    async function connectSocket(qpsUrl) {
+      // Disconnect any existing socket
+      if (socket != null) {
+        socket.disconnect();
+        socket = null;
+      }
+
+      log(`Connecting to QPS at ${qpsUrl}...`);
+      setConnStatus('', 'Connecting...');
+
+      socket = window.io(qpsUrl, {
+        transports: ['websocket'],
+        timeout: 10_000,
+      });
+
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Connection timed out'));
+        }, 10_000);
+
+        socket.once('connect', () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+
+        socket.once('connect_error', (err) => {
+          clearTimeout(timeout);
+          reject(new Error(`WebSocket connection failed: ${err.message}`));
+        });
+      });
+
+      socket.on('disconnect', (reason) => {
+        log(`Disconnected from QPS: ${reason}`, 'error');
+        setConnStatus('error', `Disconnected: ${reason}`);
+      });
+
+      socket.on('reconnect', () => {
+        log('Reconnected to QPS', 'success');
+        setConnStatus('connected', `Connected (${socket.id})`);
+      });
+
+      setConnStatus('connected', `Connected (${socket.id})`);
+      log(`Connected to QPS (socket ${socket.id})`, 'success');
+    }
+
+    async function initialize() {
+      try {
+        const configText = document.getElementById('firebase-config').value;
+        const config = JSON.parse(configText);
+        const qpsUrl = document.getElementById('qps-url').value;
+
+        // Connect WebSocket to QPS
+        await connectSocket(qpsUrl);
+
+        // Initialize Firebase
+        log('Initializing Firebase...');
+        const app = initializeApp(config);
+        messaging = getMessaging(app);
+
+        // Listen for foreground messages
+        onMessage(messaging, (payload) => {
+          console.log('[Demo] Foreground message received:', payload);
+          log(`Push received! Title: "${payload.notification?.title || '(none)'}", Body: "${payload.notification?.body || '(none)'}"`, 'success');
+
+          if (Notification.permission === 'granted') {
+            const title = payload.notification?.title || payload.data?.title || 'New Message';
+            const body = payload.notification?.body || payload.data?.body || '';
+            new Notification(title, { body, icon: '/favicon.ico' });
+          }
+        });
+
+        log('Firebase initialized successfully', 'success');
+        showCard('token-card');
+
+        // Save config to localStorage
+        localStorage.setItem('firebase-config', configText);
+        localStorage.setItem('vapid-key', document.getElementById('vapid-key').value);
+        localStorage.setItem('qps-url', qpsUrl);
+
+      } catch (error) {
+        setConnStatus('error', 'Connection failed');
+        log(`Initialization failed: ${error.message}`, 'error');
+      }
+    }
+
+    async function requestToken() {
+      try {
+        const vapidKey = document.getElementById('vapid-key').value;
+        if (!vapidKey) {
+          throw new Error('VAPID key is required');
+        }
+
+        log('Requesting notification permission...');
+        const permission = await Notification.requestPermission();
+
+        if (permission !== 'granted') {
+          throw new Error(`Notification permission ${permission}`);
+        }
+
+        log('Permission granted, setting up service worker...');
+
+        await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        const registration = await navigator.serviceWorker.ready;
+
+        log('Getting FCM token...');
+
+        const tokenPromise = getToken(messaging, {
+          vapidKey: vapidKey,
+          serviceWorkerRegistration: registration
+        });
+
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('getToken timed out - try Chrome or Firefox')), 10000);
+        });
+
+        fcmToken = await Promise.race([tokenPromise, timeoutPromise]);
+
+        if (!fcmToken) {
+          throw new Error('Failed to get FCM token');
+        }
+
+        log(`FCM token obtained (${fcmToken.length} chars)`, 'success');
+        document.getElementById('fcm-token').textContent = fcmToken;
+        document.getElementById('fcm-token-display').classList.remove('hidden');
+        showCard('register-card');
+
+      } catch (error) {
+        log(`Failed to get token: ${error.message}`, 'error');
+        showStatus('token-card', error.message, 'error');
+      }
+    }
+
+    async function registerDevice() {
+      try {
+        if (!fcmToken) {
+          throw new Error('No FCM token available');
+        }
+        if (socket == null || !socket.connected) {
+          throw new Error('Not connected to QPS — re-initialize');
+        }
+
+        const bundleId = document.getElementById('bundle-id').value;
+
+        log(`Registering device with QPS...`);
+
+        const message = {
+          ts: Date.now(),
+          status: 'sending',
+          payload: { deviceToken: fcmToken, bundleId },
+        };
+
+        const response = await socket.emitWithAck('register-device-token', message);
+
+        if (response.status !== 'success' || response.payload?.ucan == null) {
+          throw new Error(response.reason ?? 'Registration failed');
+        }
+
+        ucanToken = response.payload.ucan;
+        log(`Registered successfully, UCAN obtained (${ucanToken.length} chars)`, 'success');
+        document.getElementById('ucan-token').textContent = ucanToken;
+        document.getElementById('ucan-display').classList.remove('hidden');
+        showCard('push-card');
+
+      } catch (error) {
+        log(`Registration failed: ${error.message}`, 'error');
+      }
+    }
+
+    async function sendPush() {
+      await doSendPush(false);
+    }
+
+    async function sendSilentPush() {
+      await doSendPush(true);
+    }
+
+    async function doSendPush(silent) {
+      try {
+        if (!ucanToken) {
+          throw new Error('No UCAN token available');
+        }
+        if (socket == null || !socket.connected) {
+          throw new Error('Not connected to QPS — re-initialize');
+        }
+
+        const title = silent ? undefined : document.getElementById('push-title').value;
+        const body = silent ? undefined : document.getElementById('push-body').value;
+
+        log(`Sending ${silent ? 'silent ' : ''}push notification...`);
+
+        const payload = { ucan: ucanToken };
+        if (title) payload.title = title;
+        if (body) payload.body = body;
+        if (silent) payload.data = { type: 'silent', timestamp: Date.now().toString() };
+
+        const message = {
+          ts: Date.now(),
+          status: 'sending',
+          payload,
+        };
+
+        const response = await socket.emitWithAck('qps-send-push', message);
+
+        if (response.status === 'not found') {
+          throw new Error(`Device token no longer valid: ${response.reason ?? 'unknown'} — re-register`);
+        }
+        if (response.status !== 'success') {
+          throw new Error(response.reason ?? 'Push failed');
+        }
+
+        log('Push notification sent successfully!', 'success');
+
+      } catch (error) {
+        log(`Push failed: ${error.message}`, 'error');
+      }
+    }
+
+    // Restore saved config on load
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedConfig = localStorage.getItem('firebase-config');
+      const savedVapid = localStorage.getItem('vapid-key');
+      const savedUrl = localStorage.getItem('qps-url');
+
+      if (savedConfig) document.getElementById('firebase-config').value = savedConfig;
+      if (savedVapid) document.getElementById('vapid-key').value = savedVapid;
+      if (savedUrl) document.getElementById('qps-url').value = savedUrl;
+
+      log('QPS Demo Client ready. Configure and initialize to begin.');
+    });
+  </script>
+
+</body>
+</html>

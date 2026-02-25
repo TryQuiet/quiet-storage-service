@@ -5,6 +5,7 @@ import type { WebsocketClient } from '../../ws.client.js'
 import { createLogger } from '../../../nest/app/logger/logger.js'
 import { confirm } from '@inquirer/prompts'
 import { createCommunity, getCommunity } from './community.prompt.js'
+import { registerDevice, sendPushNotification } from './push.prompt.js'
 import type { Community } from '../../../nest/communities/types.js'
 
 const logger = createLogger('Client:Main')
@@ -29,6 +30,8 @@ const mainLoop = async (
   options: RuntimeOptions,
 ): Promise<boolean> => {
   let exit = false
+  let lastUcan: string | undefined = undefined
+
   while (!exit) {
     const defaultChoices = [
       {
@@ -40,6 +43,16 @@ const mainLoop = async (
         name: 'Get community',
         value: 'getCommunity',
         description: 'Get a community by ID from the server',
+      },
+      {
+        name: 'Register device (Push)',
+        value: 'registerDevice',
+        description: 'Register a device for push notifications and get a UCAN',
+      },
+      {
+        name: 'Send push notification',
+        value: 'sendPush',
+        description: 'Send a push notification using a UCAN token',
       },
       {
         name: 'Disconnect',
@@ -67,6 +80,17 @@ const mainLoop = async (
           case 'getCommunity': {
             community = await getCommunity(client, community)
             logger.log(JSON.stringify(community, null, 2))
+            break
+          }
+          case 'registerDevice': {
+            const ucan = await registerDevice(client)
+            if (ucan != null) {
+              lastUcan = ucan
+            }
+            break
+          }
+          case 'sendPush': {
+            await sendPushNotification(client, lastUcan)
             break
           }
           case 'disconnect': {

@@ -49,4 +49,12 @@ export enum EnvVars {
 
   // hcaptcha settings
   HCAPTCHA_SECRET_KEY = 'HCAPTCHA_SECRET_KEY',
+
+  // QPS (Quiet Push Service) settings
+  QPS_ENABLED = 'QPS_ENABLED',
+
+  // Firebase Cloud Messaging settings (used for both iOS and Android)
+  FIREBASE_PROJECT_ID = 'FIREBASE_PROJECT_ID',
+  FIREBASE_CLIENT_EMAIL = 'FIREBASE_CLIENT_EMAIL',
+  FIREBASE_PRIVATE_KEY = 'FIREBASE_PRIVATE_KEY',
 }
