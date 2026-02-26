@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 1.0.0 (2026-02-26)
+
+- Feat/2806 log sync catchup (#19) ([0d6dd9d](https://github.com/TryQuiet/quiet-storage-service/commit/0d6dd9d)), closes [#19](https://github.com/TryQuiet/quiet-storage-service/issues/19)
+- Push notifications via Firebase API (#21) ([f37766c](https://github.com/TryQuiet/quiet-storage-service/commit/f37766c)), closes [#21](https://github.com/TryQuiet/quiet-storage-service/issues/21)
+- Update app package CHANGELOG.md ([6bd683d](https://github.com/TryQuiet/quiet-storage-service/commit/6bd683d))
+- feat(3058): Update auth module to use lockbox/self-assign changes (#22) ([2aaf17e](https://github.com/TryQuiet/quiet-storage-service/commit/2aaf17e)), closes [#22](https://github.com/TryQuiet/quiet-storage-service/issues/22)
+
 ## 1.0.0-alpha.42 (2025-12-22)
 
 - chore(deploys): Improve deploy/versioning automation (#18) ([166998c](https://github.com/TryQuiet/quiet-storage-service/commit/166998c)), closes [#18](https://github.com/TryQuiet/quiet-storage-service/issues/18)
