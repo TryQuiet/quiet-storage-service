@@ -138,6 +138,7 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.ERROR,
         reason: 'Batch push failed',
+        payload: { invalidTokens: [] },
       }
       callback(response)
     }
