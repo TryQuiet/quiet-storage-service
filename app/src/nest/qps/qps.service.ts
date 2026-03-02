@@ -27,6 +27,14 @@ export interface SendPushResult {
   tokenInvalid?: boolean
 }
 
+/**
+ * Result of sending a batch of push notifications
+ */
+export interface SendBatchPushResult {
+  success: boolean
+  error?: string
+}
+
 @Injectable()
 export class QPSService {
   private readonly logger = createLogger(QPSService.name)
@@ -121,6 +129,36 @@ export class QPSService {
     }
 
     this.logger.debug(`Push notification sent successfully`)
+    return { success: true }
+  }
+
+  /**
+   * Send push notifications to a batch of devices using their UCANs
+   *
+   * @param ucans Array of UCAN tokens for target devices
+   * @returns Batch result indicating overall success
+   */
+  async sendBatchPush(ucans: string[]): Promise<SendBatchPushResult> {
+    if (ucans.length === 0) {
+      return { success: true }
+    }
+
+    let successCount = 0
+    for (const ucan of ucans) {
+      const result = await this.sendPush(ucan)
+      if (result.success) successCount++
+    }
+
+    if (successCount === 0) {
+      this.logger.warn(
+        `Batch push failed: all ${ucans.length} notifications failed`,
+      )
+      return { success: false, error: 'All push notifications failed' }
+    }
+
+    this.logger.debug(
+      `Batch push complete: ${successCount}/${ucans.length} succeeded`,
+    )
     return { success: true }
   }
 

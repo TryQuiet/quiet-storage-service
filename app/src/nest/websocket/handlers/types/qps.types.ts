@@ -39,3 +39,17 @@ export interface SendPushMessage extends BaseWebsocketMessage<SendPushPayload> {
 export interface SendPushResponse extends BaseWebsocketMessage<undefined> {
   status: CommunityOperationStatus
 }
+
+export interface SendBatchPushPayload {
+  teamId: string
+  ucans: string[]
+}
+
+export interface SendBatchPushMessage
+  extends BaseWebsocketMessage<SendBatchPushPayload> {
+  payload: SendBatchPushPayload
+}
+
+export interface SendBatchPushResponse extends BaseWebsocketMessage<undefined> {
+  status: CommunityOperationStatus
+}

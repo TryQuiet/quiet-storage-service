@@ -6,6 +6,8 @@ import type {
   QPSHandlerConfig,
   RegisterDeviceMessage,
   RegisterDeviceResponse,
+  SendBatchPushMessage,
+  SendBatchPushResponse,
   SendPushMessage,
   SendPushResponse,
 } from './types/qps.types.js'
@@ -101,6 +103,42 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
     }
   }
 
+  async function handleSendBatchPush(
+    message: SendBatchPushMessage,
+    callback: (response: SendBatchPushResponse) => void,
+  ): Promise<void> {
+    try {
+      const result = await config.qpsService.sendBatchPush(
+        message.payload.ucans,
+      )
+
+      if (!result.success) {
+        const response: SendBatchPushResponse = {
+          ts: DateTime.utc().toMillis(),
+          status: CommunityOperationStatus.ERROR,
+          reason: result.error ?? 'Batch push failed',
+        }
+        callback(response)
+        return
+      }
+
+      const response: SendBatchPushResponse = {
+        ts: DateTime.utc().toMillis(),
+        status: CommunityOperationStatus.SUCCESS,
+      }
+      callback(response)
+    } catch (error) {
+      _logger.error('Error handling send batch push', error)
+      const response: SendBatchPushResponse = {
+        ts: DateTime.utc().toMillis(),
+        status: CommunityOperationStatus.ERROR,
+        reason: 'Batch push failed',
+      }
+      callback(response)
+    }
+  }
+
   config.socket.on(WebsocketEvents.QPSRegisterDevice, handleRegisterDevice)
   config.socket.on(WebsocketEvents.QPSSendPush, handleSendPush)
+  config.socket.on(WebsocketEvents.QPSSendBatchPush, handleSendBatchPush)
 }
