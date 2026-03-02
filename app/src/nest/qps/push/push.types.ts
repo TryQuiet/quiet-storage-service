@@ -21,6 +21,15 @@ export interface PushResult {
 }
 
 /**
+ * Result of sending a multicast push notification
+ */
+export interface MulticastPushResult {
+  successCount: number
+  failureCount: number
+  invalidTokens: string[]
+}
+
+/**
  * Error codes for push notification failures
  */
 export enum PushErrorCode {

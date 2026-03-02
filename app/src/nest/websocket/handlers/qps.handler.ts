@@ -120,6 +120,7 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
           ts: DateTime.utc().toMillis(),
           status: CommunityOperationStatus.ERROR,
           reason: result.error ?? 'Batch push failed',
+          payload: { invalidTokens: result.invalidTokens ?? [] },
         }
         callback(response)
         return
@@ -128,6 +129,7 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
       const response: SendBatchPushResponse = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.SUCCESS,
+        payload: { invalidTokens: result.invalidTokens ?? [] },
       }
       callback(response)
     } catch (error) {

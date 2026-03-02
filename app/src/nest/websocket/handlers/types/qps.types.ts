@@ -52,6 +52,11 @@ export interface SendBatchPushMessage
   payload: SendBatchPushPayload
 }
 
-export interface SendBatchPushResponse extends BaseWebsocketMessage<undefined> {
+export interface SendBatchPushResponsePayload {
+  invalidTokens: string[]
+}
+
+export interface SendBatchPushResponse
+  extends BaseWebsocketMessage<SendBatchPushResponsePayload> {
   status: CommunityOperationStatus
 }

@@ -7,7 +7,7 @@ import { Injectable } from '@nestjs/common'
 import { createLogger } from '../app/logger/logger.js'
 import { UcanService } from './ucan/ucan.service.js'
 import { PushService } from './push/push.service.js'
-import { PushErrorCode } from './push/push.types.js'
+import { PushErrorCode, type MulticastPushResult } from './push/push.types.js'
 
 /**
  * Result of a device registration
@@ -33,6 +33,7 @@ export interface SendPushResult {
 export interface SendBatchPushResult {
   success: boolean
   error?: string
+  invalidTokens?: string[]
 }
 
 @Injectable()
@@ -146,25 +147,59 @@ export class QPSService {
   ): Promise<SendBatchPushResult> {
     if (ucans.length === 0) {
       return { success: true }
-    }
-
-    let successCount = 0
-    for (const ucan of ucans) {
-      const result = await this.sendPush(ucan, title, body, data)
-      if (result.success) successCount++
-    }
-
-    if (successCount === 0) {
-      this.logger.warn(
-        `Batch push failed: all ${ucans.length} notifications failed`,
+    } else if (ucans.length > 500) {
+      this.logger.debug(
+        `Batch push failed: ${ucans.length} UCANs exceeds firebase limit of 500`,
       )
-      return { success: false, error: 'All push notifications failed' }
+      return {
+        success: false,
+        error: 'Batch size exceeds limit of 500',
+      }
+    }
+
+    // Validate all UCANs and extract device tokens
+    const deviceTokens: string[] = []
+    for (const ucan of ucans) {
+      const validation = await this.ucanService.validateUcan(ucan)
+      if (validation.valid && validation.deviceToken != null) {
+        deviceTokens.push(validation.deviceToken)
+      } else {
+        this.logger.debug(
+          `Skipping invalid UCAN in batch: ${validation.error ?? 'unknown error'}`,
+        )
+      }
+    }
+
+    if (deviceTokens.length === 0) {
+      this.logger.warn(`Batch push failed: no valid UCANs`)
+      return { success: false, error: 'No valid device tokens' }
+    }
+
+    // Use FCM multicast API for efficient batch delivery
+    const result: MulticastPushResult = await this.pushService.sendMulticast(
+      deviceTokens,
+      {
+        title,
+        body,
+        data,
+      },
+    )
+
+    if (result.successCount === 0) {
+      this.logger.warn(
+        `Batch push failed: all ${deviceTokens.length} notifications failed`,
+      )
+      return {
+        success: false,
+        error: 'All push notifications failed',
+        invalidTokens: result.invalidTokens,
+      }
     }
 
     this.logger.debug(
-      `Batch push complete: ${successCount}/${ucans.length} succeeded`,
+      `Batch push complete: ${result.successCount}/${deviceTokens.length} succeeded, ${result.invalidTokens.length} invalid tokens`,
     )
-    return { success: true }
+    return { success: true, invalidTokens: result.invalidTokens }
   }
 
   /**
