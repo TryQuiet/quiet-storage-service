@@ -138,14 +138,19 @@ export class QPSService {
    * @param ucans Array of UCAN tokens for target devices
    * @returns Batch result indicating overall success
    */
-  async sendBatchPush(ucans: string[]): Promise<SendBatchPushResult> {
+  async sendBatchPush(
+    ucans: string[],
+    title?: string,
+    body?: string,
+    data?: Record<string, string>,
+  ): Promise<SendBatchPushResult> {
     if (ucans.length === 0) {
       return { success: true }
     }
 
     let successCount = 0
     for (const ucan of ucans) {
-      const result = await this.sendPush(ucan)
+      const result = await this.sendPush(ucan, title, body, data)
       if (result.success) successCount++
     }
 

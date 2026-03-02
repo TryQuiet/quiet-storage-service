@@ -110,6 +110,9 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
     try {
       const result = await config.qpsService.sendBatchPush(
         message.payload.ucans,
+        message.payload.title,
+        message.payload.body,
+        message.payload.data,
       )
 
       if (!result.success) {

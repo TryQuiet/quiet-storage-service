@@ -41,8 +41,10 @@ export interface SendPushResponse extends BaseWebsocketMessage<undefined> {
 }
 
 export interface SendBatchPushPayload {
-  teamId: string
   ucans: string[]
+  title?: string
+  body?: string
+  data?: Record<string, string>
 }
 
 export interface SendBatchPushMessage
