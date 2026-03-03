@@ -11,6 +11,7 @@ import { EnvVars } from '../../utils/config/env_vars.js'
 import {
   type PushPayload,
   type PushResult,
+  type MulticastPushResult,
   PushErrorCode,
 } from './push.types.js'
 
@@ -56,6 +57,110 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     }
 
     return await this.sendFcm(deviceToken, payload)
+  }
+
+  /**
+   * Send a push notification to multiple devices via FCM multicast
+   *
+   * @param deviceTokens Array of FCM device tokens
+   * @param payload The notification payload
+   * @returns Result with success/failure counts and invalid tokens
+   */
+  async sendMulticast(
+    deviceTokens: string[],
+    payload: PushPayload,
+  ): Promise<MulticastPushResult> {
+    if (!this.available || this.messaging == null) {
+      this.logger.warn('Push service not available for multicast')
+      return {
+        successCount: 0,
+        failureCount: deviceTokens.length,
+        invalidTokens: [],
+      }
+    }
+
+    if (deviceTokens.length === 0) {
+      return {
+        successCount: 0,
+        failureCount: 0,
+        invalidTokens: [],
+      }
+    }
+
+    try {
+      const message: admin.messaging.MulticastMessage = {
+        tokens: deviceTokens,
+        notification:
+          payload.title != null || payload.body != null
+            ? {
+                title: payload.title,
+                body: payload.body,
+              }
+            : undefined,
+        data: payload.data,
+        android: {
+          priority: 'high',
+        },
+        apns: {
+          payload: {
+            aps: {
+              contentAvailable: true,
+              mutableContent: true,
+            },
+          },
+        },
+        webpush: {
+          headers: {
+            Urgency: 'high',
+          },
+          notification:
+            payload.title != null || payload.body != null
+              ? {
+                  title: payload.title,
+                  body: payload.body,
+                }
+              : undefined,
+        },
+      }
+
+      this.logger.log(
+        `Sending multicast push to ${deviceTokens.length} devices`,
+      )
+
+      const response = await this.messaging.sendEachForMulticast(message)
+
+      const invalidTokens: string[] = []
+      response.responses.forEach((resp, idx) => {
+        if (!resp.success) {
+          const error = resp.error
+          const errorCode = error?.code
+
+          if (
+            errorCode === 'messaging/invalid-registration-token' ||
+            errorCode === 'messaging/registration-token-not-registered'
+          ) {
+            invalidTokens.push(deviceTokens[idx])
+          }
+        }
+      })
+
+      this.logger.log(
+        `Multicast complete: ${response.successCount}/${deviceTokens.length} succeeded, ${invalidTokens.length} invalid tokens`,
+      )
+
+      return {
+        successCount: response.successCount,
+        failureCount: response.failureCount,
+        invalidTokens,
+      }
+    } catch (error) {
+      this.logger.error('Error sending multicast push:', error)
+      return {
+        successCount: 0,
+        failureCount: deviceTokens.length,
+        invalidTokens: [],
+      }
+    }
   }
 
   /**

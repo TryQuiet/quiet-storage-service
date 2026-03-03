@@ -5,7 +5,11 @@ import type { WebsocketClient } from '../../ws.client.js'
 import { createLogger } from '../../../nest/app/logger/logger.js'
 import { confirm } from '@inquirer/prompts'
 import { createCommunity, getCommunity } from './community.prompt.js'
-import { registerDevice, sendPushNotification } from './push.prompt.js'
+import {
+  registerDevice,
+  sendBatchPushNotification,
+  sendPushNotification,
+} from './push.prompt.js'
 import type { Community } from '../../../nest/communities/types.js'
 
 const logger = createLogger('Client:Main')
@@ -55,6 +59,12 @@ const mainLoop = async (
         description: 'Send a push notification using a UCAN token',
       },
       {
+        name: 'Send batch push notification',
+        value: 'sendBatchPush',
+        description:
+          'Send push notifications to multiple devices using UCAN tokens',
+      },
+      {
         name: 'Disconnect',
         value: 'disconnect',
         description: 'Disconnect client',
@@ -91,6 +101,10 @@ const mainLoop = async (
           }
           case 'sendPush': {
             await sendPushNotification(client, lastUcan)
+            break
+          }
+          case 'sendBatchPush': {
+            await sendBatchPushNotification(client, lastUcan)
             break
           }
           case 'disconnect': {

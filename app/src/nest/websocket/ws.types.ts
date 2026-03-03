@@ -39,6 +39,7 @@ export enum WebsocketEvents {
   // QPS (push notifications)
   QPSRegisterDevice = 'register-device-token',
   QPSSendPush = 'qps-send-push',
+  QPSSendBatchPush = 'qps-send-batch-push',
 }
 
 /**

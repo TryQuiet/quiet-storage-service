@@ -7,6 +7,8 @@ import type { WebsocketClient } from '../../ws.client.js'
 import type {
   RegisterDeviceMessage,
   RegisterDeviceResponse,
+  SendBatchPushMessage,
+  SendBatchPushResponse,
   SendPushMessage,
   SendPushResponse,
 } from '../../../nest/websocket/handlers/types/qps.types.js'
@@ -177,6 +179,107 @@ export const sendPushNotification = async (
     'Sending push notification...',
     'Push notification sent successfully!',
     'Failed to send push notification',
+  )
+
+  return result === true
+}
+
+/**
+ * Send a batch push notification using multiple UCAN tokens
+ */
+export const sendBatchPushNotification = async (
+  client: WebsocketClient,
+  existingUcan?: string,
+): Promise<boolean> => {
+  const ucansInput = await input({
+    message: 'Enter UCAN tokens (comma-separated):',
+    default: existingUcan,
+    validate: (value: string | undefined) => {
+      if (value == null || value.trim() === '') {
+        return 'At least one UCAN token is required'
+      }
+      return true
+    },
+  })
+  const ucans = ucansInput
+    .split(',')
+    .map(u => u.trim().replace(/\s+/g, ''))
+    .filter(u => u !== '')
+
+  const title = await input({
+    message: 'Enter notification title (optional, press Enter to skip):',
+    default: undefined,
+  })
+
+  const body = await input({
+    message: 'Enter notification body (optional, press Enter to skip):',
+    default: undefined,
+  })
+
+  const dataInput = await input({
+    message:
+      'Enter custom data as JSON (optional, press Enter to skip, e.g., {"key":"value"}):',
+    default: undefined,
+    validate: (value: string | undefined) => {
+      if (value == null || value === '') {
+        return true
+      }
+      try {
+        JSON.parse(value)
+        return true
+      } catch {
+        return 'Invalid JSON format'
+      }
+    },
+  })
+
+  const payload: SendBatchPushMessage['payload'] = { ucans }
+  if (title !== '') {
+    payload.title = title
+  }
+  if (body !== '') {
+    payload.body = body
+  }
+  if (dataInput !== '') {
+    const parsed: unknown = JSON.parse(dataInput)
+    payload.data = parsed as Record<string, string>
+  }
+
+  const result = await promiseWithSpinner(
+    async () => {
+      const message: SendBatchPushMessage = {
+        ts: DateTime.utc().toMillis(),
+        status: CommunityOperationStatus.SENDING,
+        payload,
+      }
+
+      const response = await client.sendMessage<SendBatchPushResponse>(
+        WebsocketEvents.QPSSendBatchPush,
+        message,
+        true,
+      )
+
+      if (response == null) {
+        throw new Error('No response from server')
+      }
+
+      if (response.status !== CommunityOperationStatus.SUCCESS) {
+        throw new Error(
+          `Batch push failed: ${response.reason ?? 'unknown error'}`,
+        )
+      }
+
+      if ((response.payload?.invalidTokens.length ?? 0) > 0) {
+        logger.log(
+          `Invalid tokens: ${response.payload?.invalidTokens.join(', ')}`,
+        )
+      }
+
+      return true
+    },
+    'Sending batch push notification...',
+    'Batch push notification sent successfully!',
+    'Failed to send batch push notification',
   )
 
   return result === true
