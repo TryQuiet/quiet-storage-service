@@ -17,6 +17,7 @@ describe('QPS WebSocket Handlers', () => {
     mockQpsService = {
       registerDevice: jest.fn(),
       sendPush: jest.fn(),
+      sendBatchPush: jest.fn(),
     } as unknown as jest.Mocked<QPSService>
 
     handlers = new Map()
@@ -44,7 +45,7 @@ describe('QPS WebSocket Handlers', () => {
     jest.clearAllMocks()
   })
 
-  it('should register both event handlers', () => {
+  it('should register all event handlers', () => {
     // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
     expect(mockSocket.on).toHaveBeenCalledWith(
       WebsocketEvents.QPSRegisterDevice,
@@ -53,6 +54,11 @@ describe('QPS WebSocket Handlers', () => {
     // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
     expect(mockSocket.on).toHaveBeenCalledWith(
       WebsocketEvents.QPSSendPush,
+      expect.any(Function),
+    )
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
+    expect(mockSocket.on).toHaveBeenCalledWith(
+      WebsocketEvents.QPSSendBatchPush,
       expect.any(Function),
     )
   })
@@ -242,6 +248,156 @@ describe('QPS WebSocket Handlers', () => {
         expect.objectContaining({
           status: CommunityOperationStatus.ERROR,
           reason: 'Push notification failed',
+        }),
+      )
+    })
+  })
+
+  describe('handleSendBatchPush', () => {
+    it('should return SUCCESS with invalidTokens on successful batch push', async () => {
+      mockQpsService.sendBatchPush.mockResolvedValue({
+        success: true,
+        invalidTokens: ['expired-token-1', 'expired-token-2'],
+      })
+
+      const callback = jest.fn()
+      const handler = handlers.get(WebsocketEvents.QPSSendBatchPush)!
+      await handler(
+        {
+          ts: Date.now(),
+          status: '',
+          payload: {
+            ucans: ['ucan-1', 'ucan-2', 'ucan-3'],
+            title: 'Batch Test',
+            body: 'Hello All',
+            data: { key: 'value' },
+          },
+        },
+        callback,
+      )
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
+      expect(mockQpsService.sendBatchPush).toHaveBeenCalledWith(
+        ['ucan-1', 'ucan-2', 'ucan-3'],
+        'Batch Test',
+        'Hello All',
+        { key: 'value' },
+      )
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: CommunityOperationStatus.SUCCESS,
+          payload: { invalidTokens: ['expired-token-1', 'expired-token-2'] },
+        }),
+      )
+    })
+
+    it('should return SUCCESS with empty invalidTokens when all succeed', async () => {
+      mockQpsService.sendBatchPush.mockResolvedValue({
+        success: true,
+        invalidTokens: [],
+      })
+
+      const callback = jest.fn()
+      const handler = handlers.get(WebsocketEvents.QPSSendBatchPush)!
+      await handler(
+        {
+          ts: Date.now(),
+          status: '',
+          payload: {
+            ucans: ['ucan-1', 'ucan-2'],
+          },
+        },
+        callback,
+      )
+
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: CommunityOperationStatus.SUCCESS,
+          payload: { invalidTokens: [] },
+        }),
+      )
+    })
+
+    it('should return ERROR with invalidTokens on batch push failure', async () => {
+      mockQpsService.sendBatchPush.mockResolvedValue({
+        success: false,
+        error: 'All push notifications failed',
+        invalidTokens: ['token-1', 'token-2', 'token-3'],
+      })
+
+      const callback = jest.fn()
+      const handler = handlers.get(WebsocketEvents.QPSSendBatchPush)!
+      await handler(
+        {
+          ts: Date.now(),
+          status: '',
+          payload: {
+            ucans: ['ucan-1', 'ucan-2', 'ucan-3'],
+          },
+        },
+        callback,
+      )
+
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: CommunityOperationStatus.ERROR,
+          reason: 'All push notifications failed',
+          payload: { invalidTokens: ['token-1', 'token-2', 'token-3'] },
+        }),
+      )
+    })
+
+    it('should return ERROR with empty invalidTokens when error has no tokens', async () => {
+      mockQpsService.sendBatchPush.mockResolvedValue({
+        success: false,
+        error: 'Batch size exceeds limit of 500',
+      })
+
+      const callback = jest.fn()
+      const handler = handlers.get(WebsocketEvents.QPSSendBatchPush)!
+      await handler(
+        {
+          ts: Date.now(),
+          status: '',
+          payload: {
+            ucans: Array(501).fill('ucan'),
+          },
+        },
+        callback,
+      )
+
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: CommunityOperationStatus.ERROR,
+          reason: 'Batch size exceeds limit of 500',
+          payload: { invalidTokens: [] },
+        }),
+      )
+    })
+
+    it('should return ERROR when service throws', async () => {
+      mockQpsService.sendBatchPush.mockRejectedValue(
+        new Error('unexpected error'),
+      )
+
+      const callback = jest.fn()
+      const handler = handlers.get(WebsocketEvents.QPSSendBatchPush)!
+      await handler(
+        {
+          ts: Date.now(),
+          status: '',
+          payload: {
+            ucans: ['ucan-1'],
+          },
+        },
+        callback,
+      )
+
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: CommunityOperationStatus.ERROR,
+          reason: 'Batch push failed',
+          payload: { invalidTokens: [] },
         }),
       )
     })
