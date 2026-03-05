@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.1-alpha.0 (2026-03-05)</small>
+
+- Update app package CHANGELOG.md ([2e43e19](https://github.com/TryQuiet/quiet-storage-service/commit/2e43e19))
+- Update auth module ([79ff912](https://github.com/TryQuiet/quiet-storage-service/commit/79ff912))
+
 ## 1.0.0 (2026-02-26)
 
 - Feat/2806 log sync catchup (#19) ([0d6dd9d](https://github.com/TryQuiet/quiet-storage-service/commit/0d6dd9d)), closes [#19](https://github.com/TryQuiet/quiet-storage-service/issues/19)
