@@ -167,6 +167,7 @@ export class AuthConnection extends EventEmitter {
     this.logger.log(
       `Auth connection established with Peer for ${(this.userContext.team as Team).id}`,
     )
+    this.logger.log('foobar')
     this._status = AuthStatus.JOINING
     this.lfaConnection.start()
   }
