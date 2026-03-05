@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.1-alpha.3 (2026-03-05)</small>
+
+- Update app package CHANGELOG.md ([36b198b](https://github.com/TryQuiet/quiet-storage-service/commit/36b198b))
+- Update auth ([349a940](https://github.com/TryQuiet/quiet-storage-service/commit/349a940))
+
 ## <small>1.0.1-alpha.2 (2026-03-05)</small>
 
 - Update app package CHANGELOG.md ([cdbb281](https://github.com/TryQuiet/quiet-storage-service/commit/cdbb281))
