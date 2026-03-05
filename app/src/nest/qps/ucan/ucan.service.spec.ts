@@ -44,8 +44,9 @@ describe('UcanService', () => {
     it('should create a valid UCAN', async () => {
       const deviceToken = 'test-fcm-device-token-123'
       const bundleId = 'com.tryquiet.quiet'
+      const teamId = 'test-team-id'
 
-      const ucan = await ucanService!.createUcan(deviceToken, bundleId)
+      const ucan = await ucanService!.createUcan(deviceToken, bundleId, teamId)
 
       expect(ucan).toBeDefined()
       expect(typeof ucan).toBe('string')
@@ -55,17 +56,23 @@ describe('UcanService', () => {
     it('should create UCANs that can be validated', async () => {
       const deviceToken = 'roundtrip-test-token'
       const bundleId = 'com.tryquiet.quiet'
+      const teamId = 'test-team-id'
 
-      const ucan = await ucanService!.createUcan(deviceToken, bundleId)
+      const ucan = await ucanService!.createUcan(deviceToken, bundleId, teamId)
       const validation = await ucanService!.validateUcan(ucan)
 
       expect(validation.valid).toBe(true)
       expect(validation.deviceToken).toBe(deviceToken)
       expect(validation.bundleId).toBe(bundleId)
+      expect(validation.teamId).toBe(teamId)
     })
 
     it('should create self-issued UCANs (issuer === audience)', async () => {
-      const ucan = await ucanService!.createUcan('test-token', 'com.test.app')
+      const ucan = await ucanService!.createUcan(
+        'test-token',
+        'com.test.app',
+        'team-id',
+      )
       const parsed = ucans.parse(ucan)
 
       expect(parsed.payload.iss).toBe(parsed.payload.aud)
@@ -77,13 +84,15 @@ describe('UcanService', () => {
     it('should validate a valid UCAN and extract device info', async () => {
       const deviceToken = 'validation-test-token'
       const bundleId = 'com.tryquiet.quiet'
+      const teamId = 'test-team-id'
 
-      const ucan = await ucanService!.createUcan(deviceToken, bundleId)
+      const ucan = await ucanService!.createUcan(deviceToken, bundleId, teamId)
       const validation = await ucanService!.validateUcan(ucan)
 
       expect(validation.valid).toBe(true)
       expect(validation.deviceToken).toBe(deviceToken)
       expect(validation.bundleId).toBe(bundleId)
+      expect(validation.teamId).toBe(teamId)
       expect(validation.error).toBeUndefined()
     })
 
@@ -105,7 +114,11 @@ describe('UcanService', () => {
 
   describe('validateUcan - signature security', () => {
     it('should reject a UCAN with tampered signature', async () => {
-      const ucan = await ucanService!.createUcan('test-token', 'com.test.app')
+      const ucan = await ucanService!.createUcan(
+        'test-token',
+        'com.test.app',
+        'team-id',
+      )
 
       const parts = ucan.split('.')
       parts[2] = 'tampered' + parts[2].slice(8)
@@ -121,6 +134,7 @@ describe('UcanService', () => {
       const ucan = await ucanService!.createUcan(
         'original-token',
         'com.test.app',
+        'team-id',
       )
 
       const parts = ucan.split('.')
@@ -163,7 +177,11 @@ describe('UcanService', () => {
       const deviceToken = 'test-token'
       const bundleId = 'com.test.app'
 
-      const ucan = await ucanService!.createUcan(deviceToken, bundleId)
+      const ucan = await ucanService!.createUcan(
+        deviceToken,
+        bundleId,
+        'team-id',
+      )
       const parts = ucan.split('.')
       const payload = JSON.parse(
         Buffer.from(parts[1], 'base64url').toString('utf8'),
@@ -236,7 +254,11 @@ describe('UcanService', () => {
       const deviceToken = 'token-with_special.chars:123'
       const bundleId = 'com.tryquiet.quiet'
 
-      const ucan = await ucanService!.createUcan(deviceToken, bundleId)
+      const ucan = await ucanService!.createUcan(
+        deviceToken,
+        bundleId,
+        'team-id',
+      )
       const validation = await ucanService!.validateUcan(ucan)
 
       expect(validation.valid).toBe(true)
@@ -247,7 +269,11 @@ describe('UcanService', () => {
       const deviceToken = 'a'.repeat(1000)
       const bundleId = 'com.tryquiet.quiet'
 
-      const ucan = await ucanService!.createUcan(deviceToken, bundleId)
+      const ucan = await ucanService!.createUcan(
+        deviceToken,
+        bundleId,
+        'team-id',
+      )
       const validation = await ucanService!.validateUcan(ucan)
 
       expect(validation.valid).toBe(true)
@@ -263,7 +289,11 @@ describe('UcanService', () => {
       ]
 
       for (const bundleId of testCases) {
-        const ucan = await ucanService!.createUcan('test-token', bundleId)
+        const ucan = await ucanService!.createUcan(
+          'test-token',
+          bundleId,
+          'team-id',
+        )
         const validation = await ucanService!.validateUcan(ucan)
 
         expect(validation.valid).toBe(true)
@@ -275,7 +305,11 @@ describe('UcanService', () => {
   describe('validateUcan - replay and reuse protection', () => {
     it('should allow the same UCAN to be validated multiple times', async () => {
       // UCANs are bearer tokens and should be reusable
-      const ucan = await ucanService!.createUcan('test-token', 'com.test.app')
+      const ucan = await ucanService!.createUcan(
+        'test-token',
+        'com.test.app',
+        'team-id',
+      )
 
       const validation1 = await ucanService!.validateUcan(ucan)
       const validation2 = await ucanService!.validateUcan(ucan)
@@ -285,8 +319,16 @@ describe('UcanService', () => {
     })
 
     it('should create different UCANs for different device tokens', async () => {
-      const ucan1 = await ucanService!.createUcan('token1', 'com.test.app')
-      const ucan2 = await ucanService!.createUcan('token2', 'com.test.app')
+      const ucan1 = await ucanService!.createUcan(
+        'token1',
+        'com.test.app',
+        'team-id',
+      )
+      const ucan2 = await ucanService!.createUcan(
+        'token2',
+        'com.test.app',
+        'team-id',
+      )
 
       expect(ucan1).not.toBe(ucan2)
 
@@ -300,7 +342,11 @@ describe('UcanService', () => {
 
   describe('validateUcan - edge cases and malformed data', () => {
     it('should reject UCAN with empty device token', async () => {
-      const ucan = await ucanService!.createUcan('valid-token', 'com.test.app')
+      const ucan = await ucanService!.createUcan(
+        'valid-token',
+        'com.test.app',
+        'team-id',
+      )
       const parts = ucan.split('.')
       const payload = JSON.parse(
         Buffer.from(parts[1], 'base64url').toString('utf8'),
@@ -318,7 +364,11 @@ describe('UcanService', () => {
     })
 
     it('should reject UCAN with whitespace-only device token', async () => {
-      const ucan = await ucanService!.createUcan('valid-token', 'com.test.app')
+      const ucan = await ucanService!.createUcan(
+        'valid-token',
+        'com.test.app',
+        'team-id',
+      )
       const parts = ucan.split('.')
       const payload = JSON.parse(
         Buffer.from(parts[1], 'base64url').toString('utf8'),
@@ -335,7 +385,11 @@ describe('UcanService', () => {
     })
 
     it('should reject UCAN with null capability structure', async () => {
-      const ucan = await ucanService!.createUcan('valid-token', 'com.test.app')
+      const ucan = await ucanService!.createUcan(
+        'valid-token',
+        'com.test.app',
+        'team-id',
+      )
       const parts = ucan.split('.')
       const payload = JSON.parse(
         Buffer.from(parts[1], 'base64url').toString('utf8'),
@@ -352,7 +406,11 @@ describe('UcanService', () => {
     })
 
     it('should reject UCAN with missing capabilities array', async () => {
-      const ucan = await ucanService!.createUcan('valid-token', 'com.test.app')
+      const ucan = await ucanService!.createUcan(
+        'valid-token',
+        'com.test.app',
+        'team-id',
+      )
       const parts = ucan.split('.')
       const payload = JSON.parse(
         Buffer.from(parts[1], 'base64url').toString('utf8'),

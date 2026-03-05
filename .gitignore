@@ -33,6 +33,9 @@ lerna-debug.log*
 # IDE - VSCode
 /.vscode
 
+# LLM
+/.claude
+
 /storage
 /bundle
 

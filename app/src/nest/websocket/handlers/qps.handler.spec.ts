@@ -4,11 +4,15 @@ import { WebsocketEvents } from '../ws.types.js'
 import { CommunityOperationStatus } from './types/common.types.js'
 import type { QPSHandlerConfig } from './types/qps.types.js'
 import type { QPSService } from '../../qps/qps.service.js'
+import type { CommunitiesManagerService } from '../../communities/communities-manager.service.js'
 import type { Server } from 'socket.io'
 import type { QuietSocket } from '../ws.types.js'
 
+const TEST_TEAM_ID = 'test-team-id'
+
 describe('QPS WebSocket Handlers', () => {
   let mockQpsService: jest.Mocked<QPSService>
+  let mockCommunitiesManager: jest.Mocked<CommunitiesManagerService>
   let mockSocket: jest.Mocked<QuietSocket>
   let mockServer: jest.Mocked<Server>
   let handlers: Map<string, (...args: unknown[]) => unknown>
@@ -18,7 +22,12 @@ describe('QPS WebSocket Handlers', () => {
       registerDevice: jest.fn(),
       sendPush: jest.fn(),
       sendBatchPush: jest.fn(),
+      getUcanInfo: jest.fn(),
     } as unknown as jest.Mocked<QPSService>
+
+    mockCommunitiesManager = {
+      isSocketSignedIntoTeam: jest.fn().mockReturnValue(true),
+    } as unknown as jest.Mocked<CommunitiesManagerService>
 
     handlers = new Map()
 
@@ -36,6 +45,7 @@ describe('QPS WebSocket Handlers', () => {
       socketServer: mockServer,
       socket: mockSocket,
       qpsService: mockQpsService,
+      communitiesManager: mockCommunitiesManager,
     }
 
     registerQpsHandlers(config)
@@ -76,7 +86,11 @@ describe('QPS WebSocket Handlers', () => {
         {
           ts: Date.now(),
           status: '',
-          payload: { deviceToken: 'fcm-token', bundleId: 'com.test.app' },
+          payload: {
+            deviceToken: 'fcm-token',
+            bundleId: 'com.test.app',
+            teamId: TEST_TEAM_ID,
+          },
         },
         callback,
       )
@@ -85,6 +99,7 @@ describe('QPS WebSocket Handlers', () => {
       expect(mockQpsService.registerDevice).toHaveBeenCalledWith(
         'fcm-token',
         'com.test.app',
+        TEST_TEAM_ID,
       )
       expect(callback).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -92,6 +107,33 @@ describe('QPS WebSocket Handlers', () => {
           payload: { ucan: 'test-ucan-token' },
         }),
       )
+    })
+
+    it('should return UNAUTHORIZED when socket is not in team room', async () => {
+      mockCommunitiesManager.isSocketSignedIntoTeam.mockReturnValue(false)
+
+      const callback = jest.fn()
+      const handler = handlers.get(WebsocketEvents.QPSRegisterDevice)!
+      await handler(
+        {
+          ts: Date.now(),
+          status: '',
+          payload: {
+            deviceToken: 'fcm-token',
+            bundleId: 'com.test.app',
+            teamId: TEST_TEAM_ID,
+          },
+        },
+        callback,
+      )
+
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: CommunityOperationStatus.UNAUTHORIZED,
+        }),
+      )
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
+      expect(mockQpsService.registerDevice).not.toHaveBeenCalled()
     })
 
     it('should return ERROR when registration fails', async () => {
@@ -106,7 +148,11 @@ describe('QPS WebSocket Handlers', () => {
         {
           ts: Date.now(),
           status: '',
-          payload: { deviceToken: 'fcm-token', bundleId: 'com.test.app' },
+          payload: {
+            deviceToken: 'fcm-token',
+            bundleId: 'com.test.app',
+            teamId: TEST_TEAM_ID,
+          },
         },
         callback,
       )
@@ -130,7 +176,11 @@ describe('QPS WebSocket Handlers', () => {
         {
           ts: Date.now(),
           status: '',
-          payload: { deviceToken: 'fcm-token', bundleId: 'com.test.app' },
+          payload: {
+            deviceToken: 'fcm-token',
+            bundleId: 'com.test.app',
+            teamId: TEST_TEAM_ID,
+          },
         },
         callback,
       )
@@ -146,6 +196,10 @@ describe('QPS WebSocket Handlers', () => {
 
   describe('handleSendPush', () => {
     it('should return SUCCESS on successful push', async () => {
+      mockQpsService.getUcanInfo.mockResolvedValue({
+        valid: true,
+        teamId: TEST_TEAM_ID,
+      })
       mockQpsService.sendPush.mockResolvedValue({ success: true })
 
       const callback = jest.fn()
@@ -178,7 +232,64 @@ describe('QPS WebSocket Handlers', () => {
       )
     })
 
+    it('should return UNAUTHORIZED when UCAN has no teamId', async () => {
+      mockQpsService.getUcanInfo.mockResolvedValue({
+        valid: true,
+        teamId: undefined,
+      })
+
+      const callback = jest.fn()
+      const handler = handlers.get(WebsocketEvents.QPSSendPush)!
+      await handler(
+        {
+          ts: Date.now(),
+          status: '',
+          payload: { ucan: 'ucan-without-team' },
+        },
+        callback,
+      )
+
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: CommunityOperationStatus.UNAUTHORIZED,
+        }),
+      )
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
+      expect(mockQpsService.sendPush).not.toHaveBeenCalled()
+    })
+
+    it('should return UNAUTHORIZED when socket is not in the UCAN team room', async () => {
+      mockQpsService.getUcanInfo.mockResolvedValue({
+        valid: true,
+        teamId: TEST_TEAM_ID,
+      })
+      mockCommunitiesManager.isSocketSignedIntoTeam.mockReturnValue(false)
+
+      const callback = jest.fn()
+      const handler = handlers.get(WebsocketEvents.QPSSendPush)!
+      await handler(
+        {
+          ts: Date.now(),
+          status: '',
+          payload: { ucan: 'valid-ucan' },
+        },
+        callback,
+      )
+
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: CommunityOperationStatus.UNAUTHORIZED,
+        }),
+      )
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
+      expect(mockQpsService.sendPush).not.toHaveBeenCalled()
+    })
+
     it('should return ERROR for invalid UCAN', async () => {
+      mockQpsService.getUcanInfo.mockResolvedValue({
+        valid: true,
+        teamId: TEST_TEAM_ID,
+      })
       mockQpsService.sendPush.mockResolvedValue({
         success: false,
         error: 'Invalid UCAN token',
@@ -205,6 +316,10 @@ describe('QPS WebSocket Handlers', () => {
     })
 
     it('should return NOT_FOUND when device token is invalid', async () => {
+      mockQpsService.getUcanInfo.mockResolvedValue({
+        valid: true,
+        teamId: TEST_TEAM_ID,
+      })
       mockQpsService.sendPush.mockResolvedValue({
         success: false,
         error: 'Device token no longer valid',
@@ -231,6 +346,10 @@ describe('QPS WebSocket Handlers', () => {
     })
 
     it('should return ERROR when service throws', async () => {
+      mockQpsService.getUcanInfo.mockResolvedValue({
+        valid: true,
+        teamId: TEST_TEAM_ID,
+      })
       mockQpsService.sendPush.mockRejectedValue(new Error('unexpected error'))
 
       const callback = jest.fn()
@@ -254,6 +373,101 @@ describe('QPS WebSocket Handlers', () => {
   })
 
   describe('handleSendBatchPush', () => {
+    beforeEach(() => {
+      mockQpsService.getUcanInfo.mockResolvedValue({
+        valid: true,
+        teamId: TEST_TEAM_ID,
+      })
+    })
+
+    it('should return UNAUTHORIZED when a UCAN has no teamId', async () => {
+      mockQpsService.getUcanInfo.mockResolvedValue({
+        valid: true,
+        teamId: undefined,
+      })
+
+      const callback = jest.fn()
+      const handler = handlers.get(WebsocketEvents.QPSSendBatchPush)!
+      await handler(
+        {
+          ts: Date.now(),
+          status: '',
+          payload: { ucans: ['ucan-without-team'] },
+        },
+        callback,
+      )
+
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: CommunityOperationStatus.UNAUTHORIZED,
+        }),
+      )
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
+      expect(mockQpsService.sendBatchPush).not.toHaveBeenCalled()
+    })
+
+    it('should return UNAUTHORIZED when socket is not in the UCAN team room', async () => {
+      mockCommunitiesManager.isSocketSignedIntoTeam.mockReturnValue(false)
+
+      const callback = jest.fn()
+      const handler = handlers.get(WebsocketEvents.QPSSendBatchPush)!
+      await handler(
+        {
+          ts: Date.now(),
+          status: '',
+          payload: { ucans: ['ucan-1', 'ucan-2'] },
+        },
+        callback,
+      )
+
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: CommunityOperationStatus.UNAUTHORIZED,
+        }),
+      )
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
+      expect(mockQpsService.sendBatchPush).not.toHaveBeenCalled()
+    })
+
+    it('should filter out unauthorized UCANs and send only authorized ones', async () => {
+      mockQpsService.getUcanInfo
+        .mockResolvedValueOnce({ valid: true, teamId: TEST_TEAM_ID })
+        .mockResolvedValueOnce({ valid: true, teamId: undefined })
+        .mockResolvedValueOnce({ valid: true, teamId: TEST_TEAM_ID })
+      mockQpsService.sendBatchPush.mockResolvedValue({
+        success: true,
+        invalidTokens: [],
+      })
+
+      const callback = jest.fn()
+      const handler = handlers.get(WebsocketEvents.QPSSendBatchPush)!
+      await handler(
+        {
+          ts: Date.now(),
+          status: '',
+          payload: {
+            ucans: ['ucan-auth', 'ucan-no-team', 'ucan-auth-2'],
+            title: 'Test',
+            body: 'Hello',
+          },
+        },
+        callback,
+      )
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
+      expect(mockQpsService.sendBatchPush).toHaveBeenCalledWith(
+        ['ucan-auth', 'ucan-auth-2'],
+        'Test',
+        'Hello',
+        undefined,
+      )
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: CommunityOperationStatus.SUCCESS,
+        }),
+      )
+    })
+
     it('should return SUCCESS with invalidTokens on successful batch push', async () => {
       mockQpsService.sendBatchPush.mockResolvedValue({
         success: true,

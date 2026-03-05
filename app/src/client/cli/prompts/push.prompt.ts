@@ -43,12 +43,22 @@ export const registerDevice = async (
     },
   })
 
+  const teamId = await input({
+    message: 'Enter the team ID:',
+    validate: (value: string | undefined) => {
+      if (value == null || value === '') {
+        return 'Team ID is required'
+      }
+      return true
+    },
+  })
+
   const result = await promiseWithSpinner(
     async () => {
       const message: RegisterDeviceMessage = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.SENDING,
-        payload: { deviceToken, bundleId },
+        payload: { deviceToken, bundleId, teamId },
       }
 
       const response = await client.sendMessage<RegisterDeviceResponse>(

@@ -55,7 +55,11 @@ export class UcanService implements OnModuleInit {
   /**
    * Create a UCAN token for device registration
    */
-  async createUcan(deviceToken: string, bundleId: string): Promise<string> {
+  async createUcan(
+    deviceToken: string,
+    bundleId: string,
+    teamId: string,
+  ): Promise<string> {
     if (this.keypair == null || this.qpsDid == null) {
       throw new UcanError(
         'QPS signing key not initialized',
@@ -73,7 +77,7 @@ export class UcanService implements OnModuleInit {
           can: { namespace: 'push', segments: ['send'] },
         },
       ],
-      facts: [{ bundleId }],
+      facts: [{ bundleId, teamId }],
     })
 
     return ucans.encode(ucan)
@@ -151,13 +155,18 @@ export class UcanService implements OnModuleInit {
       }
 
       const deviceToken = cap.with.hierPart
-      const facts = parsed.payload.fct as Array<{ bundleId?: string }>
+      const facts = parsed.payload.fct as Array<{
+        bundleId?: string
+        teamId?: string
+      }>
       const bundleId = facts?.[0]?.bundleId
+      const teamId = facts?.[0]?.teamId
 
       return {
         valid: true,
         deviceToken,
         bundleId,
+        teamId,
       }
     } catch (error) {
       this.logger.error(`Error validating UCAN`, error)

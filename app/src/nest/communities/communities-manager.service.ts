@@ -80,6 +80,10 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     }, 60_000)
   }
 
+  public isSocketSignedIntoTeam(socket: Socket, teamId: string): boolean {
+    return socket.rooms.has(teamId)
+  }
+
   public onModuleDestroy(): void {
     this.logger.info('Clearing CommunitesManagerService')
     clearTimeout(this._communityExpiryHandler)

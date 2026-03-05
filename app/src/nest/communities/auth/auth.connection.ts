@@ -10,7 +10,6 @@ import {
   type UserWithSecrets,
   type LocalUserContext,
   type MemberContext,
-  type Team,
 } from '@localfirst/auth'
 import { WebsocketEvents } from '../../websocket/ws.types.js'
 import { createLogger } from '../../app/logger/logger.js'
@@ -66,6 +65,7 @@ export class AuthConnection extends EventEmitter {
       this.sigChain.context.server,
     ) as UserWithSecrets
     // convert the Server data on the chain to a Device object
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- cast is valid for server context
     const device: DeviceWithSecrets = castServer.toDevice(
       this.sigChain.context.server,
     ) as DeviceWithSecrets
@@ -110,7 +110,7 @@ export class AuthConnection extends EventEmitter {
    */
   public start(): void {
     // Set up auth connection event handlers.
-    this.lfaConnection.on('connected', async () => {
+    this.lfaConnection.on('connected', () => {
       try {
         this.logger.debug(
           `Sending sync message because our chain is initialized`,
@@ -119,14 +119,16 @@ export class AuthConnection extends EventEmitter {
         const { team, user } = this.userContext
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- this is valid
         this.lfaConnection.emit('sync', { team, user })
-        const teamId = (team as Team).id
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- team is valid
+        const teamId = team.id
         this._status = AuthStatus.JOINED
         this.logger.debug(
           'Joining new socket to room on sign-in',
           this.config.socket.id,
           teamId,
         )
-        await this.config.socket.join(teamId)
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- teamId is a valid string
+        void this.config.socket.join(teamId)
       } catch (e) {
         this.logger.error('Error while sending auth sync message', e)
       }
@@ -141,6 +143,7 @@ export class AuthConnection extends EventEmitter {
         teamId: this.sigChain.team.id,
       }
       this.emit(AuthEvents.AuthDisconnected, payload)
+      void this.config.socket.leave(this.sigChain.team.id)
     })
 
     // handle chain updates
@@ -164,9 +167,9 @@ export class AuthConnection extends EventEmitter {
       this.logger.error(`Remote LFA error`, error)
     })
 
-    this.logger.log(
-      `Auth connection established with Peer for ${(this.userContext.team as Team).id}`,
-    )
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-type-assertion -- team is valid
+    const teamId = this.userContext.team.id as string
+    this.logger.log(`Auth connection established with Peer for ${teamId}`)
     this._status = AuthStatus.JOINING
     this.lfaConnection.start()
   }

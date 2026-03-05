@@ -8,6 +8,7 @@ import { createLogger } from '../app/logger/logger.js'
 import { UcanService } from './ucan/ucan.service.js'
 import { PushService } from './push/push.service.js'
 import { PushErrorCode, type MulticastPushResult } from './push/push.types.js'
+import type { UcanValidationResult } from './ucan/ucan.types.js'
 
 /**
  * Result of a device registration
@@ -55,6 +56,7 @@ export class QPSService {
   async registerDevice(
     deviceToken: string,
     bundleId: string,
+    teamId: string,
   ): Promise<RegistrationResult> {
     try {
       if (!this.pushService.isAvailable()) {
@@ -65,7 +67,11 @@ export class QPSService {
         }
       }
 
-      const ucan = await this.ucanService.createUcan(deviceToken, bundleId)
+      const ucan = await this.ucanService.createUcan(
+        deviceToken,
+        bundleId,
+        teamId,
+      )
 
       this.logger.log(`Device registered successfully`)
       return {
@@ -82,6 +88,13 @@ export class QPSService {
             : 'Unknown error during registration',
       }
     }
+  }
+
+  /**
+   * Validate a UCAN and return its info (thin wrapper for handler use)
+   */
+  async getUcanInfo(ucanToken: string): Promise<UcanValidationResult> {
+    return await this.ucanService.validateUcan(ucanToken)
   }
 
   /**

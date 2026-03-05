@@ -23,9 +23,23 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
     callback: (response: RegisterDeviceResponse) => void,
   ): Promise<void> {
     try {
+      const { deviceToken, bundleId, teamId } = message.payload
+
+      if (
+        !config.communitiesManager.isSocketSignedIntoTeam(config.socket, teamId)
+      ) {
+        callback({
+          ts: DateTime.utc().toMillis(),
+          status: CommunityOperationStatus.UNAUTHORIZED,
+          reason: 'Socket is not signed into this team',
+        })
+        return
+      }
+
       const result = await config.qpsService.registerDevice(
-        message.payload.deviceToken,
-        message.payload.bundleId,
+        deviceToken,
+        bundleId,
+        teamId,
       )
 
       if (!result.success || result.ucan == null) {
@@ -60,6 +74,22 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
     callback: (response: SendPushResponse) => void,
   ): Promise<void> {
     try {
+      const ucanInfo = await config.qpsService.getUcanInfo(message.payload.ucan)
+      const teamId = ucanInfo.teamId
+
+      if (
+        teamId == null ||
+        !config.communitiesManager.isSocketSignedIntoTeam(config.socket, teamId)
+      ) {
+        callback({
+          ts: DateTime.utc().toMillis(),
+          status: CommunityOperationStatus.UNAUTHORIZED,
+          reason:
+            'Socket is not signed into the team associated with this UCAN',
+        })
+        return
+      }
+
       const result = await config.qpsService.sendPush(
         message.payload.ucan,
         message.payload.title,
@@ -108,8 +138,35 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
     callback: (response: SendBatchPushResponse) => void,
   ): Promise<void> {
     try {
+      const authorizedUcans: string[] = []
+      for (const ucan of message.payload.ucans) {
+        const ucanInfo = await config.qpsService.getUcanInfo(ucan)
+        const teamId = ucanInfo.teamId
+
+        if (
+          teamId != null &&
+          config.communitiesManager.isSocketSignedIntoTeam(
+            config.socket,
+            teamId,
+          )
+        ) {
+          authorizedUcans.push(ucan)
+        }
+      }
+
+      if (authorizedUcans.length === 0) {
+        callback({
+          ts: DateTime.utc().toMillis(),
+          status: CommunityOperationStatus.UNAUTHORIZED,
+          reason:
+            'Socket is not signed into any team associated with these UCANs',
+          payload: { invalidTokens: [] },
+        })
+        return
+      }
+
       const result = await config.qpsService.sendBatchPush(
-        message.payload.ucans,
+        authorizedUcans,
         message.payload.title,
         message.payload.body,
         message.payload.data,

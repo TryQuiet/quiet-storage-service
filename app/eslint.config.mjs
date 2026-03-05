@@ -17,7 +17,11 @@ export default [
     rules: {
       '@typescript-eslint/no-magic-numbers': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
-      '@typescript-eslint/prefer-destructuring': 'warn',
+      'prefer-destructuring': 'off',
+      '@typescript-eslint/prefer-destructuring': ['warn', {
+        VariableDeclarator: { array: false, object: true },
+        AssignmentExpression: { array: false, object: false },
+      }],
       '@typescript-eslint/no-unsafe-type-assertion': 'warn',
       '@typescript-eslint/no-misused-promises': 'warn',
       '@typescript-eslint/no-unnecessary-condition': 'warn',

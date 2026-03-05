@@ -1,14 +1,17 @@
 import type { BaseHandlerConfig, BaseWebsocketMessage } from '../../ws.types.js'
 import type { QPSService } from '../../../qps/qps.service.js'
+import type { CommunitiesManagerService } from '../../../communities/communities-manager.service.js'
 import type { CommunityOperationStatus } from './common.types.js'
 
 export interface QPSHandlerConfig extends BaseHandlerConfig {
   qpsService: QPSService
+  communitiesManager: CommunitiesManagerService
 }
 
 export interface RegisterDevicePayload {
   deviceToken: string
   bundleId: string
+  teamId: string
 }
 
 export interface RegisterDeviceMessage
