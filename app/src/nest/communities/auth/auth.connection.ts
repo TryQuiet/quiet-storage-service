@@ -6,11 +6,12 @@ import type { SigChain } from './sigchain.js'
 import {
   castServer,
   type DeviceWithSecrets,
-  Connection as LFAConnection,
+  Connection as LFAAuthConnection,
   type UserWithSecrets,
   type LocalUserContext,
   type MemberContext,
   type Team,
+  connection as LFAConnection,
 } from '@localfirst/auth'
 import { WebsocketEvents } from '../../websocket/ws.types.js'
 import { createLogger } from '../../app/logger/logger.js'
@@ -23,13 +24,17 @@ import {
 import type { QuietLogger } from '../../app/logger/types.js'
 import { type AuthConnectionConfig, AuthStatus } from './types.js'
 import EventEmitter from 'events'
-import { type AuthDisconnectedPayload, AuthEvents } from './auth.events.js'
+import {
+  type AuthDisconnectedPayload,
+  AuthDisconnectedReason,
+  AuthEvents,
+} from './auth.events.js'
 
 export class AuthConnection extends EventEmitter {
   /**
    * Auth sync connection
    */
-  public readonly lfaConnection: LFAConnection
+  public readonly lfaConnection: LFAAuthConnection
   /**
    * Member context cast from Server
    */
@@ -79,7 +84,7 @@ export class AuthConnection extends EventEmitter {
       device,
     }
     // create a new LFA auth sync connection that routes auth sync messages through an existing websocket connection
-    this.lfaConnection = new LFAConnection({
+    this.lfaConnection = new LFAAuthConnection({
       context: this.userContext,
       sendMessage: (message: Uint8Array) => {
         const socketMessage: AuthSyncMessage = {
@@ -139,6 +144,10 @@ export class AuthConnection extends EventEmitter {
       const payload: AuthDisconnectedPayload = {
         userId: this.userId,
         teamId: this.sigChain.team.id,
+        reason:
+          event.type === 'ERROR' || event.type === 'LOCAL_ERROR'
+            ? AuthDisconnectedReason.ERROR
+            : AuthDisconnectedReason.INTENDED,
       }
       this.emit(AuthEvents.AuthDisconnected, payload)
     })
@@ -162,6 +171,13 @@ export class AuthConnection extends EventEmitter {
     })
     this.lfaConnection.on('remoteError', error => {
       this.logger.error(`Remote LFA error`, error)
+      if (error.type === LFAConnection.UNHANDLED) {
+        this.logger.warn(
+          'Stopping auth connection due to unhandled error on QSS',
+          this.sigChain.team.id,
+        )
+        this.stop(AuthDisconnectedReason.ERROR, false)
+      }
     })
 
     this.logger.log(
@@ -174,12 +190,16 @@ export class AuthConnection extends EventEmitter {
   /**
    * Stop the auth sync connection
    */
-  public stop(): void {
+  public stop(
+    reason: AuthDisconnectedReason,
+    sendDisconnectToClient = true,
+  ): void {
     this.logger.debug('Closing connection with user')
-    this.lfaConnection.stop(true)
+    this.lfaConnection.stop(sendDisconnectToClient)
     const payload: AuthDisconnectedPayload = {
       userId: this.userId,
       teamId: this.sigChain.team.id,
+      reason,
     }
     this.emit(AuthEvents.AuthDisconnected, payload)
   }
