@@ -38,11 +38,7 @@ import { AuthConnection } from './auth/auth.connection.js'
 import { NativeServerWebsocketEvents } from '../websocket/ws.types.js'
 import { AuthConnectionConfig } from './auth/types.js'
 import { Socket } from 'socket.io'
-import {
-  AuthDisconnectedPayload,
-  AuthDisconnectedReason,
-  AuthEvents,
-} from './auth/auth.events.js'
+import { AuthDisconnectedPayload, AuthEvents } from './auth/auth.events.js'
 import { DateTime } from 'luxon'
 import { LogEntrySyncStorageService } from './storage/log-entry-sync.storage.service.js'
 import { Serializer } from '../utils/serialization/serializer.service.js'
@@ -269,16 +265,6 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       AuthEvents.AuthDisconnected,
       (payload: AuthDisconnectedPayload) => {
         this.logger.verbose(`Got an ${AuthEvents.AuthDisconnected} event`)
-        if (payload.reason === AuthDisconnectedReason.ERROR) {
-          this.logger.warn(
-            'Restarting auth connection due to error',
-            payload.userId,
-            payload.teamId,
-          )
-          this.startAuthSyncConnection(payload.userId, payload.teamId, config)
-          return
-        }
-
         const managedCommunity = this.communities.get(payload.teamId)
         if (managedCommunity == null) {
           return
@@ -299,7 +285,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
 
     // handle websocket disconnects and stop the auth sync connection
     config.socket.on(NativeServerWebsocketEvents.Disconnect, () => {
-      authConnection.stop(AuthDisconnectedReason.INTENDED, false)
+      authConnection.stop()
     })
 
     authConnection.start()
