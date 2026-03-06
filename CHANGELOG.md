@@ -3,6 +3,58 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.1-alpha.9 (2026-03-06)</small>
+
+- Update app package CHANGELOG.md ([3f26d4c](https://github.com/TryQuiet/quiet-storage-service/commit/3f26d4c))
+- Update auth ([a7ef9b0](https://github.com/TryQuiet/quiet-storage-service/commit/a7ef9b0))
+
+## <small>1.0.1-alpha.8 (2026-03-06)</small>
+
+- Update app package CHANGELOG.md ([f9c91ca](https://github.com/TryQuiet/quiet-storage-service/commit/f9c91ca))
+- Update auth ([592baa7](https://github.com/TryQuiet/quiet-storage-service/commit/592baa7))
+- Update auth ([d8cf375](https://github.com/TryQuiet/quiet-storage-service/commit/d8cf375))
+
+## <small>1.0.1-alpha.7 (2026-03-06)</small>
+
+- Update app package CHANGELOG.md ([5e46571](https://github.com/TryQuiet/quiet-storage-service/commit/5e46571))
+- Update auth ([3c7181f](https://github.com/TryQuiet/quiet-storage-service/commit/3c7181f))
+
+## <small>1.0.1-alpha.6 (2026-03-06)</small>
+
+- Go back to main ([663ad5b](https://github.com/TryQuiet/quiet-storage-service/commit/663ad5b))
+- Revert "Disconnect on errors and restart auth connection" ([ca4f8f9](https://github.com/TryQuiet/quiet-storage-service/commit/ca4f8f9))
+- Update app package CHANGELOG.md ([7400a89](https://github.com/TryQuiet/quiet-storage-service/commit/7400a89))
+
+## <small>1.0.1-alpha.5 (2026-03-06)</small>
+
+- Disconnect on errors and restart auth connection ([c311552](https://github.com/TryQuiet/quiet-storage-service/commit/c311552))
+- Update app package CHANGELOG.md ([294df06](https://github.com/TryQuiet/quiet-storage-service/commit/294df06))
+
+## <small>1.0.1-alpha.4 (2026-03-06)</small>
+
+- Update app package CHANGELOG.md ([dc832aa](https://github.com/TryQuiet/quiet-storage-service/commit/dc832aa))
+- Update auth ([efec742](https://github.com/TryQuiet/quiet-storage-service/commit/efec742))
+
+## <small>1.0.1-alpha.3 (2026-03-05)</small>
+
+- Update app package CHANGELOG.md ([36b198b](https://github.com/TryQuiet/quiet-storage-service/commit/36b198b))
+- Update auth ([349a940](https://github.com/TryQuiet/quiet-storage-service/commit/349a940))
+
+## <small>1.0.1-alpha.2 (2026-03-05)</small>
+
+- Update app package CHANGELOG.md ([cdbb281](https://github.com/TryQuiet/quiet-storage-service/commit/cdbb281))
+- Update auth.connection.ts ([1fd26a9](https://github.com/TryQuiet/quiet-storage-service/commit/1fd26a9))
+
+## <small>1.0.1-alpha.1 (2026-03-05)</small>
+
+- Update app package CHANGELOG.md ([0c7b1fb](https://github.com/TryQuiet/quiet-storage-service/commit/0c7b1fb))
+- Update auth.connection.ts ([9a1885a](https://github.com/TryQuiet/quiet-storage-service/commit/9a1885a))
+
+## <small>1.0.1-alpha.0 (2026-03-05)</small>
+
+- Update app package CHANGELOG.md ([2e43e19](https://github.com/TryQuiet/quiet-storage-service/commit/2e43e19))
+- Update auth module ([79ff912](https://github.com/TryQuiet/quiet-storage-service/commit/79ff912))
+
 ## 1.0.0 (2026-02-26)
 
 - Feat/2806 log sync catchup (#19) ([0d6dd9d](https://github.com/TryQuiet/quiet-storage-service/commit/0d6dd9d)), closes [#19](https://github.com/TryQuiet/quiet-storage-service/issues/19)
