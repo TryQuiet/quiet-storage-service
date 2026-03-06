@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.1-alpha.5 (2026-03-06)</small>
+
+- Disconnect on errors and restart auth connection ([c311552](https://github.com/TryQuiet/quiet-storage-service/commit/c311552))
+- Update app package CHANGELOG.md ([294df06](https://github.com/TryQuiet/quiet-storage-service/commit/294df06))
+
 ## <small>1.0.1-alpha.4 (2026-03-06)</small>
 
 - Update app package CHANGELOG.md ([dc832aa](https://github.com/TryQuiet/quiet-storage-service/commit/dc832aa))
