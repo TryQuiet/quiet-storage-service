@@ -59,14 +59,6 @@ export class QPSService {
     teamId: string,
   ): Promise<RegistrationResult> {
     try {
-      if (!this.pushService.isAvailable()) {
-        this.logger.warn(`FCM is not available for registration`)
-        return {
-          success: false,
-          error: 'Push notification service not available',
-        }
-      }
-
       const ucan = await this.ucanService.createUcan(
         deviceToken,
         bundleId,
