@@ -29,6 +29,7 @@ export class SigChain extends EventEmitter {
       serializedSigchain,
       localContext,
       teamKeyring,
+      logger.extend('Localfirst'),
     ) as auth.Team
 
     return new SigChain(deserializedTeam, localContext)
