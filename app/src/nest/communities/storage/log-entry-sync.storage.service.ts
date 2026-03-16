@@ -43,8 +43,8 @@ export class LogEntrySyncStorageService implements OnModuleInit {
       } else {
         error = new Error(String(e))
       }
-      this.logger.info(`Error name: ${error.name}`)
       if (error.name === 'UniqueConstraintViolationException') {
+        this.logger.warn('Entry ID already exists in database!')
         return true
       }
       this.logger.error(`Error while writing log sync data to storage`, error)

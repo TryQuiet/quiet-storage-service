@@ -112,6 +112,7 @@ describe('Communities', () => {
     testClient.client.close()
     secondTestClient.client.close()
     invalidTestClient.client.close()
+    await dataSyncStorage.clearRepository()
     await TestUtils.close()
     await testingModule.close()
   })
@@ -132,6 +133,7 @@ describe('Communities', () => {
         USER_NAME,
         DEVICE_NAME,
       )
+      invite = testTeam.team.inviteMember()
     })
 
     it('should validate that the context and team are defined', () => {
@@ -287,7 +289,6 @@ describe('Communities', () => {
     })
 
     it('should sign into the community as a new user', async () => {
-      invite = testTeam.team.inviteMember()
       const prospectiveUser = createUser(SECOND_USER_NAME)
       const prospectiveDevice: DeviceWithSecrets = createDevice({
         userId: prospectiveUser.userId,
