@@ -9,6 +9,7 @@ import * as uint8arrays from 'uint8arrays'
 import EventEmitter from 'events'
 
 const logger = createLogger('Auth:SigChain')
+const lfaLogger = createLogger('Localfirst')
 
 @Injectable()
 export class SigChain extends EventEmitter {
@@ -29,6 +30,7 @@ export class SigChain extends EventEmitter {
       serializedSigchain,
       localContext,
       teamKeyring,
+      lfaLogger,
     ) as auth.Team
 
     return new SigChain(deserializedTeam, localContext)
