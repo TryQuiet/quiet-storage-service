@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.1-alpha.11 (2026-03-20)</small>
+
+- fix: Handle auth errors on QSS (#25) ([b10f52a](https://github.com/TryQuiet/quiet-storage-service/commit/b10f52a)), closes [#25](https://github.com/TryQuiet/quiet-storage-service/issues/25)
+- Allow more fuzziness in timestamp validations and use updated logging ([2d41414](https://github.com/TryQuiet/quiet-storage-service/commit/2d41414))
+- Update app package CHANGELOG.md ([2e43e19](https://github.com/TryQuiet/quiet-storage-service/commit/2e43e19))
+- Update auth ([875fcc0](https://github.com/TryQuiet/quiet-storage-service/commit/875fcc0))
+
 ## <small>1.0.1-alpha.10 (2026-03-09)</small>
 
 - Update app package CHANGELOG.md ([fdca051](https://github.com/TryQuiet/quiet-storage-service/commit/fdca051))
