@@ -132,12 +132,12 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       const invalidTokens: string[] = []
       response.responses.forEach((resp, idx) => {
         if (!resp.success) {
-          const error = resp.error
-          const errorCode = error?.code
-
+          const result = this.handleFcmError(resp.error, deviceTokens[idx])
           if (
-            errorCode === 'messaging/invalid-registration-token' ||
-            errorCode === 'messaging/registration-token-not-registered'
+            result.errorCode === PushErrorCode.FCM_INVALID_REGISTRATION ||
+            result.errorCode === PushErrorCode.FCM_NOT_REGISTERED ||
+            result.errorCode === PushErrorCode.FCM_SENDER_ID_MISMATCH ||
+            result.errorCode === PushErrorCode.FCM_INVALID_PACKAGE_NAME
           ) {
             invalidTokens.push(deviceTokens[idx])
           }
@@ -289,8 +289,8 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     this.logger.error(`FCM error for token ${tokenSnippet}:`, error)
 
     // Check for Firebase messaging errors
-    if (error instanceof Error) {
-      const errorCode = (error as { code?: string }).code
+    if (error instanceof Error && 'code' in error) {
+      const errorCode = error.code as string
 
       // Device token issues - client should remove this token
       if (
@@ -312,6 +312,14 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
           success: false,
           error: 'FCM credentials do not match the device token',
           errorCode: PushErrorCode.FCM_SENDER_ID_MISMATCH,
+        }
+      }
+
+      if (errorCode === 'messaging/invalid-package-name') {
+        return {
+          success: false,
+          error: 'Device token package name does not match',
+          errorCode: PushErrorCode.FCM_INVALID_PACKAGE_NAME,
         }
       }
     }

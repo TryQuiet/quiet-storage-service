@@ -22,6 +22,13 @@ interface PushServicePrivate {
   messaging: unknown
 }
 
+/** Create a mock FCM error (extends Error with a code property) */
+function fcmError(code: string): Error {
+  const err = new Error(code)
+  ;(err as Error & { code: string }).code = code
+  return err
+}
+
 describe('PushService', () => {
   let module: TestingModule | undefined = undefined
   let pushService: PushService | undefined = undefined
@@ -137,11 +144,11 @@ describe('PushService', () => {
               { success: true },
               {
                 success: false,
-                error: { code: 'messaging/invalid-registration-token' },
+                error: fcmError('messaging/invalid-registration-token'),
               },
               {
                 success: false,
-                error: { code: 'messaging/registration-token-not-registered' },
+                error: fcmError('messaging/registration-token-not-registered'),
               },
             ],
           }),
@@ -163,6 +170,43 @@ describe('PushService', () => {
       ])
     })
 
+    it('should identify mismatched-credential and invalid-package-name as invalid tokens', async () => {
+      const mockMessaging = {
+        sendEachForMulticast: jest
+          .fn<() => Promise<unknown>>()
+          .mockResolvedValue({
+            successCount: 1,
+            failureCount: 2,
+            responses: [
+              { success: true },
+              {
+                success: false,
+                error: fcmError('messaging/mismatched-credential'),
+              },
+              {
+                success: false,
+                error: fcmError('messaging/invalid-package-name'),
+              },
+            ],
+          }),
+      }
+
+      getPrivate().available = true
+      getPrivate().messaging = mockMessaging
+
+      const result = await pushService!.sendMulticast(
+        ['valid-token', 'mismatched-token', 'bad-package-token'],
+        { title: 'Test' },
+      )
+
+      expect(result.successCount).toBe(1)
+      expect(result.failureCount).toBe(2)
+      expect(result.invalidTokens).toEqual([
+        'mismatched-token',
+        'bad-package-token',
+      ])
+    })
+
     it('should handle mixed success and non-token failures', async () => {
       const mockMessaging = {
         sendEachForMulticast: jest
@@ -174,12 +218,12 @@ describe('PushService', () => {
               { success: true },
               {
                 success: false,
-                error: { code: 'messaging/invalid-registration-token' },
+                error: fcmError('messaging/invalid-registration-token'),
               },
               { success: true },
               {
                 success: false,
-                error: { code: 'messaging/server-unavailable' },
+                error: fcmError('messaging/server-unavailable'),
               },
             ],
           }),
