@@ -179,8 +179,8 @@ export class QPSService {
     const result: MulticastPushResult = await this.pushService.sendMulticast(
       deviceTokens,
       {
-        title,
-        body,
+        title: title ?? 'Quiet',
+        body: body ?? 'You have new activity',
         data,
       },
     )
