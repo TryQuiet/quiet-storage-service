@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common'
 import {
   NseAuthService,
-  type NseLogEntry,
+  type NseLogEntriesResponse,
   type ChallengePayload,
 } from './nse-auth.service.js'
 import { NseJwtAuthGuard } from './nse-jwt-auth.guard.js'
@@ -60,26 +60,30 @@ export class NseAuthController {
   }
 
   /**
-   * GET /nse-auth/logs/:teamId?since=<ms>
+   * GET /nse-auth/logs/:teamId?afterSeq=<seq>
    * Requires Authorization: Bearer <jwt>
-   * Returns: { entries: NseLogEntry[] }
+   * Returns: { entries: NseLogEntry[], resolvedAfterSeq: number }
    */
   @UseGuards(NseJwtAuthGuard)
   @Get('logs/:teamId')
   async getLogEntries(
     @Param('teamId') teamId: string,
+    @Query('afterSeq') afterSeq: string,
     @Query('since') since: string,
     @Request() req: { user: { teamId: string } },
-  ): Promise<{ entries: NseLogEntry[] }> {
+  ): Promise<NseLogEntriesResponse> {
     // Extra guard: the JWT teamId must match the path param
     if (req.user.teamId !== teamId) {
       throw new UnauthorizedException('Token teamId does not match path')
     }
-    const sinceMs = since != null && since !== '' ? parseInt(since, 10) : 0
-    const entries = await this.nseAuthService.getLogEntriesSince(
+    const afterSeqNum =
+      afterSeq != null && afterSeq !== '' ? parseInt(afterSeq, 10) : undefined
+    const sinceMs =
+      since != null && since !== '' ? parseInt(since, 10) : undefined
+    return await this.nseAuthService.getLogEntriesAfterSeq(
       teamId,
+      afterSeqNum,
       sinceMs,
     )
-    return { entries }
   }
 }

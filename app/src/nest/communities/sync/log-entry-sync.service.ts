@@ -51,7 +51,7 @@ export class LogEntrySyncManager implements OnModuleDestroy {
   public async processIncomingLogEntrySyncMessage(
     payload: LogEntrySyncPayload,
     socket: Socket,
-  ): Promise<boolean> {
+  ): Promise<{ receivedAt: number; syncSeq: number } | undefined> {
     const managedCommunity = await this.communities.get(payload.teamId)
     this._validateSyncPermission(
       payload.encEntry.userId,
@@ -61,6 +61,7 @@ export class LogEntrySyncManager implements OnModuleDestroy {
     )
     this._validateIncomingSyncMessage(payload)
 
+    const receivedAt = DateTime.utc()
     // convert the message payload to a form writable to the DB
     // NOTE: the entry field is a binary column in postgres so we must losslessly serialize
     //       the object to a buffer
@@ -69,10 +70,10 @@ export class LogEntrySyncManager implements OnModuleDestroy {
       cid: payload.hash,
       hashedDbId: payload.hashedDbId,
       entry: this.serializer.serialize(payload.encEntry),
-      receivedAt: DateTime.utc(),
+      receivedAt,
     }
-    const written = await this.logEntrySyncStorage.addLogEntry(dbPayload)
-    if (written) {
+    const storedPosition = await this.logEntrySyncStorage.addLogEntry(dbPayload)
+    if (storedPosition != null) {
       this.logger.debug(
         'Data sync successfully written to the DB',
         dbPayload.cid,
@@ -81,7 +82,12 @@ export class LogEntrySyncManager implements OnModuleDestroy {
       this.logger.error('Data sync write to DB was unsuccessful', dbPayload.cid)
     }
 
-    return written
+    return storedPosition != null
+      ? {
+          receivedAt: storedPosition.receivedAtMs,
+          syncSeq: storedPosition.syncSeq,
+        }
+      : undefined
   }
 
   public async getPaginatedLogEntries(
@@ -89,8 +95,9 @@ export class LogEntrySyncManager implements OnModuleDestroy {
     socket: Socket,
   ): Promise<{
     entries: Buffer[]
-    cursor?: string
     hasNextPage: boolean
+    highestSyncSeq?: number
+    resolvedStartSeq?: number
   }> {
     const managedCommunity = await this.communities.get(payload.teamId)
     this._validateSyncPermission(
@@ -100,35 +107,45 @@ export class LogEntrySyncManager implements OnModuleDestroy {
       socket,
     )
 
-    if (payload.startTs == null) {
-      throw new Error(`startTs must be provided in log entry pull message`)
+    if (payload.startSeq == null && payload.startTs == null) {
+      throw new Error(
+        `startSeq or startTs must be provided in log entry pull message`,
+      )
     }
 
     const maxBytes = 1000 * 1000 * 0.8 // maximum 1MB with 20% buffer
     const entries: LogEntrySyncEntity[] = []
-    let { cursor } = payload
     let hasNextPage = false
     let usedBytes = 0
-    let nextCursor = payload.cursor
     let hitSizeLimit = false
     let hitLimit = false
+    const resolvedStartSeq =
+      payload.startSeq ??
+      (await this.logEntrySyncStorage.resolveSyncSeqForTimestamp(
+        payload.teamId,
+        payload.startTs ?? 0,
+      ))
+    let nextStartSeq = resolvedStartSeq
 
     while (true) {
       const page = await this.logEntrySyncStorage.getPaginatedLogEntries(
         payload.teamId,
         {
           limit: Math.min(payload.limit ?? 200, 200), // TODO: track p50 entry size to optimize page size dynamically
-          startTs: payload.startTs,
-          endTs: payload.endTs,
+          startSeq: nextStartSeq,
+          endSeq: payload.endSeq,
           hashedDbId: payload.hashedDbId,
           hash: payload.hash,
         },
-        nextCursor,
       )
 
       if (page.items.length === 0) {
         if (entries.length === 0) {
-          return { entries: [], hasNextPage: false }
+          return {
+            entries: [],
+            hasNextPage: false,
+            resolvedStartSeq,
+          }
         }
         hasNextPage = false
         break
@@ -137,13 +154,11 @@ export class LogEntrySyncManager implements OnModuleDestroy {
       for (let i = 0; i < page.items.length; i += 1) {
         const { entry: entryBuffer } = page.items[i]
         const entryBytes = entryBuffer.length
-        const candidateCursor =
-          i < page.items.length - 1 ? page.from(page.items[i]) : page.endCursor
         const candidateHasNextPage =
           i < page.items.length - 1 ? true : page.hasNextPage
         const metadataBytes = Buffer.byteLength(
           JSON.stringify({
-            cursor: candidateCursor,
+            highestSyncSeq: Number(page.items[i].syncSeq),
             hasNextPage: candidateHasNextPage,
           }),
         )
@@ -159,7 +174,7 @@ export class LogEntrySyncManager implements OnModuleDestroy {
 
         entries.push(page.items[i])
         usedBytes += entryBytes
-        cursor = candidateCursor ?? undefined
+        nextStartSeq = Number(page.items[i].syncSeq)
         hasNextPage = candidateHasNextPage
 
         if (usedBytes + metadataBytes >= maxBytes) {
@@ -184,8 +199,7 @@ export class LogEntrySyncManager implements OnModuleDestroy {
         break
       }
 
-      nextCursor = page.endCursor ?? undefined
-      if (nextCursor == null) {
+      if (entries.length === 0) {
         hasNextPage = false
         break
       }
@@ -196,8 +210,12 @@ export class LogEntrySyncManager implements OnModuleDestroy {
 
     return {
       entries: entries.map(entry => entry.entry),
-      cursor,
       hasNextPage,
+      highestSyncSeq:
+        entries.length > 0
+          ? Number(entries[entries.length - 1].syncSeq)
+          : undefined,
+      resolvedStartSeq,
     }
   }
 

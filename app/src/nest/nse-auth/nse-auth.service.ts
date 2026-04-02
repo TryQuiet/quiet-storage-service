@@ -17,10 +17,8 @@ import { pack } from 'msgpackr'
 import { randomBytes } from 'node:crypto'
 import { createLogger } from '../app/logger/logger.js'
 import { LogEntrySyncStorageService } from '../communities/storage/log-entry-sync.storage.service.js'
+import { CommunitiesManagerService } from '../communities/communities-manager.service.js'
 import type { LogSyncEntry } from '../communities/types.js'
-
-// TODO: add UCAN-level trust anchor check — verify that the device public key
-// is registered as a known device in the @localfirst/auth sigchain for the teamId.
 
 const logger = createLogger('NseAuth:Service')
 
@@ -88,6 +86,12 @@ export interface NseLogEntry {
   communityId: string
   entry: { type: 'Buffer'; data: number[] }
   receivedAt: string
+  syncSeq: number
+}
+
+export interface NseLogEntriesResponse {
+  entries: NseLogEntry[]
+  resolvedAfterSeq: number
 }
 
 @Injectable()
@@ -107,6 +111,7 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly jwtService: JwtService,
     private readonly logEntrySyncStorage: LogEntrySyncStorageService,
+    private readonly communitiesManager: CommunitiesManagerService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -174,6 +179,15 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
       this.challenges.delete(challengeId)
       throw new UnauthorizedException('Challenge expired or not found')
     }
+
+    if (stored.challenge.name !== deviceId) {
+      this.challenges.delete(challengeId)
+      logger.warn(
+        `Challenge device mismatch for challengeId ${challengeId}: expected ${stored.challenge.name}, received ${deviceId}`,
+      )
+      throw new UnauthorizedException('Challenge does not belong to device')
+    }
+
     // Consume immediately to prevent replay
     this.challenges.delete(challengeId)
 
@@ -187,13 +201,37 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
       throw new UnauthorizedException('Invalid base58 in proof')
     }
 
+    const expectedPubKey = await this.getRegisteredDeviceSignatureKey(
+      stored.teamId,
+      deviceId,
+    )
+
+    let expectedPubKeyBytes: Uint8Array
+    try {
+      expectedPubKeyBytes = base58Decode(expectedPubKey)
+    } catch {
+      logger.error(
+        `Registered device key for ${deviceId} on team ${stored.teamId} was not valid base58`,
+      )
+      throw new UnauthorizedException('Registered device key is invalid')
+    }
+
+    if (!Buffer.from(pubKeyBytes).equals(Buffer.from(expectedPubKeyBytes))) {
+      logger.warn(
+        `Proof public key mismatch for device ${deviceId} team ${stored.teamId}`,
+      )
+      throw new UnauthorizedException(
+        'Proof key does not match registered device',
+      )
+    }
+
     // Re-derive the message bytes the NSE signed: msgpackr.pack(challengePayload)
     const messageBytes = pack(stored.challenge)
 
     const valid = sodium.crypto_sign_verify_detached(
       sigBytes,
       messageBytes,
-      pubKeyBytes,
+      expectedPubKeyBytes,
     )
     if (!valid) {
       logger.warn(
@@ -212,28 +250,81 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
     return { token, expiresIn }
   }
 
+  private async getRegisteredDeviceSignatureKey(
+    teamId: string,
+    deviceId: string,
+  ): Promise<string> {
+    const community = await this.communitiesManager.get(teamId)
+    if (community == null) {
+      logger.warn(`No managed community found for team ${teamId}`)
+      throw new UnauthorizedException('Unknown team')
+    }
+
+    const team = community.sigChain.team
+    if (team.deviceWasRemoved(deviceId)) {
+      logger.warn(
+        `Removed device ${deviceId} attempted NSE auth for team ${teamId}`,
+      )
+      throw new UnauthorizedException('Device was removed from team')
+    }
+
+    if (!team.hasDevice(deviceId)) {
+      logger.warn(
+        `Unknown device ${deviceId} attempted NSE auth for team ${teamId}`,
+      )
+      throw new UnauthorizedException('Unknown device for team')
+    }
+
+    try {
+      const device = team.device(deviceId) as { keys: { signature: string } }
+      return device.keys.signature
+    } catch (error) {
+      logger.warn(
+        `Failed to resolve registered device key for ${deviceId} on team ${teamId}`,
+        error,
+      )
+      throw new UnauthorizedException('Unknown device for team')
+    }
+  }
+
   /**
    * Fetch log entries for a team since the given millisecond timestamp.
    * Caller must have already validated the JWT and matched the teamId.
    */
-  async getLogEntriesSince(
+  async getLogEntriesAfterSeq(
     teamId: string,
-    since: number,
-  ): Promise<NseLogEntry[]> {
+    afterSeq?: number,
+    legacySince?: number,
+  ): Promise<NseLogEntriesResponse> {
+    const resolvedAfterSeq =
+      afterSeq ??
+      (await this.logEntrySyncStorage.resolveSyncSeqForTimestamp(
+        teamId,
+        legacySince ?? 0,
+      ))
     const entries: LogSyncEntry[] | undefined | null =
-      await this.logEntrySyncStorage.getLogEntriesForCommunity(teamId, since)
+      await this.logEntrySyncStorage.getLogEntriesForCommunity(
+        teamId,
+        resolvedAfterSeq,
+      )
 
-    if (entries == null) return []
+    if (entries == null) {
+      return { entries: [], resolvedAfterSeq }
+    }
 
-    return entries.map(e => ({
-      cid: e.cid,
-      hashedDbId: e.hashedDbId,
-      communityId: e.communityId,
-      // Serialize Buffer as Node.js JSON so the Swift Data decoder works:
-      //   LogEntry.init(from:) decodes { "type": "Buffer", "data": [...] }
-      entry: { type: 'Buffer' as const, data: Array.from(e.entry) },
-      receivedAt: e.receivedAt.toUTC().toISO() ?? '',
-    }))
+    return {
+      entries: entries.map(e => ({
+        cid: e.cid,
+        hashedDbId: e.hashedDbId,
+        communityId: e.communityId,
+        // Serialize Buffer as Node.js JSON so the Swift Data decoder works:
+        //   LogEntry.init(from:) decodes { "type": "Buffer", "data": [...] }
+        entry: { type: 'Buffer' as const, data: Array.from(e.entry) },
+        receivedAt: e.receivedAt.toUTC().toISO() ?? '',
+        syncSeq: e.syncSeq ?? 0,
+      })),
+      resolvedAfterSeq,
+    }
   }
 
   private evictExpiredChallenges(): void {

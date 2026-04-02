@@ -192,6 +192,7 @@ describe('LogEntrySyncManager', () => {
       cid: string
       entry: Buffer
       receivedAtMs: number
+      syncSeq: number
       hashedDbId: string
     }>
   > => {
@@ -216,7 +217,7 @@ describe('LogEntrySyncManager', () => {
         contents,
       })
       const entry = serializer!.serialize(payload.encEntry)
-      await dataSyncStorage!.addLogEntry({
+      const stored = await dataSyncStorage!.addLogEntry({
         cid: payload.hash,
         hashedDbId: payload.hashedDbId,
         communityId: teamId,
@@ -227,6 +228,7 @@ describe('LogEntrySyncManager', () => {
         cid,
         entry,
         receivedAtMs,
+        syncSeq: stored!.syncSeq,
         hashedDbId,
       })
     }
@@ -273,29 +275,37 @@ describe('LogEntrySyncManager', () => {
       }
 
       let error: Error | undefined = undefined
-      let written = false
+      let storedPosition:
+        | {
+            receivedAt: number
+            syncSeq: number
+          }
+        | undefined = undefined
       try {
-        written = await logEntrySyncManager!.processIncomingLogEntrySyncMessage(
-          payload,
-          wsConfig!.socket,
-        )
+        storedPosition =
+          await logEntrySyncManager!.processIncomingLogEntrySyncMessage(
+            payload,
+            wsConfig!.socket,
+          )
       } catch (e) {
         error = e as Error
       }
 
       expect(error).toBeUndefined()
-      expect(written).toBe(true)
+      expect(storedPosition).toEqual({
+        receivedAt: expect.any(Number),
+        syncSeq: 1,
+      })
 
       const storedSyncContents =
-        await dataSyncStorage!.getLogEntriesForCommunity(
-          testTeam.team.id,
-          payload.encEntry.ts - 20_000,
-        )
+        await dataSyncStorage!.getLogEntriesForCommunity(testTeam.team.id, 0)
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(1)
       const contents = storedSyncContents![0]
       expect(contents.cid).toBe(payload.hash)
       expect(contents.communityId).toBe(testTeam.team.id)
+      expect(contents.receivedAt.toMillis()).toBe(storedPosition!.receivedAt)
+      expect(contents.syncSeq).toBe(storedPosition!.syncSeq)
       const deserializedContents = serializer!.deserialize(
         contents.entry,
       ) as EncryptedAndSignedPayload
@@ -356,12 +366,18 @@ describe('LogEntrySyncManager', () => {
       }
 
       let error: Error | undefined = undefined
-      let written = false
+      let storedPosition:
+        | {
+            receivedAt: number
+            syncSeq: number
+          }
+        | undefined = undefined
       try {
-        written = await logEntrySyncManager!.processIncomingLogEntrySyncMessage(
-          payload,
-          wsConfig!.socket,
-        )
+        storedPosition =
+          await logEntrySyncManager!.processIncomingLogEntrySyncMessage(
+            payload,
+            wsConfig!.socket,
+          )
       } catch (e) {
         error = e as Error
       }
@@ -370,13 +386,10 @@ describe('LogEntrySyncManager', () => {
       expect(error?.message).toBe(
         'User does not have permissions on this community or has not signed in',
       )
-      expect(written).toBe(false)
+      expect(storedPosition).toBeUndefined()
 
       const storedSyncContents =
-        await dataSyncStorage!.getLogEntriesForCommunity(
-          testTeam.team.id,
-          payload.encEntry.ts - 10_000,
-        )
+        await dataSyncStorage!.getLogEntriesForCommunity(testTeam.team.id, 0)
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(0)
     })
@@ -420,12 +433,18 @@ describe('LogEntrySyncManager', () => {
       }
 
       let error: Error | undefined = undefined
-      let written = false
+      let storedPosition:
+        | {
+            receivedAt: number
+            syncSeq: number
+          }
+        | undefined = undefined
       try {
-        written = await logEntrySyncManager!.processIncomingLogEntrySyncMessage(
-          payload,
-          wsConfig!.socket,
-        )
+        storedPosition =
+          await logEntrySyncManager!.processIncomingLogEntrySyncMessage(
+            payload,
+            wsConfig!.socket,
+          )
       } catch (e) {
         error = e as Error
       }
@@ -434,13 +453,10 @@ describe('LogEntrySyncManager', () => {
       expect(error?.message).toBe(
         'User does not have permissions on this community or has not signed in',
       )
-      expect(written).toBe(false)
+      expect(storedPosition).toBeUndefined()
 
       const storedSyncContents =
-        await dataSyncStorage!.getLogEntriesForCommunity(
-          testTeam.team.id,
-          payload.encEntry.ts - 10_000,
-        )
+        await dataSyncStorage!.getLogEntriesForCommunity(testTeam.team.id, 0)
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(0)
     })
@@ -484,12 +500,18 @@ describe('LogEntrySyncManager', () => {
       }
 
       let error: Error | undefined = undefined
-      let written = false
+      let storedPosition:
+        | {
+            receivedAt: number
+            syncSeq: number
+          }
+        | undefined = undefined
       try {
-        written = await logEntrySyncManager!.processIncomingLogEntrySyncMessage(
-          payload,
-          wsConfig!.socket,
-        )
+        storedPosition =
+          await logEntrySyncManager!.processIncomingLogEntrySyncMessage(
+            payload,
+            wsConfig!.socket,
+          )
       } catch (e) {
         error = e as Error
       }
@@ -498,13 +520,10 @@ describe('LogEntrySyncManager', () => {
       expect(error?.message).toBe(
         'User does not have permissions on this community or has not signed in',
       )
-      expect(written).toBe(false)
+      expect(storedPosition).toBeUndefined()
 
       const storedSyncContents =
-        await dataSyncStorage!.getLogEntriesForCommunity(
-          testTeam.team.id,
-          payload.encEntry.ts - 10_000,
-        )
+        await dataSyncStorage!.getLogEntriesForCommunity(testTeam.team.id, 0)
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(0)
     })
@@ -520,12 +539,18 @@ describe('LogEntrySyncManager', () => {
       ): Promise<ManagedCommunity | undefined> => undefined
 
       let error: Error | undefined = undefined
-      let written = false
+      let storedPosition:
+        | {
+            receivedAt: number
+            syncSeq: number
+          }
+        | undefined = undefined
       try {
-        written = await logEntrySyncManager!.processIncomingLogEntrySyncMessage(
-          payload,
-          wsConfig!.socket,
-        )
+        storedPosition =
+          await logEntrySyncManager!.processIncomingLogEntrySyncMessage(
+            payload,
+            wsConfig!.socket,
+          )
       } catch (e) {
         error = e as Error
       }
@@ -534,13 +559,10 @@ describe('LogEntrySyncManager', () => {
       expect(error?.message).toMatch(
         'No community found for this community ID:',
       )
-      expect(written).toBe(false)
+      expect(storedPosition).toBeUndefined()
 
       const storedSyncContents =
-        await dataSyncStorage!.getLogEntriesForCommunity(
-          testTeam.team.id,
-          payload.encEntry.ts - 10_000,
-        )
+        await dataSyncStorage!.getLogEntriesForCommunity(testTeam.team.id, 0)
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(0)
     })
@@ -585,32 +607,35 @@ describe('LogEntrySyncManager', () => {
       }
 
       let error: Error | undefined = undefined
-      let written = false
+      let storedPosition:
+        | {
+            receivedAt: number
+            syncSeq: number
+          }
+        | undefined = undefined
       try {
-        written = await logEntrySyncManager!.processIncomingLogEntrySyncMessage(
-          payload,
-          wsConfig!.socket,
-        )
+        storedPosition =
+          await logEntrySyncManager!.processIncomingLogEntrySyncMessage(
+            payload,
+            wsConfig!.socket,
+          )
       } catch (e) {
         error = e as Error
       }
 
       expect(error).toBeDefined()
       expect(error?.message).toBe(`User ID on entry doesn't match signature`)
-      expect(written).toBe(false)
+      expect(storedPosition).toBeUndefined()
 
       const storedSyncContents =
-        await dataSyncStorage!.getLogEntriesForCommunity(
-          testTeam.team.id,
-          payload.encEntry.ts - 10_000,
-        )
+        await dataSyncStorage!.getLogEntriesForCommunity(testTeam.team.id, 0)
       expect(storedSyncContents).toBeDefined()
       expect(storedSyncContents!.length).toBe(0)
     })
   })
 
   describe('getPaginatedLogEntries', () => {
-    it('paginates large entries and continues with cursor', async () => {
+    it('paginates large entries and continues with syncSeq', async () => {
       const testTeam = await testTeamUtils!.createTestTeam()
       await setupAuth(testTeam, AuthStatus.JOINED)
       const startMs = DateTime.utc().toMillis()
@@ -626,7 +651,7 @@ describe('LogEntrySyncManager', () => {
       const basePayload = {
         teamId: testTeam.team.id,
         userId: testTeam.testUserContext.user.userId,
-        startTs: startMs - 1000,
+        startSeq: 0,
       }
 
       const firstPage = await logEntrySyncManager!.getPaginatedLogEntries(
@@ -635,28 +660,30 @@ describe('LogEntrySyncManager', () => {
       )
       expect(firstPage.entries).toHaveLength(1)
       expect(firstPage.entries[0]).toEqual(entries[0].entry)
-      expect(firstPage.cursor).toBeDefined()
+      expect(firstPage.resolvedStartSeq).toBe(0)
       expect(firstPage.hasNextPage).toBe(true)
+      expect(firstPage.highestSyncSeq).toBe(entries[0].syncSeq)
 
       const secondPage = await logEntrySyncManager!.getPaginatedLogEntries(
-        { ...basePayload, cursor: firstPage.cursor },
+        { ...basePayload, startSeq: firstPage.highestSyncSeq! },
         wsConfig!.socket as Socket,
       )
       expect(secondPage.entries).toHaveLength(1)
       expect(secondPage.entries[0]).toEqual(entries[1].entry)
-      expect(secondPage.cursor).toBeDefined()
       expect(secondPage.hasNextPage).toBe(true)
+      expect(secondPage.highestSyncSeq).toBe(entries[1].syncSeq)
 
       const thirdPage = await logEntrySyncManager!.getPaginatedLogEntries(
-        { ...basePayload, cursor: secondPage.cursor },
+        { ...basePayload, startSeq: secondPage.highestSyncSeq! },
         wsConfig!.socket as Socket,
       )
       expect(thirdPage.entries).toHaveLength(1)
       expect(thirdPage.entries[0]).toEqual(entries[2].entry)
       expect(thirdPage.hasNextPage).toBe(false)
+      expect(thirdPage.highestSyncSeq).toBe(entries[2].syncSeq)
     })
 
-    it('filters entries by time range', async () => {
+    it('filters entries by sync sequence range', async () => {
       const testTeam = await testTeamUtils!.createTestTeam()
       await setupAuth(testTeam, AuthStatus.JOINED)
       const startMs = DateTime.utc().toMillis()
@@ -672,8 +699,8 @@ describe('LogEntrySyncManager', () => {
         {
           teamId: testTeam.team.id,
           userId: testTeam.testUserContext.user.userId,
-          startTs: startMs + 500,
-          endTs: startMs + 1500,
+          startSeq: entries[0].syncSeq,
+          endSeq: entries[1].syncSeq,
         },
         wsConfig!.socket as Socket,
       )
@@ -681,6 +708,7 @@ describe('LogEntrySyncManager', () => {
       expect(result.entries).toHaveLength(1)
       expect(result.entries[0]).toEqual(entries[1].entry)
       expect(result.hasNextPage).toBe(false)
+      expect(result.highestSyncSeq).toBe(entries[1].syncSeq)
     })
 
     it('filters entries by hashedDbId', async () => {
@@ -706,7 +734,7 @@ describe('LogEntrySyncManager', () => {
         {
           teamId: testTeam.team.id,
           userId: testTeam.testUserContext.user.userId,
-          startTs: startMs,
+          startSeq: 0,
           hashedDbId: 'hashed-db-a',
         },
         wsConfig!.socket as Socket,
@@ -715,6 +743,7 @@ describe('LogEntrySyncManager', () => {
       expect(result.entries).toHaveLength(2)
       expect(result.entries[0]).toEqual(hashedEntries[0].entry)
       expect(result.entries[1]).toEqual(hashedEntries[1].entry)
+      expect(result.highestSyncSeq).toBe(hashedEntries[1].syncSeq)
     })
 
     it('fetches a single entry by hash', async () => {
@@ -733,7 +762,7 @@ describe('LogEntrySyncManager', () => {
         {
           teamId: testTeam.team.id,
           userId: testTeam.testUserContext.user.userId,
-          startTs: startMs,
+          startSeq: 0,
           hash: entries[1].cid,
         },
         wsConfig!.socket as Socket,
@@ -742,6 +771,7 @@ describe('LogEntrySyncManager', () => {
       expect(result.entries).toHaveLength(1)
       expect(result.entries[0]).toEqual(entries[1].entry)
       expect(result.hasNextPage).toBe(false)
+      expect(result.highestSyncSeq).toBe(entries[1].syncSeq)
     })
 
     it('returns up to the requested limit from a single page', async () => {
@@ -760,7 +790,7 @@ describe('LogEntrySyncManager', () => {
         {
           teamId: testTeam.team.id,
           userId: testTeam.testUserContext.user.userId,
-          startTs: startMs,
+          startSeq: 0,
           limit: 2,
         },
         wsConfig!.socket as Socket,
@@ -770,6 +800,7 @@ describe('LogEntrySyncManager', () => {
       expect(result.entries[0]).toEqual(entries[0].entry)
       expect(result.entries[1]).toEqual(entries[1].entry)
       expect(result.hasNextPage).toBe(true)
+      expect(result.highestSyncSeq).toBe(entries[1].syncSeq)
     })
 
     it('saturates a given socket message with max size', async () => {
@@ -789,11 +820,11 @@ describe('LogEntrySyncManager', () => {
         {
           teamId: testTeam.team.id,
           userId: testTeam.testUserContext.user.userId,
-          startTs: startMs,
+          startSeq: entries[0].syncSeq,
         },
         wsConfig!.socket as Socket,
       )
-      expect(result.entries.length).toBeLessThan(entries.length)
+      expect(result.entries.length).toBeLessThan(entries.length - 1)
       expect(result.hasNextPage).toBe(true)
       // verify that the total size is less than or equal to MAX_SOCKET_MESSAGE_SIZE
       const totalSize = result.entries.reduce(
@@ -802,6 +833,7 @@ describe('LogEntrySyncManager', () => {
       )
       logger.info(`Total size of entries sent: ${totalSize} bytes`)
       expect(totalSize).toBeLessThanOrEqual(1000 * 1000)
+      expect(result.entries[0]).toEqual(entries[1].entry)
     })
   })
 })

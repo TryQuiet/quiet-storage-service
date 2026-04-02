@@ -1,9 +1,11 @@
 import { jest } from '@jest/globals'
 import { Test, type TestingModule } from '@nestjs/testing'
 import { UnauthorizedException } from '@nestjs/common'
+import { JwtModule } from '@nestjs/jwt'
 import { NseAuthController } from './nse-auth.controller.js'
 import { NseAuthService } from './nse-auth.service.js'
-import type { NseLogEntry } from './nse-auth.service.js'
+import type { NseLogEntriesResponse, NseLogEntry } from './nse-auth.service.js'
+import { NseJwtAuthGuard } from './nse-jwt-auth.guard.js'
 
 const TEAM_ID = 'test-team-id'
 const DEVICE_ID = 'test-device-id'
@@ -22,7 +24,7 @@ describe('NseAuthController', () => {
   let mockService: jest.Mocked<
     Pick<
       NseAuthService,
-      'issueChallenge' | 'verifyAndIssueToken' | 'getLogEntriesSince'
+      'issueChallenge' | 'verifyAndIssueToken' | 'getLogEntriesAfterSeq'
     >
   >
 
@@ -30,12 +32,21 @@ describe('NseAuthController', () => {
     mockService = {
       issueChallenge: jest.fn<NseAuthService['issueChallenge']>(),
       verifyAndIssueToken: jest.fn<NseAuthService['verifyAndIssueToken']>(),
-      getLogEntriesSince: jest.fn<NseAuthService['getLogEntriesSince']>(),
+      getLogEntriesAfterSeq: jest.fn<NseAuthService['getLogEntriesAfterSeq']>(),
     }
 
     module = await Test.createTestingModule({
+      imports: [
+        JwtModule.register({
+          secret: 'test-secret',
+          signOptions: { expiresIn: 900 },
+        }),
+      ],
       controllers: [NseAuthController],
-      providers: [{ provide: NseAuthService, useValue: mockService }],
+      providers: [
+        { provide: NseAuthService, useValue: mockService },
+        NseJwtAuthGuard,
+      ],
     }).compile()
 
     controller = module.get<NseAuthController>(NseAuthController)
@@ -118,53 +129,72 @@ describe('NseAuthController', () => {
 
     it('delegates to service and wraps result in { entries }', async () => {
       const fakeEntries: NseLogEntry[] = []
-      mockService.getLogEntriesSince.mockResolvedValue(fakeEntries)
+      const response: NseLogEntriesResponse = {
+        entries: fakeEntries,
+        resolvedAfterSeq: 0,
+      }
+      mockService.getLogEntriesAfterSeq.mockResolvedValue(response)
 
-      const result = await controller.getLogEntries(TEAM_ID, '0', req)
+      const result = await controller.getLogEntries(TEAM_ID, '0', '', req)
 
       // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock; method ref is safe
-      expect(mockService.getLogEntriesSince).toHaveBeenCalledWith(TEAM_ID, 0)
-      expect(result).toEqual({ entries: fakeEntries })
+      expect(mockService.getLogEntriesAfterSeq).toHaveBeenCalledWith(
+        TEAM_ID,
+        0,
+        undefined,
+      )
+      expect(result).toEqual(response)
     })
 
     it('uses since=0 when query param is empty', async () => {
-      mockService.getLogEntriesSince.mockResolvedValue([])
+      mockService.getLogEntriesAfterSeq.mockResolvedValue({
+        entries: [],
+        resolvedAfterSeq: 0,
+      })
 
-      await controller.getLogEntries(TEAM_ID, '', req)
+      await controller.getLogEntries(TEAM_ID, '', '', req)
 
       // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock; method ref is safe
-      expect(mockService.getLogEntriesSince).toHaveBeenCalledWith(TEAM_ID, 0)
+      expect(mockService.getLogEntriesAfterSeq).toHaveBeenCalledWith(
+        TEAM_ID,
+        undefined,
+        undefined,
+      )
     })
 
     it('passes parsed since timestamp to service', async () => {
-      mockService.getLogEntriesSince.mockResolvedValue([])
+      mockService.getLogEntriesAfterSeq.mockResolvedValue({
+        entries: [],
+        resolvedAfterSeq: 1700000000000,
+      })
 
-      await controller.getLogEntries(TEAM_ID, '1700000000000', req)
+      await controller.getLogEntries(TEAM_ID, '', '1700000000000', req)
 
       // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock; method ref is safe
-      expect(mockService.getLogEntriesSince).toHaveBeenCalledWith(
+      expect(mockService.getLogEntriesAfterSeq).toHaveBeenCalledWith(
         TEAM_ID,
+        undefined,
         1700000000000,
       )
     })
 
     it('throws UnauthorizedException if req.user.teamId does not match path teamId', async () => {
       await expect(
-        controller.getLogEntries('other-team', '0', req),
+        controller.getLogEntries('other-team', '0', '', req),
       ).rejects.toThrow(UnauthorizedException)
 
       // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock; method ref is safe
-      expect(mockService.getLogEntriesSince).not.toHaveBeenCalled()
+      expect(mockService.getLogEntriesAfterSeq).not.toHaveBeenCalled()
     })
 
     it('propagates UnauthorizedException from service', async () => {
-      mockService.getLogEntriesSince.mockRejectedValue(
+      mockService.getLogEntriesAfterSeq.mockRejectedValue(
         new UnauthorizedException('Storage error'),
       )
 
-      await expect(controller.getLogEntries(TEAM_ID, '0', req)).rejects.toThrow(
-        UnauthorizedException,
-      )
+      await expect(
+        controller.getLogEntries(TEAM_ID, '0', '', req),
+      ).rejects.toThrow(UnauthorizedException)
     })
   })
 })
