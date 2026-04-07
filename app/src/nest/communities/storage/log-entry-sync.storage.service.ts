@@ -17,6 +17,17 @@ interface StoredSyncPosition {
   syncSeq: number
 }
 
+/**
+ * Safely convert a bigint or number sync sequence value to a JS number.
+ * sync_seq is a bigint column in Postgres; MikroORM may return it as bigint or
+ * string depending on the driver.  Values will never exceed Number.MAX_SAFE_INTEGER
+ * in practice (would require ~9 quadrillion entries), but we centralise the cast
+ * here so there is one place to change if we ever need BigInt throughout.
+ */
+export function toSyncSeq(value: bigint | number | string): number {
+  return Number(value)
+}
+
 @Injectable()
 export class LogEntrySyncStorageService implements OnModuleInit {
   /**
@@ -71,17 +82,23 @@ export class LogEntrySyncStorageService implements OnModuleInit {
         const repo = em.getRepository(LogEntrySyncEntity)
         const existingEntity = await repo.findOne({ id: { $eq: payload.cid } })
         if (existingEntity != null) {
+          this.logger.log(
+            `[addLogEntry] cid=${payload.cid} already exists with syncSeq=${toSyncSeq(existingEntity.syncSeq)}, skipping insert`,
+          )
           return {
             receivedAtMs: DateTime.fromJSDate(
               new Date(existingEntity.receivedAt),
             )
               .toUTC()
               .toMillis(),
-            syncSeq: Number(existingEntity.syncSeq),
+            syncSeq: toSyncSeq(existingEntity.syncSeq),
           }
         }
 
-        const syncSeq = Number(lockedCounter.next_sync_seq)
+        const syncSeq = toSyncSeq(lockedCounter.next_sync_seq)
+        this.logger.log(
+          `[addLogEntry] cid=${payload.cid} communityId=${payload.communityId} allocating syncSeq=${syncSeq} next_sync_seq_raw=${lockedCounter.next_sync_seq}`,
+        )
         const entity = this.payloadToEntity({ ...payload, syncSeq })
         await repo.insert(entity)
         await em.getConnection().execute(
@@ -89,6 +106,9 @@ export class LogEntrySyncStorageService implements OnModuleInit {
                 set "next_sync_seq" = ?
               where "community_id" = ?`,
           [syncSeq + 1, payload.communityId],
+        )
+        this.logger.log(
+          `[addLogEntry] cid=${payload.cid} committed syncSeq=${syncSeq} updated counter to ${syncSeq + 1}`,
         )
 
         return {
@@ -117,7 +137,7 @@ export class LogEntrySyncStorageService implements OnModuleInit {
           receivedAtMs: DateTime.fromJSDate(new Date(existingEntity.receivedAt))
             .toUTC()
             .toMillis(),
-          syncSeq: Number(existingEntity.syncSeq),
+          syncSeq: toSyncSeq(existingEntity.syncSeq),
         }
       }
       this.logger.error(`Error while writing log sync data to storage`, error)
@@ -167,7 +187,7 @@ export class LogEntrySyncStorageService implements OnModuleInit {
       { orderBy: { receivedAt: 'DESC', syncSeq: 'DESC' } },
     )
 
-    return existing != null ? Number(existing.syncSeq) : 0
+    return existing != null ? toSyncSeq(existing.syncSeq) : 0
   }
 
   public async getPaginatedLogEntries(
@@ -180,7 +200,7 @@ export class LogEntrySyncStorageService implements OnModuleInit {
       hash?: string
     },
   ): Promise<{
-    items: LogEntrySyncEntity[]
+    items: Array<{ id: string; syncSeq: number; entry: Buffer }>
     hasNextPage: boolean
   }> {
     this.logger.log(
@@ -201,7 +221,7 @@ export class LogEntrySyncStorageService implements OnModuleInit {
     ]
     const repo = this.repository.entityManager.getRepository(LogEntrySyncEntity)
     const pageSize = Math.min(filter.limit ?? 200, 200)
-    const items = await repo.find(
+    const rows = await repo.find(
       { $and: filters },
       {
         limit: pageSize + 1,
@@ -209,8 +229,12 @@ export class LogEntrySyncStorageService implements OnModuleInit {
       },
     )
     return {
-      items: items.slice(0, pageSize),
-      hasNextPage: items.length > pageSize,
+      items: rows.slice(0, pageSize).map(r => ({
+        id: r.id,
+        syncSeq: toSyncSeq(r.syncSeq),
+        entry: r.entry,
+      })),
+      hasNextPage: rows.length > pageSize,
     }
   }
 
@@ -247,7 +271,7 @@ export class LogEntrySyncStorageService implements OnModuleInit {
       cid: entity.id,
       hashedDbId: entity.hashedDbId,
       receivedAt: DateTime.fromJSDate(new Date(entity.receivedAt)).toUTC(),
-      syncSeq: Number(entity.syncSeq),
+      syncSeq: toSyncSeq(entity.syncSeq),
     }
   }
 

@@ -16,13 +16,15 @@ import { SERIALIZER } from '../../app/const.js'
 import { AuthStatus } from '../auth/types.js'
 import { Socket } from 'socket.io'
 import { DateTime } from 'luxon'
-import { LogEntrySyncStorageService } from '../storage/log-entry-sync.storage.service.js'
+import {
+  LogEntrySyncStorageService,
+  toSyncSeq,
+} from '../storage/log-entry-sync.storage.service.js'
 import {
   LogEntryPullPayload,
   LogEntrySyncPayload,
 } from '../../websocket/handlers/types/log-entry-sync.types.js'
 import { Serializer } from '../../utils/serialization/serializer.service.js'
-import type { LogEntrySync as LogEntrySyncEntity } from '../storage/entities/log-sync.entity.js'
 import { CommunitiesManagerService } from '../communities-manager.service.js'
 
 @Injectable()
@@ -114,7 +116,7 @@ export class LogEntrySyncManager implements OnModuleDestroy {
     }
 
     const maxBytes = 1000 * 1000 * 0.8 // maximum 1MB with 20% buffer
-    const entries: LogEntrySyncEntity[] = []
+    const entries: Array<{ syncSeq: number; entry: Buffer }> = []
     let hasNextPage = false
     let usedBytes = 0
     let hitSizeLimit = false
@@ -158,7 +160,7 @@ export class LogEntrySyncManager implements OnModuleDestroy {
           i < page.items.length - 1 ? true : page.hasNextPage
         const metadataBytes = Buffer.byteLength(
           JSON.stringify({
-            highestSyncSeq: Number(page.items[i].syncSeq),
+            highestSyncSeq: toSyncSeq(page.items[i].syncSeq),
             hasNextPage: candidateHasNextPage,
           }),
         )
@@ -174,7 +176,7 @@ export class LogEntrySyncManager implements OnModuleDestroy {
 
         entries.push(page.items[i])
         usedBytes += entryBytes
-        nextStartSeq = Number(page.items[i].syncSeq)
+        nextStartSeq = toSyncSeq(page.items[i].syncSeq)
         hasNextPage = candidateHasNextPage
 
         if (usedBytes + metadataBytes >= maxBytes) {
@@ -213,7 +215,7 @@ export class LogEntrySyncManager implements OnModuleDestroy {
       hasNextPage,
       highestSyncSeq:
         entries.length > 0
-          ? Number(entries[entries.length - 1].syncSeq)
+          ? toSyncSeq(entries[entries.length - 1].syncSeq)
           : undefined,
       resolvedStartSeq,
     }

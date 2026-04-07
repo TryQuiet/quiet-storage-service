@@ -179,7 +179,7 @@ describe('LogEntrySyncStorageService', () => {
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
-        hashedDbId: 'hashedDbId1',
+        hashedDbId: 'hashedDbId-seq-exclude-1',
         entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'communityId',
         receivedAt: DateTime.fromMillis(filterTs).toUTC(),
@@ -188,7 +188,7 @@ describe('LogEntrySyncStorageService', () => {
         cid: sodiumHelper!.sodium.to_hex(
           sodiumHelper!.sodium.randombytes_buf(32),
         ),
-        hashedDbId: 'hashedDbId1',
+        hashedDbId: 'hashedDbId-seq-exclude-2',
         entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
         communityId: 'communityId',
         receivedAt: DateTime.fromMillis(filterTs + 1).toUTC(),
