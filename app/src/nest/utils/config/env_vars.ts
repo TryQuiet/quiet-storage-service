@@ -53,8 +53,13 @@ export enum EnvVars {
   // QPS (Quiet Push Service) settings
   QPS_ENABLED = 'QPS_ENABLED',
 
-  // Firebase Cloud Messaging settings (used for both iOS and Android)
+  // Firebase Cloud Messaging settings — iOS
   FIREBASE_PROJECT_ID = 'FIREBASE_PROJECT_ID',
   FIREBASE_CLIENT_EMAIL = 'FIREBASE_CLIENT_EMAIL',
   FIREBASE_PRIVATE_KEY = 'FIREBASE_PRIVATE_KEY',
+
+  // Firebase Cloud Messaging settings — Android (separate Firebase project)
+  FIREBASE_ANDROID_PROJECT_ID = 'FIREBASE_ANDROID_PROJECT_ID',
+  FIREBASE_ANDROID_CLIENT_EMAIL = 'FIREBASE_ANDROID_CLIENT_EMAIL',
+  FIREBASE_ANDROID_PRIVATE_KEY = 'FIREBASE_ANDROID_PRIVATE_KEY',
 }
