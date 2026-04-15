@@ -9,6 +9,7 @@ import { LogEntrySync as LogEntrySyncEntity } from './entities/log-sync.entity.j
 import { PostgresClient } from '../../storage/postgres/postgres.client.js'
 import { PostgresRepo } from '../../storage/postgres/postgres.repo.js'
 import { MikroORM } from '@mikro-orm/postgresql'
+import type { Cursor, Transaction } from '@mikro-orm/core'
 import { DateTime } from 'luxon'
 import { TableNames } from '../../storage/postgres/const.js'
 
@@ -54,12 +55,16 @@ export class LogEntrySyncStorageService implements OnModuleInit {
     const receivedAtMs = payload.receivedAt.toUTC().toMillis()
     try {
       this.logger.log(`Adding new log sync data with ID ${payload.cid}`)
-      const stored = await this.orm.em.transactional(async em => {
+      const stored = await this.orm.em.fork().transactional(async em => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-redundant-type-constituents -- Transaction<T = any> is typed as `any` in MikroORM; the cast is intentional
+        const trx: Transaction | undefined = em.getTransactionContext()
         await em.getConnection().execute(
           `insert into "${TableNames.LOG_ENTRY_SYNC_COUNTER}" ("community_id", "next_sync_seq")
              values (?, 1)
              on conflict ("community_id") do nothing`,
           [payload.communityId],
+          'run',
+          trx,
         )
 
         const executedRows: Array<{ next_sync_seq: number | string }> = await em
@@ -70,6 +75,8 @@ export class LogEntrySyncStorageService implements OnModuleInit {
             where "community_id" = ?
             for update`,
             [payload.communityId],
+            'all',
+            trx,
           )
         const [lockedCounter] = executedRows
 
@@ -106,6 +113,8 @@ export class LogEntrySyncStorageService implements OnModuleInit {
                 set "next_sync_seq" = ?
               where "community_id" = ?`,
           [syncSeq + 1, payload.communityId],
+          'run',
+          trx,
         )
         this.logger.log(
           `[addLogEntry] cid=${payload.cid} committed syncSeq=${syncSeq} updated counter to ${syncSeq + 1}`,
@@ -191,6 +200,63 @@ export class LogEntrySyncStorageService implements OnModuleInit {
   }
 
   public async getPaginatedLogEntries(
+    communityId: string,
+    filter: {
+      limit?: number
+      startTs: number
+      endTs?: number
+      hashedDbId?: string
+      hash?: string
+      direction?: 'forward' | 'backward'
+    },
+    cursor?: string,
+  ): Promise<Cursor<LogEntrySyncEntity>> {
+    const startDateTime = DateTime.fromMillis(filter.startTs).toISO()
+    const endDateTime =
+      filter.endTs != null
+        ? DateTime.fromMillis(filter.endTs).toISO()
+        : undefined
+    this.logger.log(
+      `Getting paged log entries for community ID ${communityId} and starting datetime ${startDateTime}`,
+    )
+    const filters = [
+      ...(filter.hash != null ? [{ id: { $eq: filter.hash } }] : []),
+      { communityId: { $eq: communityId } },
+      ...(filter.hashedDbId != null
+        ? [{ hashedDbId: { $eq: filter.hashedDbId } }]
+        : []),
+      {
+        receivedAt: {
+          $gte: startDateTime,
+          ...(endDateTime != null ? { $lte: endDateTime } : {}),
+        },
+      },
+    ]
+    const repo = this.repository.entityManager.getRepository(LogEntrySyncEntity)
+    if (filter.direction === 'backward') {
+      return await repo.findByCursor(
+        { $and: filters },
+        {
+          before: cursor,
+          last: filter.limit,
+          includeCount: true,
+          orderBy: { receivedAt: 'ASC', id: 'ASC' },
+        },
+      )
+    }
+
+    return await repo.findByCursor(
+      { $and: filters },
+      {
+        after: cursor,
+        first: filter.limit,
+        includeCount: true,
+        orderBy: { receivedAt: 'ASC', id: 'ASC' },
+      },
+    )
+  }
+
+  public async getPaginatedLogEntriesBySyncSeq(
     communityId: string,
     filter: {
       limit?: number

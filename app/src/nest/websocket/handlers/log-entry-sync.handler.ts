@@ -122,11 +122,14 @@ export function registerLogEntrySyncHandlers(
         message.payload,
         config.socket,
       )
+      const responsePayload = {
+        ...result,
+      } satisfies LogEntryPullResponseMessage['payload']
 
       const response: LogEntryPullResponseMessage = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.SUCCESS,
-        payload: { ...result },
+        payload: responsePayload,
       }
       callback(response)
     } catch (e) {
