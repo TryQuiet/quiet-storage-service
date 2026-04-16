@@ -39,6 +39,7 @@ export interface LogEntryPullPayload {
   teamId: string
   userId: string
   direction?: 'forward' | 'backward'
+  cursor?: string
   startSeq?: number
   endSeq?: number
   startTs?: number
@@ -57,6 +58,7 @@ export interface LogEntryPullMessage
 }
 
 export interface LogEntryPullResponsePayload {
+  cursor?: string
   hasNextPage: boolean
   entries: Buffer[]
   highestSyncSeq?: number

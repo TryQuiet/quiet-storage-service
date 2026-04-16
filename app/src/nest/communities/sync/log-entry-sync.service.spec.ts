@@ -635,6 +635,85 @@ describe('LogEntrySyncManager', () => {
   })
 
   describe('getPaginatedLogEntries', () => {
+    it('paginates large entries and continues with a legacy cursor', async () => {
+      const testTeam = await testTeamUtils!.createTestTeam()
+      await setupAuth(testTeam, AuthStatus.JOINED)
+      const startMs = DateTime.utc().toMillis()
+      const entries = await addLogEntries({
+        testTeam,
+        hashedDbId: 'hashed-db-large-legacy',
+        startMs,
+        count: 3,
+        size: 500_000,
+        cidPrefix: 'large-entry-legacy',
+      })
+
+      const basePayload = {
+        teamId: testTeam.team.id,
+        userId: testTeam.testUserContext.user.userId,
+        startTs: startMs - 1000,
+      }
+
+      const firstPage = await logEntrySyncManager!.getPaginatedLogEntries(
+        basePayload,
+        wsConfig!.socket as Socket,
+      )
+      expect(firstPage.entries).toHaveLength(1)
+      expect(firstPage.entries[0]).toEqual(entries[0].entry)
+      expect(firstPage.resolvedStartSeq).toBe(0)
+      expect(firstPage.cursor).toBeDefined()
+      expect(firstPage.hasNextPage).toBe(true)
+      expect(firstPage.highestSyncSeq).toBe(entries[0].syncSeq)
+
+      const secondPage = await logEntrySyncManager!.getPaginatedLogEntries(
+        { ...basePayload, cursor: firstPage.cursor },
+        wsConfig!.socket as Socket,
+      )
+      expect(secondPage.entries).toHaveLength(1)
+      expect(secondPage.entries[0]).toEqual(entries[1].entry)
+      expect(secondPage.cursor).toBeDefined()
+      expect(secondPage.hasNextPage).toBe(true)
+      expect(secondPage.highestSyncSeq).toBe(entries[1].syncSeq)
+
+      const thirdPage = await logEntrySyncManager!.getPaginatedLogEntries(
+        { ...basePayload, cursor: secondPage.cursor },
+        wsConfig!.socket as Socket,
+      )
+      expect(thirdPage.entries).toHaveLength(1)
+      expect(thirdPage.entries[0]).toEqual(entries[2].entry)
+      expect(thirdPage.hasNextPage).toBe(false)
+      expect(thirdPage.highestSyncSeq).toBe(entries[2].syncSeq)
+    })
+
+    it('filters entries by time range with the legacy cursor flow', async () => {
+      const testTeam = await testTeamUtils!.createTestTeam()
+      await setupAuth(testTeam, AuthStatus.JOINED)
+      const startMs = DateTime.utc().toMillis()
+      const entries = await addLogEntries({
+        testTeam,
+        hashedDbId: 'hashed-db-time-legacy',
+        startMs,
+        count: 3,
+        cidPrefix: 'time-entry-legacy',
+      })
+
+      const result = await logEntrySyncManager!.getPaginatedLogEntries(
+        {
+          teamId: testTeam.team.id,
+          userId: testTeam.testUserContext.user.userId,
+          startTs: startMs + 500,
+          endTs: startMs + 1500,
+        },
+        wsConfig!.socket as Socket,
+      )
+
+      expect(result.entries).toHaveLength(1)
+      expect(result.entries[0]).toEqual(entries[1].entry)
+      expect(result.hasNextPage).toBe(false)
+      expect(result.highestSyncSeq).toBe(entries[1].syncSeq)
+      expect(result.resolvedStartSeq).toBe(entries[0].syncSeq)
+    })
+
     it('paginates large entries and continues with syncSeq', async () => {
       const testTeam = await testTeamUtils!.createTestTeam()
       await setupAuth(testTeam, AuthStatus.JOINED)

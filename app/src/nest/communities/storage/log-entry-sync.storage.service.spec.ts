@@ -213,6 +213,36 @@ describe('LogEntrySyncStorageService', () => {
     expect(result?.[0].cid).toBe(payloads[1].cid)
   })
 
+  // COUNT is kept below the connection pool limit — each concurrent transaction holds a
+  // connection while waiting for the FOR UPDATE lock, so COUNT=10 exhausts the pool
+  it('assigns unique, contiguous sync sequences under concurrent writes', async () => {
+    const COUNT = 10
+    const payloads: LogSyncEntry[] = Array.from({ length: COUNT }, () => ({
+      cid: sodiumHelper!.sodium.to_hex(
+        sodiumHelper!.sodium.randombytes_buf(32),
+      ),
+      hashedDbId: 'hashedDbId-concurrent',
+      entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
+      communityId: 'communityId',
+      receivedAt: DateTime.utc(),
+    }))
+
+    const results = await Promise.all(
+      payloads.map(async p => await logSyncStorageService!.addLogEntry(p)),
+    )
+
+    // All writes succeeded
+    expect(results.every(r => r != null)).toBe(true)
+
+    const seqs = results.map(r => r!.syncSeq).sort((a, b) => a - b)
+    // All sequences are unique
+    expect(new Set(seqs).size).toBe(COUNT)
+    // Sequences form a contiguous range (no gaps)
+    for (let i = 1; i < seqs.length; i++) {
+      expect(seqs[i]).toBe(seqs[i - 1] + 1)
+    }
+  })
+
   it('should return no records when filtering for a community ID that has no records', async () => {
     const payloads: LogSyncEntry[] = []
     for (let i = 0; i < 3; i += 1) {
@@ -342,6 +372,76 @@ describe('LogEntrySyncStorageService', () => {
       return entries
     }
 
+    it('paginates forward with a legacy cursor', async () => {
+      const startMs = DateTime.utc().toMillis()
+      const entries = await addLogEntries({
+        communityId: 'communityId',
+        hashedDbId: 'hashedDbId',
+        startMs,
+        count: 3,
+        cidPrefix: 'page-entry-legacy',
+      })
+
+      const firstPage =
+        await logSyncStorageService!.getPaginatedLogEntriesBySyncSeq(
+          'communityId',
+          { startSeq: 0, limit: 2 },
+        )
+
+      expect(firstPage.items).toHaveLength(2)
+      expect(firstPage.items[0].id).toBe(entries[0].cid)
+      expect(firstPage.items[1].id).toBe(entries[1].cid)
+      expect(firstPage.hasNextPage).toBe(true)
+      expect(firstPage.items[1].syncSeq).toBe(entries[1].syncSeq)
+
+      const secondPage =
+        await logSyncStorageService!.getPaginatedLogEntriesBySyncSeq(
+          'communityId',
+          { startSeq: entries[1].syncSeq, limit: 2 },
+        )
+
+      expect(secondPage.items).toHaveLength(1)
+      expect(secondPage.items[0].id).toBe(entries[2].cid)
+      expect(secondPage.hasNextPage).toBe(false)
+    })
+
+    it('filters by time range and communityId with the legacy cursor flow', async () => {
+      const startMs = DateTime.utc().toMillis()
+      const entries = await addLogEntries({
+        communityId: 'communityId-a',
+        hashedDbId: 'hashedDbId-a',
+        startMs,
+        count: 3,
+        cidPrefix: 'filter-entry-legacy',
+      })
+      await addLogEntries({
+        communityId: 'communityId-b',
+        hashedDbId: 'hashedDbId-b',
+        startMs: startMs + 5000,
+        count: 1,
+        cidPrefix: 'filter-entry-other-legacy',
+      })
+      await addLogEntries({
+        communityId: 'communityId-c',
+        hashedDbId: 'hashedDbId-a',
+        startMs: startMs + 1000,
+        count: 1,
+        cidPrefix: 'filter-entry-community-legacy',
+      })
+
+      const page = await logSyncStorageService!.getPaginatedLogEntries(
+        'communityId-a',
+        {
+          limit: 10,
+          startTs: startMs + 500,
+        },
+      )
+
+      expect(page.items).toHaveLength(2)
+      expect(page.items[0].id).toBe(entries[1].cid)
+      expect(page.items[1].id).toBe(entries[2].cid)
+    })
+
     it('paginates forward with a sync sequence cursor', async () => {
       const startMs = DateTime.utc().toMillis()
       const entries = await addLogEntries({
@@ -352,10 +452,11 @@ describe('LogEntrySyncStorageService', () => {
         cidPrefix: 'page-entry',
       })
 
-      const firstPage = await logSyncStorageService!.getPaginatedLogEntries(
-        'communityId',
-        { startSeq: 0, limit: 2 },
-      )
+      const firstPage =
+        await logSyncStorageService!.getPaginatedLogEntriesBySyncSeq(
+          'communityId',
+          { startSeq: 0, limit: 2 },
+        )
 
       expect(firstPage.items).toHaveLength(2)
       expect(firstPage.items[0].id).toBe(entries[0].cid)
@@ -363,10 +464,11 @@ describe('LogEntrySyncStorageService', () => {
       expect(firstPage.hasNextPage).toBe(true)
       expect(firstPage.items[1].syncSeq).toBe(entries[1].syncSeq)
 
-      const secondPage = await logSyncStorageService!.getPaginatedLogEntries(
-        'communityId',
-        { startSeq: entries[1].syncSeq, limit: 2 },
-      )
+      const secondPage =
+        await logSyncStorageService!.getPaginatedLogEntriesBySyncSeq(
+          'communityId',
+          { startSeq: entries[1].syncSeq, limit: 2 },
+        )
 
       expect(secondPage.items).toHaveLength(1)
       expect(secondPage.items[0].id).toBe(entries[2].cid)
@@ -397,7 +499,7 @@ describe('LogEntrySyncStorageService', () => {
         cidPrefix: 'filter-entry-community',
       })
 
-      const page = await logSyncStorageService!.getPaginatedLogEntries(
+      const page = await logSyncStorageService!.getPaginatedLogEntriesBySyncSeq(
         'communityId-a',
         {
           limit: 10,
@@ -421,7 +523,7 @@ describe('LogEntrySyncStorageService', () => {
         cidPrefix: 'hash-entry',
       })
 
-      const page = await logSyncStorageService!.getPaginatedLogEntries(
+      const page = await logSyncStorageService!.getPaginatedLogEntriesBySyncSeq(
         'communityId',
         { startSeq: 0, hash: entries[2].cid, limit: 5 },
       )
@@ -441,7 +543,7 @@ describe('LogEntrySyncStorageService', () => {
         cidPrefix: 'strict-start-entry',
       })
 
-      const page = await logSyncStorageService!.getPaginatedLogEntries(
+      const page = await logSyncStorageService!.getPaginatedLogEntriesBySyncSeq(
         'communityId',
         { startSeq: entries[0].syncSeq, limit: 5 },
       )

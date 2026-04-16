@@ -20,6 +20,7 @@ import {
   LogEntrySyncStorageService,
   toSyncSeq,
 } from '../storage/log-entry-sync.storage.service.js'
+import type { LogEntrySync as LogEntrySyncEntity } from '../storage/entities/log-sync.entity.js'
 import {
   LogEntryPullPayload,
   LogEntrySyncPayload,
@@ -97,6 +98,7 @@ export class LogEntrySyncManager implements OnModuleDestroy {
     socket: Socket,
   ): Promise<{
     entries: Buffer[]
+    cursor?: string
     hasNextPage: boolean
     highestSyncSeq?: number
     resolvedStartSeq?: number
@@ -109,12 +111,154 @@ export class LogEntrySyncManager implements OnModuleDestroy {
       socket,
     )
 
-    if (payload.startSeq == null && payload.startTs == null) {
+    const useSyncSeqPagination =
+      payload.startSeq != null || payload.endSeq != null
+
+    if (!useSyncSeqPagination && payload.startTs == null) {
       throw new Error(
         `startSeq or startTs must be provided in log entry pull message`,
       )
     }
 
+    if (!useSyncSeqPagination) {
+      return await this._getPaginatedLogEntriesByCursor(payload)
+    }
+
+    return await this._getPaginatedLogEntriesBySyncSeq(payload)
+  }
+
+  private async _getPaginatedLogEntriesByCursor(
+    payload: LogEntryPullPayload,
+  ): Promise<{
+    entries: Buffer[]
+    cursor?: string
+    hasNextPage: boolean
+    highestSyncSeq?: number
+    resolvedStartSeq?: number
+  }> {
+    const maxBytes = 1000 * 1000 * 0.8 // maximum 1MB with 20% buffer
+    const entries: LogEntrySyncEntity[] = []
+    let { cursor } = payload
+    let nextCursor = payload.cursor
+    let hasNextPage = false
+    let usedBytes = 0
+    let hitSizeLimit = false
+    let hitLimit = false
+    const resolvedStartSeq =
+      await this.logEntrySyncStorage.resolveSyncSeqForTimestamp(
+        payload.teamId,
+        payload.startTs ?? 0,
+      )
+
+    while (true) {
+      const page = await this.logEntrySyncStorage.getPaginatedLogEntries(
+        payload.teamId,
+        {
+          limit: Math.min(payload.limit ?? 200, 200), // TODO: track p50 entry size to optimize page size dynamically
+          startTs: payload.startTs!,
+          endTs: payload.endTs,
+          hashedDbId: payload.hashedDbId,
+          hash: payload.hash,
+          direction: payload.direction,
+        },
+        nextCursor,
+      )
+
+      if (page.items.length === 0) {
+        if (entries.length === 0) {
+          return {
+            entries: [],
+            cursor,
+            hasNextPage: false,
+            resolvedStartSeq,
+          }
+        }
+        hasNextPage = false
+        break
+      }
+
+      for (let i = 0; i < page.items.length; i += 1) {
+        const { entry: entryBuffer } = page.items[i]
+        const entryBytes = entryBuffer.length
+        const candidateCursor =
+          i < page.items.length - 1 ? page.from(page.items[i]) : page.endCursor
+        const candidateHasNextPage =
+          i < page.items.length - 1 ? true : page.hasNextPage
+        const metadataBytes = Buffer.byteLength(
+          JSON.stringify({
+            cursor: candidateCursor,
+            highestSyncSeq: toSyncSeq(page.items[i].syncSeq),
+            resolvedStartSeq,
+            hasNextPage: candidateHasNextPage,
+          }),
+        )
+
+        if (
+          entries.length > 0 &&
+          usedBytes + entryBytes + metadataBytes > maxBytes
+        ) {
+          hasNextPage = true
+          hitSizeLimit = true
+          break
+        }
+
+        entries.push(page.items[i])
+        usedBytes += entryBytes
+        cursor = candidateCursor ?? undefined
+        hasNextPage = candidateHasNextPage
+
+        if (usedBytes + metadataBytes >= maxBytes) {
+          hitSizeLimit = true
+          break
+        }
+
+        if (payload.limit != null && entries.length >= payload.limit) {
+          hitLimit = true
+          break
+        }
+      }
+
+      if (hitLimit) {
+        break
+      }
+
+      if (hitSizeLimit || !page.hasNextPage) {
+        if (!hitSizeLimit && !page.hasNextPage) {
+          hasNextPage = false
+        }
+        break
+      }
+
+      nextCursor = page.endCursor ?? undefined
+      if (nextCursor == null) {
+        hasNextPage = false
+        break
+      }
+    }
+    this.logger.debug(
+      `Returning ${entries.length} log entries, hasNextPage=${hasNextPage}`,
+    )
+
+    return {
+      entries: entries.map(entry => entry.entry),
+      cursor,
+      hasNextPage,
+      highestSyncSeq:
+        entries.length > 0
+          ? toSyncSeq(entries[entries.length - 1].syncSeq)
+          : undefined,
+      resolvedStartSeq,
+    }
+  }
+
+  private async _getPaginatedLogEntriesBySyncSeq(
+    payload: LogEntryPullPayload,
+  ): Promise<{
+    entries: Buffer[]
+    hasNextPage: boolean
+    highestSyncSeq?: number
+    resolvedStartSeq?: number
+  }> {
     const maxBytes = 1000 * 1000 * 0.8 // maximum 1MB with 20% buffer
     const entries: Array<{ syncSeq: number; entry: Buffer }> = []
     let hasNextPage = false
@@ -130,16 +274,17 @@ export class LogEntrySyncManager implements OnModuleDestroy {
     let nextStartSeq = resolvedStartSeq
 
     while (true) {
-      const page = await this.logEntrySyncStorage.getPaginatedLogEntries(
-        payload.teamId,
-        {
-          limit: Math.min(payload.limit ?? 200, 200), // TODO: track p50 entry size to optimize page size dynamically
-          startSeq: nextStartSeq,
-          endSeq: payload.endSeq,
-          hashedDbId: payload.hashedDbId,
-          hash: payload.hash,
-        },
-      )
+      const page =
+        await this.logEntrySyncStorage.getPaginatedLogEntriesBySyncSeq(
+          payload.teamId,
+          {
+            limit: Math.min(payload.limit ?? 200, 200), // TODO: track p50 entry size to optimize page size dynamically
+            startSeq: nextStartSeq,
+            endSeq: payload.endSeq,
+            hashedDbId: payload.hashedDbId,
+            hash: payload.hash,
+          },
+        )
 
       if (page.items.length === 0) {
         if (entries.length === 0) {
@@ -206,6 +351,7 @@ export class LogEntrySyncManager implements OnModuleDestroy {
         break
       }
     }
+
     this.logger.debug(
       `Returning ${entries.length} log entries, hasNextPage=${hasNextPage}`,
     )
