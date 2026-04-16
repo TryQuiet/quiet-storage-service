@@ -7,7 +7,11 @@ import { Injectable } from '@nestjs/common'
 import { createLogger } from '../app/logger/logger.js'
 import { UcanService } from './ucan/ucan.service.js'
 import { PushService } from './push/push.service.js'
-import { PushErrorCode, type MulticastPushResult } from './push/push.types.js'
+import {
+  PushErrorCode,
+  type MulticastPushResult,
+  type PushPayload,
+} from './push/push.types.js'
 
 /**
  * Result of a device registration
@@ -122,7 +126,7 @@ export class QPSService {
     const platform = validation.platform ?? 'ios'
     const result = await this.pushService.send(
       validation.deviceToken,
-      { title, body, data },
+      this.makePayload(platform, title, body, data),
       platform,
     )
 
@@ -189,23 +193,24 @@ export class QPSService {
       return { success: false, error: 'No valid device tokens' }
     }
 
-    const payload = {
-      title: title ?? 'Quiet',
-      body: body ?? 'You have new activity',
-      data,
-    }
+    const iosPayload = this.makePayload('ios', title, body, data)
+    const androidPayload = this.makePayload('android', title, body, data)
 
     // Send multicast per platform so each uses the correct Firebase project
     const results: MulticastPushResult[] = await Promise.all([
       iosTokens.length > 0
-        ? this.pushService.sendMulticast(iosTokens, payload, 'ios')
+        ? this.pushService.sendMulticast(iosTokens, iosPayload, 'ios')
         : Promise.resolve({
             successCount: 0,
             failureCount: 0,
             invalidTokens: [],
           }),
       androidTokens.length > 0
-        ? this.pushService.sendMulticast(androidTokens, payload, 'android')
+        ? this.pushService.sendMulticast(
+            androidTokens,
+            androidPayload,
+            'android',
+          )
         : Promise.resolve({
             successCount: 0,
             failureCount: 0,
@@ -246,5 +251,24 @@ export class QPSService {
     ]
 
     return tokenInvalidCodes.includes(errorCode)
+  }
+
+  private makePayload(
+    platform: 'ios' | 'android',
+    title?: string,
+    body?: string,
+    data?: Record<string, string>,
+  ): PushPayload {
+    if (platform === 'android') {
+      // Android background delivery must be data-only so the app service can
+      // fetch/decrypt the latest QSS entry instead of showing the fallback text.
+      return { data }
+    }
+
+    return {
+      title: title ?? 'Quiet',
+      body: body ?? 'You have new activity',
+      data,
+    }
   }
 }
