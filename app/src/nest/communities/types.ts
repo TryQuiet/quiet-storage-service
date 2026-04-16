@@ -48,6 +48,7 @@ export interface LogSyncEntry {
   communityId: string
   entry: Buffer
   receivedAt: DateTime
+  syncSeq?: number
 }
 
 export enum EncryptionScopeType {

@@ -9,6 +9,10 @@ import { BasicEntityWithId } from '../../../storage/postgres/basic-id.entity.js'
   name: 'entries_by_receivedAt_idx',
   properties: ['communityId', 'receivedAt', 'hashedDbId'],
 })
+@Index({
+  name: 'entries_by_syncSeq_idx',
+  properties: ['communityId', 'syncSeq'],
+})
 export class LogEntrySync extends BasicEntityWithId {
   @Property({
     type: 'string',
@@ -30,6 +34,13 @@ export class LogEntrySync extends BasicEntityWithId {
 
   @Property({ type: 'timestamptz', fieldName: 'received_at' })
   receivedAt!: string // set when the message is originally recieved on the websocket
+
+  @Property({
+    fieldName: 'sync_seq',
+    type: 'bigint',
+    runtimeType: 'number',
+  })
+  syncSeq!: number
 
   @Property({ type: 'timestamptz', fieldName: 'created_at' })
   createdAt!: string // datetime when the record was added to the DB

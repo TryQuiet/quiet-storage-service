@@ -510,10 +510,7 @@ describe('Communities', () => {
 
     it('should store the message contents in postgres', async () => {
       const storedSyncContents =
-        await dataSyncStorage.getLogEntriesForCommunity(
-          testTeam.team.id,
-          logSyncMessage.ts - 10_000,
-        )
+        await dataSyncStorage.getLogEntriesForCommunity(testTeam.team.id, 0)
       expect(storedSyncContents).not.toBeNull()
       expect(storedSyncContents!.length).toBe(1)
       const [contents] = storedSyncContents!

@@ -4,7 +4,7 @@ services:
     image: postgres:latest
     hostname: postgres-qss-quiet
     networks:
-      - qss 
+      - qss
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -12,7 +12,7 @@ services:
     command: -p 5434
     ports:
       - "5434:5434"
-      
+
   redis-qss-quiet:
     image: "redis/redis-stack:latest"
     hostname: redis-qss-quiet
@@ -37,6 +37,9 @@ services:
     depends_on:
       - postgres-qss-quiet
       - redis-qss-quiet
+    env_file:
+      # Runtime-only secret overrides. Keep this file untracked.
+      - ./.env.local.docker.private
     build:
       context: ..
       dockerfile: Dockerfile
@@ -45,11 +48,10 @@ services:
 
 networks:
   qss:
-    # Specify driver options
     driver: bridge
     driver_opts:
-      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"
-      
+      com.docker.network.bridge.host_binding_ipv4: "0.0.0.0"
+
 volumes:
   redis_qss_data:
     driver: local

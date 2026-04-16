@@ -45,7 +45,10 @@ describe('LogEntrySyncStorageService', () => {
       communityId: 'communityId',
       receivedAt: DateTime.utc(),
     }
-    expect(await logSyncStorageService?.addLogEntry(data)).toBe(true)
+    expect(await logSyncStorageService?.addLogEntry(data)).toEqual({
+      receivedAtMs: data.receivedAt.toMillis(),
+      syncSeq: 1,
+    })
   })
 
   it('should succeed but not write a log entry to postgres on duplicate ID', async () => {
@@ -59,20 +62,25 @@ describe('LogEntrySyncStorageService', () => {
       hashedDbId: 'hashedDbId',
       receivedAt: DateTime.utc(),
     }
-    expect(await logSyncStorageService?.addLogEntry(data)).toBe(true)
+    expect(await logSyncStorageService?.addLogEntry(data)).toEqual({
+      receivedAtMs: data.receivedAt.toMillis(),
+      syncSeq: 1,
+    })
 
     const dupeIdData: LogSyncEntry = {
       cid,
       entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
       hashedDbId: 'hashedDbId',
       communityId: 'communityId',
-      receivedAt: DateTime.utc(),
+      receivedAt: DateTime.utc().plus({ minutes: 1 }),
     }
-    expect(await logSyncStorageService?.addLogEntry(dupeIdData)).toBe(true)
+    expect(await logSyncStorageService?.addLogEntry(dupeIdData)).toEqual({
+      receivedAtMs: data.receivedAt.toMillis(),
+      syncSeq: 1,
+    })
   })
 
   it('should write and then get an array of all records for a community ID', async () => {
-    const filterTs = DateTime.utc().toMillis() - 500
     const payloads: LogSyncEntry[] = []
     for (let i = 0; i < 4; i += 1) {
       payloads.push({
@@ -95,12 +103,16 @@ describe('LogEntrySyncStorageService', () => {
       receivedAt: DateTime.utc(),
     })
     for (const payload of payloads) {
-      expect(await logSyncStorageService?.addLogEntry(payload)).toBe(true)
+      expect(await logSyncStorageService?.addLogEntry(payload)).toEqual(
+        expect.objectContaining({
+          receivedAtMs: payload.receivedAt.toMillis(),
+        }),
+      )
     }
 
     const result = await logSyncStorageService?.getLogEntriesForCommunity(
       'communityId',
-      filterTs,
+      0,
     )
     expect(result?.length).toBe(4)
     expect(
@@ -108,8 +120,7 @@ describe('LogEntrySyncStorageService', () => {
     ).toEqual([])
   })
 
-  it('should write and then get an array of records for a community ID that match the filter timestamp', async () => {
-    const filterTs = DateTime.utc().toMillis() - 10_000
+  it('should write and then get an array of records for a community ID that are after the filter sequence', async () => {
     const payloads: LogSyncEntry[] = []
     for (let i = 0; i < 3; i += 1) {
       payloads.push({
@@ -140,27 +151,99 @@ describe('LogEntrySyncStorageService', () => {
       communityId: 'otherId',
       receivedAt: DateTime.utc().minus({ days: 1 }),
     })
+    const positions: Array<{ receivedAtMs: number; syncSeq: number }> = []
     for (const payload of payloads) {
-      expect(await logSyncStorageService?.addLogEntry(payload)).toBe(true)
+      positions.push(
+        (await logSyncStorageService?.addLogEntry(payload)) as {
+          receivedAtMs: number
+          syncSeq: number
+        },
+      )
     }
 
     const result = await logSyncStorageService?.getLogEntriesForCommunity(
       'communityId',
-      filterTs,
+      positions[2].syncSeq,
     )
     expect(result?.length).toBe(1)
     expect(
       result?.filter(entity => entity.communityId !== 'communityId'),
     ).toEqual([])
-    expect(
-      result?.filter(
-        entity => entity.receivedAt >= DateTime.fromMillis(filterTs),
-      ).length,
-    ).toEqual(1)
+    expect(result?.[0].syncSeq).toEqual(positions[3].syncSeq)
+  })
+
+  it('should exclude records whose syncSeq exactly matches the filter sequence', async () => {
+    const filterTs = DateTime.utc().toMillis()
+    const payloads: LogSyncEntry[] = [
+      {
+        cid: sodiumHelper!.sodium.to_hex(
+          sodiumHelper!.sodium.randombytes_buf(32),
+        ),
+        hashedDbId: 'hashedDbId-seq-exclude-1',
+        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
+        communityId: 'communityId',
+        receivedAt: DateTime.fromMillis(filterTs).toUTC(),
+      },
+      {
+        cid: sodiumHelper!.sodium.to_hex(
+          sodiumHelper!.sodium.randombytes_buf(32),
+        ),
+        hashedDbId: 'hashedDbId-seq-exclude-2',
+        entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
+        communityId: 'communityId',
+        receivedAt: DateTime.fromMillis(filterTs + 1).toUTC(),
+      },
+    ]
+    const positions: Array<{ receivedAtMs: number; syncSeq: number }> = []
+    for (const payload of payloads) {
+      positions.push(
+        (await logSyncStorageService?.addLogEntry(payload)) as {
+          receivedAtMs: number
+          syncSeq: number
+        },
+      )
+    }
+
+    const result = await logSyncStorageService?.getLogEntriesForCommunity(
+      'communityId',
+      positions[0].syncSeq,
+    )
+
+    expect(result?.length).toBe(1)
+    expect(result?.[0].cid).toBe(payloads[1].cid)
+  })
+
+  // COUNT is kept below the connection pool limit — each concurrent transaction holds a
+  // connection while waiting for the FOR UPDATE lock, so COUNT=10 exhausts the pool
+  it('assigns unique, contiguous sync sequences under concurrent writes', async () => {
+    const COUNT = 10
+    const payloads: LogSyncEntry[] = Array.from({ length: COUNT }, () => ({
+      cid: sodiumHelper!.sodium.to_hex(
+        sodiumHelper!.sodium.randombytes_buf(32),
+      ),
+      hashedDbId: 'hashedDbId-concurrent',
+      entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
+      communityId: 'communityId',
+      receivedAt: DateTime.utc(),
+    }))
+
+    const results = await Promise.all(
+      payloads.map(async p => await logSyncStorageService!.addLogEntry(p)),
+    )
+
+    // All writes succeeded
+    expect(results.every(r => r != null)).toBe(true)
+
+    const seqs = results.map(r => r!.syncSeq).sort((a, b) => a - b)
+    // All sequences are unique
+    expect(new Set(seqs).size).toBe(COUNT)
+    // Sequences form a contiguous range (no gaps)
+    for (let i = 1; i < seqs.length; i++) {
+      expect(seqs[i]).toBe(seqs[i - 1] + 1)
+    }
   })
 
   it('should return no records when filtering for a community ID that has no records', async () => {
-    const filterTs = DateTime.utc().minus({ days: 100 }).toMillis()
     const payloads: LogSyncEntry[] = []
     for (let i = 0; i < 3; i += 1) {
       payloads.push({
@@ -192,14 +275,51 @@ describe('LogEntrySyncStorageService', () => {
       receivedAt: DateTime.utc().minus({ days: 1 }),
     })
     for (const payload of payloads) {
-      expect(await logSyncStorageService?.addLogEntry(payload)).toBe(true)
+      expect(await logSyncStorageService?.addLogEntry(payload)).toEqual(
+        expect.objectContaining({
+          receivedAtMs: payload.receivedAt.toMillis(),
+        }),
+      )
     }
 
     const result = await logSyncStorageService?.getLogEntriesForCommunity(
       'foobar',
-      filterTs,
+      0,
     )
     expect(result?.length).toBe(0)
+  })
+
+  it('resolves the highest sync sequence at or before a legacy timestamp', async () => {
+    const startMs = DateTime.utc().toMillis()
+    const payloads: LogSyncEntry[] = [0, 1, 2].map(i => ({
+      cid: sodiumHelper!.sodium.to_hex(
+        sodiumHelper!.sodium.randombytes_buf(32),
+      ),
+      hashedDbId: 'hashedDbId1',
+      entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
+      communityId: 'communityId',
+      receivedAt: DateTime.fromMillis(startMs + i * 1000).toUTC(),
+    }))
+
+    const positions: Array<{ receivedAtMs: number; syncSeq: number }> = []
+    for (const payload of payloads) {
+      positions.push(
+        (await logSyncStorageService?.addLogEntry(payload)) as {
+          receivedAtMs: number
+          syncSeq: number
+        },
+      )
+    }
+
+    await expect(
+      logSyncStorageService?.resolveSyncSeqForTimestamp('communityId', startMs),
+    ).resolves.toBe(positions[0].syncSeq)
+    await expect(
+      logSyncStorageService?.resolveSyncSeqForTimestamp(
+        'communityId',
+        startMs + 1500,
+      ),
+    ).resolves.toBe(positions[1].syncSeq)
   })
 
   describe('getPaginatedLogEntries', () => {
@@ -215,6 +335,7 @@ describe('LogEntrySyncStorageService', () => {
         cid: string
         entry: Buffer
         receivedAtMs: number
+        syncSeq: number
         hashedDbId: string
         communityId: string
       }>
@@ -232,7 +353,7 @@ describe('LogEntrySyncStorageService', () => {
         const receivedAtMs = startMs + i * 1000
         const entry = Buffer.alloc(size, i)
         const cid = `${cidPrefix}-${i}`
-        await logSyncStorageService!.addLogEntry({
+        const stored = await logSyncStorageService!.addLogEntry({
           cid,
           hashedDbId,
           communityId,
@@ -243,6 +364,7 @@ describe('LogEntrySyncStorageService', () => {
           cid,
           entry,
           receivedAtMs,
+          syncSeq: stored!.syncSeq,
           hashedDbId,
           communityId,
         })
@@ -250,14 +372,14 @@ describe('LogEntrySyncStorageService', () => {
       return entries
     }
 
-    it('paginates forward with a cursor', async () => {
+    it('paginates forward with a legacy cursor', async () => {
       const startMs = DateTime.utc().toMillis()
       const entries = await addLogEntries({
         communityId: 'communityId',
         hashedDbId: 'hashedDbId',
         startMs,
         count: 3,
-        cidPrefix: 'page-entry',
+        cidPrefix: 'page-entry-legacy',
       })
 
       const firstPage = await logSyncStorageService!.getPaginatedLogEntries(
@@ -282,7 +404,77 @@ describe('LogEntrySyncStorageService', () => {
       expect(secondPage.hasNextPage).toBe(false)
     })
 
-    it('filters by time range and communityId', async () => {
+    it('filters by time range and communityId with the legacy cursor flow', async () => {
+      const startMs = DateTime.utc().toMillis()
+      const entries = await addLogEntries({
+        communityId: 'communityId-a',
+        hashedDbId: 'hashedDbId-a',
+        startMs,
+        count: 3,
+        cidPrefix: 'filter-entry-legacy',
+      })
+      await addLogEntries({
+        communityId: 'communityId-b',
+        hashedDbId: 'hashedDbId-b',
+        startMs: startMs + 5000,
+        count: 1,
+        cidPrefix: 'filter-entry-other-legacy',
+      })
+      await addLogEntries({
+        communityId: 'communityId-c',
+        hashedDbId: 'hashedDbId-a',
+        startMs: startMs + 1000,
+        count: 1,
+        cidPrefix: 'filter-entry-community-legacy',
+      })
+
+      const page = await logSyncStorageService!.getPaginatedLogEntries(
+        'communityId-a',
+        {
+          limit: 10,
+          startTs: startMs + 500,
+        },
+      )
+
+      expect(page.items).toHaveLength(2)
+      expect(page.items[0].id).toBe(entries[1].cid)
+      expect(page.items[1].id).toBe(entries[2].cid)
+    })
+
+    it('paginates forward with a sync sequence cursor', async () => {
+      const startMs = DateTime.utc().toMillis()
+      const entries = await addLogEntries({
+        communityId: 'communityId',
+        hashedDbId: 'hashedDbId',
+        startMs,
+        count: 3,
+        cidPrefix: 'page-entry',
+      })
+
+      const firstPage =
+        await logSyncStorageService!.getPaginatedLogEntriesBySyncSeq(
+          'communityId',
+          { startSeq: 0, limit: 2 },
+        )
+
+      expect(firstPage.items).toHaveLength(2)
+      expect(firstPage.items[0].id).toBe(entries[0].cid)
+      expect(firstPage.items[1].id).toBe(entries[1].cid)
+      expect(firstPage.hasNextPage).toBe(true)
+      expect(firstPage.items[1].syncSeq).toBe(entries[1].syncSeq)
+
+      const secondPage =
+        await logSyncStorageService!.getPaginatedLogEntriesBySyncSeq(
+          'communityId',
+          { startSeq: entries[1].syncSeq, limit: 2 },
+        )
+
+      expect(secondPage.items).toHaveLength(1)
+      expect(secondPage.items[0].id).toBe(entries[2].cid)
+      expect(secondPage.hasNextPage).toBe(false)
+    })
+
+    it('filters by sequence range and communityId', async () => {
       const startMs = DateTime.utc().toMillis()
       const entries = await addLogEntries({
         communityId: 'communityId-a',
@@ -306,16 +498,18 @@ describe('LogEntrySyncStorageService', () => {
         cidPrefix: 'filter-entry-community',
       })
 
-      const page = await logSyncStorageService!.getPaginatedLogEntries(
+      const page = await logSyncStorageService!.getPaginatedLogEntriesBySyncSeq(
         'communityId-a',
         {
           limit: 10,
-          startTs: startMs + 500,
+          startSeq: 0,
+          endSeq: entries[1].syncSeq,
         },
       )
 
       expect(page.items).toHaveLength(2)
-      expect(page.items[0].id).toBe(entries[1].cid)
+      expect(page.items[0].id).toBe(entries[0].cid)
+      expect(page.items[1].id).toBe(entries[1].cid)
     })
 
     it('filters by hash', async () => {
@@ -328,14 +522,34 @@ describe('LogEntrySyncStorageService', () => {
         cidPrefix: 'hash-entry',
       })
 
-      const page = await logSyncStorageService!.getPaginatedLogEntries(
+      const page = await logSyncStorageService!.getPaginatedLogEntriesBySyncSeq(
         'communityId',
-        { startTs: startMs - 1000, hash: entries[2].cid, limit: 5 },
+        { startSeq: 0, hash: entries[2].cid, limit: 5 },
       )
 
       expect(page.items).toHaveLength(1)
       expect(page.items[0].id).toBe(entries[2].cid)
       expect(page.hasNextPage).toBe(false)
+    })
+
+    it('excludes entries whose syncSeq exactly matches startSeq', async () => {
+      const startMs = DateTime.utc().toMillis()
+      const entries = await addLogEntries({
+        communityId: 'communityId',
+        hashedDbId: 'hashedDbId',
+        startMs,
+        count: 3,
+        cidPrefix: 'strict-start-entry',
+      })
+
+      const page = await logSyncStorageService!.getPaginatedLogEntriesBySyncSeq(
+        'communityId',
+        { startSeq: entries[0].syncSeq, limit: 5 },
+      )
+
+      expect(page.items).toHaveLength(2)
+      expect(page.items[0].id).toBe(entries[1].cid)
+      expect(page.items[1].id).toBe(entries[2].cid)
     })
   })
 })

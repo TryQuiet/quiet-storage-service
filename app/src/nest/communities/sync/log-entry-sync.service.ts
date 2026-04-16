@@ -16,13 +16,16 @@ import { SERIALIZER } from '../../app/const.js'
 import { AuthStatus } from '../auth/types.js'
 import { Socket } from 'socket.io'
 import { DateTime } from 'luxon'
-import { LogEntrySyncStorageService } from '../storage/log-entry-sync.storage.service.js'
+import {
+  LogEntrySyncStorageService,
+  toSyncSeq,
+} from '../storage/log-entry-sync.storage.service.js'
+import type { LogEntrySync as LogEntrySyncEntity } from '../storage/entities/log-sync.entity.js'
 import {
   LogEntryPullPayload,
   LogEntrySyncPayload,
 } from '../../websocket/handlers/types/log-entry-sync.types.js'
 import { Serializer } from '../../utils/serialization/serializer.service.js'
-import type { LogEntrySync as LogEntrySyncEntity } from '../storage/entities/log-sync.entity.js'
 import { CommunitiesManagerService } from '../communities-manager.service.js'
 
 @Injectable()
@@ -51,7 +54,7 @@ export class LogEntrySyncManager implements OnModuleDestroy {
   public async processIncomingLogEntrySyncMessage(
     payload: LogEntrySyncPayload,
     socket: Socket,
-  ): Promise<boolean> {
+  ): Promise<{ receivedAt: number; syncSeq: number } | undefined> {
     const managedCommunity = await this.communities.get(payload.teamId)
     this._validateSyncPermission(
       payload.encEntry.userId,
@@ -61,6 +64,7 @@ export class LogEntrySyncManager implements OnModuleDestroy {
     )
     this._validateIncomingSyncMessage(payload)
 
+    const receivedAt = DateTime.utc()
     // convert the message payload to a form writable to the DB
     // NOTE: the entry field is a binary column in postgres so we must losslessly serialize
     //       the object to a buffer
@@ -69,10 +73,10 @@ export class LogEntrySyncManager implements OnModuleDestroy {
       cid: payload.hash,
       hashedDbId: payload.hashedDbId,
       entry: this.serializer.serialize(payload.encEntry),
-      receivedAt: DateTime.utc(),
+      receivedAt,
     }
-    const written = await this.logEntrySyncStorage.addLogEntry(dbPayload)
-    if (written) {
+    const storedPosition = await this.logEntrySyncStorage.addLogEntry(dbPayload)
+    if (storedPosition != null) {
       this.logger.debug(
         'Data sync successfully written to the DB',
         dbPayload.cid,
@@ -81,7 +85,12 @@ export class LogEntrySyncManager implements OnModuleDestroy {
       this.logger.error('Data sync write to DB was unsuccessful', dbPayload.cid)
     }
 
-    return written
+    return storedPosition != null
+      ? {
+          receivedAt: storedPosition.receivedAtMs,
+          syncSeq: storedPosition.syncSeq,
+        }
+      : undefined
   }
 
   public async getPaginatedLogEntries(
@@ -91,6 +100,8 @@ export class LogEntrySyncManager implements OnModuleDestroy {
     entries: Buffer[]
     cursor?: string
     hasNextPage: boolean
+    highestSyncSeq?: number
+    resolvedStartSeq?: number
   }> {
     const managedCommunity = await this.communities.get(payload.teamId)
     this._validateSyncPermission(
@@ -100,16 +111,36 @@ export class LogEntrySyncManager implements OnModuleDestroy {
       socket,
     )
 
-    if (payload.startTs == null) {
-      throw new Error(`startTs must be provided in log entry pull message`)
+    const useSyncSeqPagination =
+      payload.startSeq != null || payload.endSeq != null
+
+    if (!useSyncSeqPagination && payload.startTs == null) {
+      throw new Error(
+        `startSeq or startTs must be provided in log entry pull message`,
+      )
     }
 
+    if (!useSyncSeqPagination) {
+      return await this._getPaginatedLogEntriesByCursor(payload)
+    }
+
+    return await this._getPaginatedLogEntriesBySyncSeq(payload)
+  }
+
+  private async _getPaginatedLogEntriesByCursor(
+    payload: LogEntryPullPayload,
+  ): Promise<{
+    entries: Buffer[]
+    cursor?: string
+    hasNextPage: boolean
+    highestSyncSeq?: number
+  }> {
     const maxBytes = 1000 * 1000 * 0.8 // maximum 1MB with 20% buffer
     const entries: LogEntrySyncEntity[] = []
     let { cursor } = payload
+    let nextCursor = payload.cursor
     let hasNextPage = false
     let usedBytes = 0
-    let nextCursor = payload.cursor
     let hitSizeLimit = false
     let hitLimit = false
 
@@ -118,17 +149,22 @@ export class LogEntrySyncManager implements OnModuleDestroy {
         payload.teamId,
         {
           limit: Math.min(payload.limit ?? 200, 200), // TODO: track p50 entry size to optimize page size dynamically
-          startTs: payload.startTs,
+          startTs: payload.startTs!,
           endTs: payload.endTs,
           hashedDbId: payload.hashedDbId,
           hash: payload.hash,
+          direction: payload.direction,
         },
         nextCursor,
       )
 
       if (page.items.length === 0) {
         if (entries.length === 0) {
-          return { entries: [], hasNextPage: false }
+          return {
+            entries: [],
+            cursor,
+            hasNextPage: false,
+          }
         }
         hasNextPage = false
         break
@@ -198,6 +234,126 @@ export class LogEntrySyncManager implements OnModuleDestroy {
       entries: entries.map(entry => entry.entry),
       cursor,
       hasNextPage,
+      highestSyncSeq:
+        entries.length > 0
+          ? toSyncSeq(entries[entries.length - 1].syncSeq)
+          : undefined,
+    }
+  }
+
+  private async _getPaginatedLogEntriesBySyncSeq(
+    payload: LogEntryPullPayload,
+  ): Promise<{
+    entries: Buffer[]
+    hasNextPage: boolean
+    highestSyncSeq?: number
+    resolvedStartSeq?: number
+  }> {
+    const maxBytes = 1000 * 1000 * 0.8 // maximum 1MB with 20% buffer
+    const entries: Array<{ syncSeq: number; entry: Buffer }> = []
+    let hasNextPage = false
+    let usedBytes = 0
+    let hitSizeLimit = false
+    let hitLimit = false
+    const resolvedStartSeq =
+      payload.startSeq ??
+      (await this.logEntrySyncStorage.resolveSyncSeqForTimestamp(
+        payload.teamId,
+        payload.startTs ?? 0,
+      ))
+    let nextStartSeq = resolvedStartSeq
+
+    while (true) {
+      const page =
+        await this.logEntrySyncStorage.getPaginatedLogEntriesBySyncSeq(
+          payload.teamId,
+          {
+            limit: Math.min(payload.limit ?? 200, 200), // TODO: track p50 entry size to optimize page size dynamically
+            startSeq: nextStartSeq,
+            endSeq: payload.endSeq,
+            hashedDbId: payload.hashedDbId,
+            hash: payload.hash,
+          },
+        )
+
+      if (page.items.length === 0) {
+        if (entries.length === 0) {
+          return {
+            entries: [],
+            hasNextPage: false,
+            resolvedStartSeq,
+          }
+        }
+        hasNextPage = false
+        break
+      }
+
+      for (let i = 0; i < page.items.length; i += 1) {
+        const { entry: entryBuffer } = page.items[i]
+        const entryBytes = entryBuffer.length
+        const candidateHasNextPage =
+          i < page.items.length - 1 ? true : page.hasNextPage
+        const metadataBytes = Buffer.byteLength(
+          JSON.stringify({
+            highestSyncSeq: toSyncSeq(page.items[i].syncSeq),
+            hasNextPage: candidateHasNextPage,
+          }),
+        )
+
+        if (
+          entries.length > 0 &&
+          usedBytes + entryBytes + metadataBytes > maxBytes
+        ) {
+          hasNextPage = true
+          hitSizeLimit = true
+          break
+        }
+
+        entries.push(page.items[i])
+        usedBytes += entryBytes
+        nextStartSeq = toSyncSeq(page.items[i].syncSeq)
+        hasNextPage = candidateHasNextPage
+
+        if (usedBytes + metadataBytes >= maxBytes) {
+          hitSizeLimit = true
+          break
+        }
+
+        if (payload.limit != null && entries.length >= payload.limit) {
+          hitLimit = true
+          break
+        }
+      }
+
+      if (hitLimit) {
+        break
+      }
+
+      if (hitSizeLimit || !page.hasNextPage) {
+        if (!hitSizeLimit && !page.hasNextPage) {
+          hasNextPage = false
+        }
+        break
+      }
+
+      if (entries.length === 0) {
+        hasNextPage = false
+        break
+      }
+    }
+
+    this.logger.debug(
+      `Returning ${entries.length} log entries, hasNextPage=${hasNextPage}`,
+    )
+
+    return {
+      entries: entries.map(entry => entry.entry),
+      hasNextPage,
+      highestSyncSeq:
+        entries.length > 0
+          ? toSyncSeq(entries[entries.length - 1].syncSeq)
+          : undefined,
+      resolvedStartSeq,
     }
   }
 
