@@ -4,15 +4,15 @@ import type { UcanService } from './ucan/ucan.service.js'
 import type { PushService } from './push/push.service.js'
 
 describe('QPSService', () => {
-  const validateUcan = jest.fn()
-  const send = jest.fn()
-  const sendMulticast = jest.fn()
+  const validateUcan = jest.fn<UcanService['validateUcan']>()
+  const send = jest.fn<PushService['send']>()
+  const sendMulticast = jest.fn<PushService['sendMulticast']>()
 
-  const ucanService = {
+  const ucanService: Pick<UcanService, 'validateUcan'> = {
     validateUcan,
   }
 
-  const pushService = {
+  const pushService: Pick<PushService, 'send' | 'sendMulticast'> = {
     send,
     sendMulticast,
   }

@@ -221,6 +221,19 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
             },
           },
         },
+        // Web Push configuration
+        webpush: {
+          headers: {
+            Urgency: 'high',
+          },
+          notification:
+            payload.title != null || payload.body != null
+              ? {
+                  title: payload.title,
+                  body: payload.body,
+                }
+              : undefined,
+        },
       }
 
       this.logger.log(
@@ -243,14 +256,16 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
    * Initialize the iOS FCM client
    */
   private initializeIos(): void {
-    const projectId = ConfigService.getString(EnvVars.FIREBASE_PROJECT_ID)
-    const clientEmail = ConfigService.getString(EnvVars.FIREBASE_CLIENT_EMAIL)
-    const privateKey = ConfigService.getString(EnvVars.FIREBASE_PRIVATE_KEY)
+    const projectId = ConfigService.getString(EnvVars.FIREBASE_IOS_PROJECT_ID)
+    const clientEmail = ConfigService.getString(
+      EnvVars.FIREBASE_IOS_CLIENT_EMAIL,
+    )
+    const privateKey = ConfigService.getString(EnvVars.FIREBASE_IOS_PRIVATE_KEY)
 
     if (projectId == null || clientEmail == null || privateKey == null) {
       this.logger.error(
         `iOS FCM credentials not configured. iOS push notifications will be unavailable. ` +
-          `Please configure FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY.`,
+          `Please configure FIREBASE_IOS_PROJECT_ID, FIREBASE_IOS_CLIENT_EMAIL, and FIREBASE_IOS_PRIVATE_KEY.`,
       )
       this.iosAvailable = false
       return

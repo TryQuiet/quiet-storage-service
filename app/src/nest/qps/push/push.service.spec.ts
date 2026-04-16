@@ -32,9 +32,9 @@ describe('PushService', () => {
 
   beforeEach(async () => {
     // Set environment variables for FCM
-    process.env.FIREBASE_PROJECT_ID = 'test-project'
-    process.env.FIREBASE_CLIENT_EMAIL = 'test@test.iam.gserviceaccount.com'
-    process.env.FIREBASE_PRIVATE_KEY =
+    process.env.FIREBASE_IOS_PROJECT_ID = 'test-project'
+    process.env.FIREBASE_IOS_CLIENT_EMAIL = 'test@test.iam.gserviceaccount.com'
+    process.env.FIREBASE_IOS_PRIVATE_KEY =
       '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----'
 
     module = await Test.createTestingModule({
@@ -45,9 +45,9 @@ describe('PushService', () => {
   })
 
   afterEach(async () => {
-    delete process.env.FIREBASE_PROJECT_ID
-    delete process.env.FIREBASE_CLIENT_EMAIL
-    delete process.env.FIREBASE_PRIVATE_KEY
+    delete process.env.FIREBASE_IOS_PROJECT_ID
+    delete process.env.FIREBASE_IOS_CLIENT_EMAIL
+    delete process.env.FIREBASE_IOS_PRIVATE_KEY
     await module?.close()
     jest.clearAllMocks()
   })

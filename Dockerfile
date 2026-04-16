@@ -11,10 +11,7 @@ COPY package.json pnpm-lock.yaml ./
 COPY . .
 
 FROM base AS builder
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    cd bootstrapper && \
-    pnpm --ignore-workspace i --frozen-lockfile && \
-    node ./bootstrap.mjs --deployed --copy-submodules --skip-submodule-pull
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm run bootstrap -v -r
 
 EXPOSE 3000
 CMD ["pnpm", "run", "start:bare"]
