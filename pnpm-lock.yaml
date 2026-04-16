@@ -109,8 +109,8 @@ importers:
         specifier: workspace:*
         version: link:../auth-packages/lfa/crdx
       '@mgcrea/fastify-graceful-exit':
-        specifier: 1.1.1
-        version: 1.1.1
+        specifier: ^1.2.0
+        version: 1.2.0
       '@mikro-orm/cli':
         specifier: ^6.4.7
         version: 6.5.5(pg@8.16.3)
@@ -1590,8 +1590,8 @@ packages:
     resolution: {integrity: sha512-Z7C/xXCiGWsg0KuKsHTKJxbWhpI3Vs5GwLfOean7MGyVFGqdRgBbAjOCh6u4bbjPc/8MJ2pZmK/0DLdCbivLDA==}
     engines: {node: '>=8'}
 
-  '@mgcrea/fastify-graceful-exit@1.1.1':
-    resolution: {integrity: sha512-0E1NwBg0J7DHDgJlb6mvqgCe0TfsyyZhnrQCbT+hrKL0USyUJRgAlyEMIdUqWJt6jrNbRrv8y2OSqL1twxKi/g==}
+  '@mgcrea/fastify-graceful-exit@1.2.0':
+    resolution: {integrity: sha512-2Tgdohk2V3gYXzhucJN2kh5EoxYmwkarJV6ddPzzvE+VJN8BCE0r9mWkwZ5kVetR4I4Vd116XWeg2JuzpyqWDw==}
 
   '@microsoft/tsdoc@0.15.1':
     resolution: {integrity: sha512-4aErSrCR/On/e5G2hDP0wjooqDdauzEbIq8hIkIe5pXV0rtWJZvdCEKL0ykZxex+IxIwBp0eGeV48hQN07dXtw==}
@@ -4464,6 +4464,9 @@ packages:
 
   fastify-plugin@4.5.1:
     resolution: {integrity: sha512-stRHYGeuqpEZTL1Ef0Ovr2ltazUT9g844X5z/zEBFLG8RYlpDiOCIG+ATvYEp+/zmc7sN29mcIMp8gvYplYPIQ==}
+
+  fastify-plugin@5.1.0:
+    resolution: {integrity: sha512-FAIDA8eovSt5qcDgcBvDuX/v0Cjz0ohGhENZ/wpc3y+oZCY2afZ9Baqql3g/lC+OHRnciQol4ww7tuthOb9idw==}
 
   fastify@4.28.1:
     resolution: {integrity: sha512-kFWUtpNr4i7t5vY2EJPCN2KgMVpuqfU4NjnJNCgiNB900oiDeYqaNDRcAfeBbOF5hGixixxcKnOU4KN9z6QncQ==}
@@ -10344,9 +10347,9 @@ snapshots:
 
   '@lukeed/csprng@1.1.0': {}
 
-  '@mgcrea/fastify-graceful-exit@1.1.1':
+  '@mgcrea/fastify-graceful-exit@1.2.0':
     dependencies:
-      fastify-plugin: 4.5.1
+      fastify-plugin: 5.1.0
 
   '@microsoft/tsdoc@0.15.1': {}
 
@@ -13884,6 +13887,8 @@ snapshots:
       strnum: 2.1.2
 
   fastify-plugin@4.5.1: {}
+
+  fastify-plugin@5.1.0: {}
 
   fastify@4.28.1:
     dependencies:
