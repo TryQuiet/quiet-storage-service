@@ -18,8 +18,8 @@ jest.unstable_mockModule('firebase-admin', () => ({
 
 // Interface for accessing private members in tests
 interface PushServicePrivate {
-  available: boolean
-  messaging: unknown
+  iosAvailable: boolean
+  iosMessaging: unknown
 }
 
 describe('PushService', () => {
@@ -29,6 +29,12 @@ describe('PushService', () => {
   // Helper to access private members for testing
   const getPrivate = (): PushServicePrivate =>
     pushService as unknown as PushServicePrivate
+
+  const setIosMessagingAvailable = (messaging: unknown): void => {
+    const privateService = getPrivate()
+    privateService.iosAvailable = true
+    privateService.iosMessaging = messaging
+  }
 
   beforeEach(async () => {
     // Set environment variables for FCM
@@ -113,8 +119,7 @@ describe('PushService', () => {
       }
 
       // Override the private properties for testing
-      getPrivate().available = true
-      getPrivate().messaging = mockMessaging
+      setIosMessagingAvailable(mockMessaging)
 
       const result = await pushService!.sendMulticast(
         ['token-1', 'token-2', 'token-3'],
@@ -147,8 +152,7 @@ describe('PushService', () => {
           }),
       }
 
-      getPrivate().available = true
-      getPrivate().messaging = mockMessaging
+      setIosMessagingAvailable(mockMessaging)
 
       const result = await pushService!.sendMulticast(
         ['valid-token', 'invalid-token', 'unregistered-token'],
@@ -185,8 +189,7 @@ describe('PushService', () => {
           }),
       }
 
-      getPrivate().available = true
-      getPrivate().messaging = mockMessaging
+      setIosMessagingAvailable(mockMessaging)
 
       const result = await pushService!.sendMulticast(
         ['token-1', 'token-2', 'token-3', 'token-4'],
@@ -205,8 +208,7 @@ describe('PushService', () => {
           .mockRejectedValue(new Error('FCM error')),
       }
 
-      getPrivate().available = true
-      getPrivate().messaging = mockMessaging
+      setIosMessagingAvailable(mockMessaging)
 
       const result = await pushService!.sendMulticast(['token-1', 'token-2'], {
         title: 'Test',
@@ -228,8 +230,7 @@ describe('PushService', () => {
           }),
       }
 
-      getPrivate().available = true
-      getPrivate().messaging = mockMessaging
+      setIosMessagingAvailable(mockMessaging)
 
       await pushService!.sendMulticast(['token-1'], {
         title: 'Test Title',
@@ -261,8 +262,7 @@ describe('PushService', () => {
           }),
       }
 
-      getPrivate().available = true
-      getPrivate().messaging = mockMessaging
+      setIosMessagingAvailable(mockMessaging)
 
       await pushService!.sendMulticast(['token-1'], {
         data: { key: 'value' },
