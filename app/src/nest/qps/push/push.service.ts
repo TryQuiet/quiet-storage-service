@@ -6,14 +6,15 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common'
 import admin from 'firebase-admin'
 import { createLogger } from '../../app/logger/logger.js'
-import { ConfigService } from '../../utils/config/config.service.js'
 import { EnvVars } from '../../utils/config/env_vars.js'
+import { AWSSecretsService } from '../../utils/aws/aws-secrets.service.js'
 import {
   type PushPayload,
   type PushResult,
   type MulticastPushResult,
   PushErrorCode,
 } from './push.types.js'
+import { ConfigService } from '../../utils/config/config.service.js'
 
 @Injectable()
 export class PushService implements OnModuleInit, OnModuleDestroy {
@@ -27,9 +28,10 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
 
   private readonly logger = createLogger(PushService.name)
 
-  onModuleInit(): void {
-    this.initializeIos()
-    this.initializeAndroid()
+  constructor(private readonly awsSecretsService: AWSSecretsService) {}
+
+  async onModuleInit(): Promise<void> {
+    await Promise.all([this.initializeIos(), this.initializeAndroid()])
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -255,12 +257,14 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
   /**
    * Initialize the iOS FCM client
    */
-  private initializeIos(): void {
+  private async initializeIos(): Promise<void> {
     const projectId = ConfigService.getString(EnvVars.FIREBASE_IOS_PROJECT_ID)
     const clientEmail = ConfigService.getString(
       EnvVars.FIREBASE_IOS_CLIENT_EMAIL,
     )
-    const privateKey = ConfigService.getString(EnvVars.FIREBASE_IOS_PRIVATE_KEY)
+    const privateKey = await this.awsSecretsService.getSecretEnvVar(
+      EnvVars.FIREBASE_IOS_PRIVATE_KEY,
+    )
 
     if (projectId == null || clientEmail == null || privateKey == null) {
       this.logger.error(
@@ -300,14 +304,14 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
   /**
    * Initialize the Android FCM client (separate Firebase project)
    */
-  private initializeAndroid(): void {
+  private async initializeAndroid(): Promise<void> {
     const projectId = ConfigService.getString(
       EnvVars.FIREBASE_ANDROID_PROJECT_ID,
     )
     const clientEmail = ConfigService.getString(
       EnvVars.FIREBASE_ANDROID_CLIENT_EMAIL,
     )
-    const privateKey = ConfigService.getString(
+    const privateKey = await this.awsSecretsService.getSecretEnvVar(
       EnvVars.FIREBASE_ANDROID_PRIVATE_KEY,
     )
 

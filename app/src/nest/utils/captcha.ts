@@ -1,3 +1,5 @@
+import { Injectable } from '@nestjs/common'
+import { AWSSecretsService } from './aws/aws-secrets.service.js'
 import { ConfigService } from './config/config.service.js'
 import { EnvVars } from './config/env_vars.js'
 
@@ -18,62 +20,84 @@ export function isHCaptchaSiteVerifyResponse(
     typeof (obj as { success: unknown }).success === 'boolean'
   )
 }
-export async function verifyHCaptchaToken(
-  token: string | undefined,
-  timeoutMs = 5000,
-): Promise<HCaptchaSiteVerifyResponse> {
-  if (token == null) {
-    return {
-      success: false,
-      'error-codes': ['hCaptcha token required'],
-    }
-  }
-  const hcaptchaSecret = ConfigService.getString(EnvVars.HCAPTCHA_SECRET_KEY)
-  if (hcaptchaSecret == null) {
-    throw new Error('hCaptcha secret not configured')
-  }
-  const verifyBody = new URLSearchParams({
-    secret: hcaptchaSecret,
-    response: token,
-  })
-  const controller = new AbortController()
-  const to = setTimeout(() => {
-    controller.abort()
-  }, timeoutMs)
-  try {
-    const verifyResponse = await fetch('https://api.hcaptcha.com/siteverify', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/x-www-form-urlencoded',
-      },
-      body: verifyBody,
-      signal: controller.signal,
-    })
 
-    if (!verifyResponse.ok) {
-      clearTimeout(to)
+@Injectable()
+export class CaptchaService {
+  constructor(private readonly awsSecretsService: AWSSecretsService) {}
+
+  public async verifyToken(
+    token: string | undefined,
+    timeoutMs = 5000,
+  ): Promise<HCaptchaSiteVerifyResponse> {
+    if (token == null) {
       return {
         success: false,
-        'error-codes': ['hCaptcha verification request failed'],
+        'error-codes': ['hCaptcha token required'],
       }
     }
 
-    const rawVerification: unknown = await verifyResponse.json()
-    if (isHCaptchaSiteVerifyResponse(rawVerification)) {
-      return rawVerification
+    const hcaptchaSecret = await this.awsSecretsService.getSecretEnvVar(
+      EnvVars.HCAPTCHA_SECRET_KEY,
+    )
+    if (hcaptchaSecret == null) {
+      throw new Error('hCaptcha secret not configured')
     }
-    return { success: false, 'error-codes': ['Invalid hCaptcha response'] }
-  } catch (err: unknown) {
-    const isAbortError =
-      typeof err === 'object' &&
-      err !== null &&
-      'name' in err &&
-      (err as { name?: unknown }).name === 'AbortError'
-    const code = isAbortError
-      ? 'hcaptcha-verify-timeout'
-      : 'hcaptcha-verify-network-error'
-    return { success: false, 'error-codes': [code] }
-  } finally {
-    clearTimeout(to)
+
+    const verifyBody = new URLSearchParams({
+      secret: hcaptchaSecret,
+      response: token,
+    })
+    const controller = new AbortController()
+    const to = setTimeout(() => {
+      controller.abort()
+    }, timeoutMs)
+
+    try {
+      const verifyResponse = await fetch(
+        'https://api.hcaptcha.com/siteverify',
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/x-www-form-urlencoded',
+          },
+          body: verifyBody,
+          signal: controller.signal,
+        },
+      )
+
+      if (!verifyResponse.ok) {
+        clearTimeout(to)
+        return {
+          success: false,
+          'error-codes': ['hCaptcha verification request failed'],
+        }
+      }
+
+      const rawVerification: unknown = await verifyResponse.json()
+      if (isHCaptchaSiteVerifyResponse(rawVerification)) {
+        return rawVerification
+      }
+      return { success: false, 'error-codes': ['Invalid hCaptcha response'] }
+    } catch (err: unknown) {
+      const isAbortError =
+        typeof err === 'object' &&
+        err !== null &&
+        'name' in err &&
+        (err as { name?: unknown }).name === 'AbortError'
+      const code = isAbortError
+        ? 'hcaptcha-verify-timeout'
+        : 'hcaptcha-verify-network-error'
+      return { success: false, 'error-codes': [code] }
+    } finally {
+      clearTimeout(to)
+    }
+  }
+
+  public getSiteKey(): string {
+    const siteKey = ConfigService.getString(EnvVars.HCAPTCHA_SITE_KEY)
+    if (siteKey == null) {
+      throw new Error('hCaptcha site key not configured')
+    }
+    return siteKey
   }
 }
