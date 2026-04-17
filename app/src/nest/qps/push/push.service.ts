@@ -17,27 +17,36 @@ import {
 
 @Injectable()
 export class PushService implements OnModuleInit, OnModuleDestroy {
-  private app: admin.app.App | undefined
-  private messaging: admin.messaging.Messaging | undefined
-  private available = false
+  private iosApp: admin.app.App | undefined
+  private iosMessaging: admin.messaging.Messaging | undefined
+  private iosAvailable = false
+
+  private androidApp: admin.app.App | undefined
+  private androidMessaging: admin.messaging.Messaging | undefined
+  private androidAvailable = false
 
   private readonly logger = createLogger(PushService.name)
 
   onModuleInit(): void {
-    this.initialize()
+    this.initializeIos()
+    this.initializeAndroid()
   }
 
   async onModuleDestroy(): Promise<void> {
-    if (this.app != null) {
-      await this.app.delete()
-    }
+    await Promise.all([this.iosApp?.delete(), this.androidApp?.delete()])
   }
 
   /**
-   * Check if push service is available
+   * Check if push service is available for the given platform
    */
-  isAvailable(): boolean {
-    return this.available
+  isAvailable(platform: 'ios' | 'android' = 'ios'): boolean {
+    return platform === 'android' ? this.androidAvailable : this.iosAvailable
+  }
+
+  private messagingFor(
+    platform: 'ios' | 'android',
+  ): admin.messaging.Messaging | undefined {
+    return platform === 'android' ? this.androidMessaging : this.iosMessaging
   }
 
   /**
@@ -45,33 +54,43 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
    *
    * @param deviceToken The FCM device token
    * @param payload The notification payload
+   * @param platform Target platform — selects the correct Firebase project
    * @returns Result of the push operation
    */
-  async send(deviceToken: string, payload: PushPayload): Promise<PushResult> {
-    if (!this.available) {
+  async send(
+    deviceToken: string,
+    payload: PushPayload,
+    platform: 'ios' | 'android' = 'ios',
+  ): Promise<PushResult> {
+    if (!this.isAvailable(platform)) {
       return {
         success: false,
-        error: 'Push service not available',
+        error: `Push service not available for platform: ${platform}`,
         errorCode: PushErrorCode.SERVICE_UNAVAILABLE,
       }
     }
 
-    return await this.sendFcm(deviceToken, payload)
+    return await this.sendFcm(deviceToken, payload, platform)
   }
 
   /**
    * Send a push notification to multiple devices via FCM multicast
    *
-   * @param deviceTokens Array of FCM device tokens
+   * @param deviceTokens Array of FCM device tokens (must all be same platform)
    * @param payload The notification payload
+   * @param platform Target platform — selects the correct Firebase project
    * @returns Result with success/failure counts and invalid tokens
    */
   async sendMulticast(
     deviceTokens: string[],
     payload: PushPayload,
+    platform: 'ios' | 'android' = 'ios',
   ): Promise<MulticastPushResult> {
-    if (!this.available || this.messaging == null) {
-      this.logger.warn('Push service not available for multicast')
+    const messaging = this.messagingFor(platform)
+    if (!this.isAvailable(platform) || messaging == null) {
+      this.logger.warn(
+        `Push service not available for multicast (platform=${platform})`,
+      )
       return {
         successCount: 0,
         failureCount: deviceTokens.length,
@@ -127,7 +146,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
         `Sending multicast push to ${deviceTokens.length} devices`,
       )
 
-      const response = await this.messaging.sendEachForMulticast(message)
+      const response = await messaging.sendEachForMulticast(message)
 
       const invalidTokens: string[] = []
       response.responses.forEach((resp, idx) => {
@@ -164,16 +183,18 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Send via real FCM
+   * Send via real FCM using the correct app for the given platform
    */
   private async sendFcm(
     deviceToken: string,
     payload: PushPayload,
+    platform: 'ios' | 'android',
   ): Promise<PushResult> {
-    if (this.messaging == null) {
+    const messaging = this.messagingFor(platform)
+    if (messaging == null) {
       return {
         success: false,
-        error: 'FCM service not configured',
+        error: `FCM service not configured for platform: ${platform}`,
         errorCode: PushErrorCode.SERVICE_UNAVAILABLE,
       }
     }
@@ -189,11 +210,9 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
               }
             : undefined,
         data: payload.data,
-        // High priority for Android
         android: {
           priority: 'high',
         },
-        // iOS/APNs configuration
         apns: {
           payload: {
             aps: {
@@ -218,11 +237,11 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       }
 
       this.logger.log(
-        `Sending push notification to token: ${deviceToken.substring(0, 20)}...`,
+        `Sending push notification to ${platform} token: ${deviceToken.substring(0, 20)}...`,
       )
       this.logger.debug(`Push payload:`, { payload, message })
 
-      const messageId = await this.messaging.send(message)
+      const messageId = await messaging.send(message)
 
       this.logger.log(
         `Push notification sent successfully, messageId: ${messageId}`,
@@ -234,47 +253,96 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Initialize the FCM client with configuration from environment
+   * Initialize the iOS FCM client
    */
-  private initialize(): void {
-    const projectId = ConfigService.getString(EnvVars.FIREBASE_PROJECT_ID)
-    const clientEmail = ConfigService.getString(EnvVars.FIREBASE_CLIENT_EMAIL)
-    const privateKey = ConfigService.getString(EnvVars.FIREBASE_PRIVATE_KEY)
+  private initializeIos(): void {
+    const projectId = ConfigService.getString(EnvVars.FIREBASE_IOS_PROJECT_ID)
+    const clientEmail = ConfigService.getString(
+      EnvVars.FIREBASE_IOS_CLIENT_EMAIL,
+    )
+    const privateKey = ConfigService.getString(EnvVars.FIREBASE_IOS_PRIVATE_KEY)
 
     if (projectId == null || clientEmail == null || privateKey == null) {
       this.logger.error(
-        `FCM credentials not configured. Push notifications will be unavailable. ` +
-          `Please configure FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY.`,
+        `iOS FCM credentials not configured. iOS push notifications will be unavailable. ` +
+          `Please configure FIREBASE_IOS_PROJECT_ID, FIREBASE_IOS_CLIENT_EMAIL, and FIREBASE_IOS_PRIVATE_KEY.`,
       )
-      this.available = false
+      this.iosAvailable = false
       return
     }
 
     try {
-      // The private key may be stored with escaped newlines in environment variables
       const formattedPrivateKey = privateKey.replace(/\\n/g, '\n')
-
-      // Check if app already exists (e.g., from hot reload or multiple instances)
-      const existingApps = admin.apps
-      if (existingApps.length > 0 && existingApps[0] != null) {
-        this.app = existingApps[0]
+      const existingApp = admin.apps.find(a => a?.name === 'ios')
+      if (existingApp != null) {
+        this.iosApp = existingApp
       } else {
-        this.app = admin.initializeApp({
-          credential: admin.credential.cert({
-            projectId,
-            clientEmail,
-            privateKey: formattedPrivateKey,
-          }),
-        })
+        this.iosApp = admin.initializeApp(
+          {
+            credential: admin.credential.cert({
+              projectId,
+              clientEmail,
+              privateKey: formattedPrivateKey,
+            }),
+          },
+          'ios',
+        )
       }
-
-      this.messaging = this.app.messaging()
-      this.available = true
-
-      this.logger.log(`FCM client initialized for project ${projectId}`)
+      this.iosMessaging = this.iosApp.messaging()
+      this.iosAvailable = true
+      this.logger.log(`iOS FCM client initialized for project ${projectId}`)
     } catch (error) {
-      this.logger.error(`Failed to initialize FCM client`, error)
-      this.available = false
+      this.logger.error(`Failed to initialize iOS FCM client`, error)
+      this.iosAvailable = false
+    }
+  }
+
+  /**
+   * Initialize the Android FCM client (separate Firebase project)
+   */
+  private initializeAndroid(): void {
+    const projectId = ConfigService.getString(
+      EnvVars.FIREBASE_ANDROID_PROJECT_ID,
+    )
+    const clientEmail = ConfigService.getString(
+      EnvVars.FIREBASE_ANDROID_CLIENT_EMAIL,
+    )
+    const privateKey = ConfigService.getString(
+      EnvVars.FIREBASE_ANDROID_PRIVATE_KEY,
+    )
+
+    if (projectId == null || clientEmail == null || privateKey == null) {
+      this.logger.warn(
+        `Android FCM credentials not configured. Android push notifications will be unavailable. ` +
+          `Please configure FIREBASE_ANDROID_PROJECT_ID, FIREBASE_ANDROID_CLIENT_EMAIL, and FIREBASE_ANDROID_PRIVATE_KEY.`,
+      )
+      this.androidAvailable = false
+      return
+    }
+
+    try {
+      const formattedPrivateKey = privateKey.replace(/\\n/g, '\n')
+      const existingApp = admin.apps.find(a => a?.name === 'android')
+      if (existingApp != null) {
+        this.androidApp = existingApp
+      } else {
+        this.androidApp = admin.initializeApp(
+          {
+            credential: admin.credential.cert({
+              projectId,
+              clientEmail,
+              privateKey: formattedPrivateKey,
+            }),
+          },
+          'android',
+        )
+      }
+      this.androidMessaging = this.androidApp.messaging()
+      this.androidAvailable = true
+      this.logger.log(`Android FCM client initialized for project ${projectId}`)
+    } catch (error) {
+      this.logger.error(`Failed to initialize Android FCM client`, error)
+      this.androidAvailable = false
     }
   }
 

@@ -382,22 +382,23 @@ describe('LogEntrySyncStorageService', () => {
         cidPrefix: 'page-entry-legacy',
       })
 
-      const firstPage = await logSyncStorageService!.getPaginatedLogEntries(
-        'communityId',
-        { startTs: startMs - 1000, limit: 2 },
-      )
+      const firstPage =
+        await logSyncStorageService!.getPaginatedLogEntriesBySyncSeq(
+          'communityId',
+          { startSeq: 0, limit: 2 },
+        )
 
       expect(firstPage.items).toHaveLength(2)
       expect(firstPage.items[0].id).toBe(entries[0].cid)
       expect(firstPage.items[1].id).toBe(entries[1].cid)
       expect(firstPage.hasNextPage).toBe(true)
-      expect(firstPage.endCursor).toBeDefined()
+      expect(firstPage.items[1].syncSeq).toBe(entries[1].syncSeq)
 
-      const secondPage = await logSyncStorageService!.getPaginatedLogEntries(
-        'communityId',
-        { startTs: startMs - 1000, limit: 2 },
-        firstPage.endCursor ?? undefined,
-      )
+      const secondPage =
+        await logSyncStorageService!.getPaginatedLogEntriesBySyncSeq(
+          'communityId',
+          { startSeq: entries[1].syncSeq, limit: 2 },
+        )
 
       expect(secondPage.items).toHaveLength(1)
       expect(secondPage.items[0].id).toBe(entries[2].cid)

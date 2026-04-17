@@ -7,7 +7,11 @@ import { Injectable } from '@nestjs/common'
 import { createLogger } from '../app/logger/logger.js'
 import { UcanService } from './ucan/ucan.service.js'
 import { PushService } from './push/push.service.js'
-import { PushErrorCode, type MulticastPushResult } from './push/push.types.js'
+import {
+  PushErrorCode,
+  type MulticastPushResult,
+  type PushPayload,
+} from './push/push.types.js'
 
 /**
  * Result of a device registration
@@ -55,17 +59,24 @@ export class QPSService {
   async registerDevice(
     deviceToken: string,
     bundleId: string,
+    platform: 'ios' | 'android',
   ): Promise<RegistrationResult> {
     try {
-      if (!this.pushService.isAvailable()) {
-        this.logger.warn(`FCM is not available for registration`)
+      if (!this.pushService.isAvailable(platform)) {
+        this.logger.warn(
+          `FCM is not available for registration (platform=${platform})`,
+        )
         return {
           success: false,
           error: 'Push notification service not available',
         }
       }
 
-      const ucan = await this.ucanService.createUcan(deviceToken, bundleId)
+      const ucan = await this.ucanService.createUcan(
+        deviceToken,
+        bundleId,
+        platform,
+      )
 
       this.logger.log(`Device registered successfully`)
       return {
@@ -112,11 +123,12 @@ export class QPSService {
       }
     }
 
-    const result = await this.pushService.send(validation.deviceToken, {
-      title,
-      body,
-      data,
-    })
+    const platform = validation.platform ?? 'ios'
+    const result = await this.pushService.send(
+      validation.deviceToken,
+      this.makePayload(platform, title, body, data),
+      platform,
+    )
 
     if (!result.success) {
       // Check if this is a token-invalid error (should return 410)
@@ -157,12 +169,17 @@ export class QPSService {
       }
     }
 
-    // Validate all UCANs and extract device tokens
-    const deviceTokens: string[] = []
+    // Validate all UCANs and bucket by platform
+    const iosTokens: string[] = []
+    const androidTokens: string[] = []
     for (const ucan of ucans) {
       const validation = await this.ucanService.validateUcan(ucan)
       if (validation.valid && validation.deviceToken != null) {
-        deviceTokens.push(validation.deviceToken)
+        if (validation.platform === 'android') {
+          androidTokens.push(validation.deviceToken)
+        } else {
+          iosTokens.push(validation.deviceToken)
+        }
       } else {
         this.logger.debug(
           `Skipping invalid UCAN in batch: ${validation.error ?? 'unknown error'}`,
@@ -170,36 +187,55 @@ export class QPSService {
       }
     }
 
-    if (deviceTokens.length === 0) {
+    const totalValid = iosTokens.length + androidTokens.length
+    if (totalValid === 0) {
       this.logger.warn(`Batch push failed: no valid UCANs`)
       return { success: false, error: 'No valid device tokens' }
     }
 
-    // Use FCM multicast API for efficient batch delivery
-    const result: MulticastPushResult = await this.pushService.sendMulticast(
-      deviceTokens,
-      {
-        title: title ?? 'Quiet',
-        body: body ?? 'You have new activity',
-        data,
-      },
-    )
+    const iosPayload = this.makePayload('ios', title, body, data)
+    const androidPayload = this.makePayload('android', title, body, data)
 
-    if (result.successCount === 0) {
+    // Send multicast per platform so each uses the correct Firebase project
+    const results: MulticastPushResult[] = await Promise.all([
+      iosTokens.length > 0
+        ? this.pushService.sendMulticast(iosTokens, iosPayload, 'ios')
+        : Promise.resolve({
+            successCount: 0,
+            failureCount: 0,
+            invalidTokens: [],
+          }),
+      androidTokens.length > 0
+        ? this.pushService.sendMulticast(
+            androidTokens,
+            androidPayload,
+            'android',
+          )
+        : Promise.resolve({
+            successCount: 0,
+            failureCount: 0,
+            invalidTokens: [],
+          }),
+    ])
+
+    const successCount = results.reduce((n, r) => n + r.successCount, 0)
+    const invalidTokens = results.flatMap(r => r.invalidTokens)
+
+    if (successCount === 0) {
       this.logger.warn(
-        `Batch push failed: all ${deviceTokens.length} notifications failed`,
+        `Batch push failed: all ${totalValid} notifications failed`,
       )
       return {
         success: false,
         error: 'All push notifications failed',
-        invalidTokens: result.invalidTokens,
+        invalidTokens,
       }
     }
 
     this.logger.debug(
-      `Batch push complete: ${result.successCount}/${deviceTokens.length} succeeded, ${result.invalidTokens.length} invalid tokens`,
+      `Batch push complete: ${successCount}/${totalValid} succeeded, ${invalidTokens.length} invalid tokens`,
     )
-    return { success: true, invalidTokens: result.invalidTokens }
+    return { success: true, invalidTokens }
   }
 
   /**
@@ -215,5 +251,24 @@ export class QPSService {
     ]
 
     return tokenInvalidCodes.includes(errorCode)
+  }
+
+  private makePayload(
+    platform: 'ios' | 'android',
+    title?: string,
+    body?: string,
+    data?: Record<string, string>,
+  ): PushPayload {
+    if (platform === 'android') {
+      // Android background delivery must be data-only so the app service can
+      // fetch/decrypt the latest QSS entry instead of showing the fallback text.
+      return { data }
+    }
+
+    return {
+      title: title ?? 'Quiet',
+      body: body ?? 'You have new activity',
+      data,
+    }
   }
 }

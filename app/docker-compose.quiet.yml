@@ -39,7 +39,8 @@ services:
       - redis-qss-quiet
     env_file:
       # Runtime-only secret overrides. Keep this file untracked.
-      - ./.env.local.docker.private
+      - path: ./.env.local.docker.private
+        required: false
     build:
       context: ..
       dockerfile: Dockerfile

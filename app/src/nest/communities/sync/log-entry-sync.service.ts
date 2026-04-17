@@ -134,6 +134,7 @@ export class LogEntrySyncManager implements OnModuleDestroy {
     cursor?: string
     hasNextPage: boolean
     highestSyncSeq?: number
+    resolvedStartSeq?: number
   }> {
     const maxBytes = 1000 * 1000 * 0.8 // maximum 1MB with 20% buffer
     const entries: LogEntrySyncEntity[] = []
@@ -143,6 +144,11 @@ export class LogEntrySyncManager implements OnModuleDestroy {
     let usedBytes = 0
     let hitSizeLimit = false
     let hitLimit = false
+    const resolvedStartSeq =
+      await this.logEntrySyncStorage.resolveSyncSeqForTimestamp(
+        payload.teamId,
+        payload.startTs ?? 0,
+      )
 
     while (true) {
       const page = await this.logEntrySyncStorage.getPaginatedLogEntries(
@@ -164,6 +170,7 @@ export class LogEntrySyncManager implements OnModuleDestroy {
             entries: [],
             cursor,
             hasNextPage: false,
+            resolvedStartSeq,
           }
         }
         hasNextPage = false
@@ -180,6 +187,8 @@ export class LogEntrySyncManager implements OnModuleDestroy {
         const metadataBytes = Buffer.byteLength(
           JSON.stringify({
             cursor: candidateCursor,
+            highestSyncSeq: toSyncSeq(page.items[i].syncSeq),
+            resolvedStartSeq,
             hasNextPage: candidateHasNextPage,
           }),
         )
@@ -238,6 +247,7 @@ export class LogEntrySyncManager implements OnModuleDestroy {
         entries.length > 0
           ? toSyncSeq(entries[entries.length - 1].syncSeq)
           : undefined,
+      resolvedStartSeq,
     }
   }
 

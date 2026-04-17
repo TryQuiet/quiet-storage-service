@@ -26,6 +26,7 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
       const result = await config.qpsService.registerDevice(
         message.payload.deviceToken,
         message.payload.bundleId,
+        message.payload.platform,
       )
 
       if (!result.success || result.ucan == null) {

@@ -9,6 +9,7 @@ export interface QPSHandlerConfig extends BaseHandlerConfig {
 export interface RegisterDevicePayload {
   deviceToken: string
   bundleId: string
+  platform: 'ios' | 'android'
 }
 
 export interface RegisterDeviceMessage

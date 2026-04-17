@@ -660,8 +660,10 @@ describe('LogEntrySyncManager', () => {
       )
       expect(firstPage.entries).toHaveLength(1)
       expect(firstPage.entries[0]).toEqual(entries[0].entry)
+      expect(firstPage.resolvedStartSeq).toBe(0)
       expect(firstPage.cursor).toBeDefined()
       expect(firstPage.hasNextPage).toBe(true)
+      expect(firstPage.highestSyncSeq).toBe(entries[0].syncSeq)
 
       const secondPage = await logEntrySyncManager!.getPaginatedLogEntries(
         { ...basePayload, cursor: firstPage.cursor },
@@ -671,6 +673,7 @@ describe('LogEntrySyncManager', () => {
       expect(secondPage.entries[0]).toEqual(entries[1].entry)
       expect(secondPage.cursor).toBeDefined()
       expect(secondPage.hasNextPage).toBe(true)
+      expect(secondPage.highestSyncSeq).toBe(entries[1].syncSeq)
 
       const thirdPage = await logEntrySyncManager!.getPaginatedLogEntries(
         { ...basePayload, cursor: secondPage.cursor },
@@ -679,6 +682,7 @@ describe('LogEntrySyncManager', () => {
       expect(thirdPage.entries).toHaveLength(1)
       expect(thirdPage.entries[0]).toEqual(entries[2].entry)
       expect(thirdPage.hasNextPage).toBe(false)
+      expect(thirdPage.highestSyncSeq).toBe(entries[2].syncSeq)
     })
 
     it('filters entries by time range with the legacy cursor flow', async () => {
@@ -706,6 +710,8 @@ describe('LogEntrySyncManager', () => {
       expect(result.entries).toHaveLength(1)
       expect(result.entries[0]).toEqual(entries[1].entry)
       expect(result.hasNextPage).toBe(false)
+      expect(result.highestSyncSeq).toBe(entries[1].syncSeq)
+      expect(result.resolvedStartSeq).toBe(entries[0].syncSeq)
     })
 
     it('paginates large entries and continues with syncSeq', async () => {

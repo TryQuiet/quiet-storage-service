@@ -66,9 +66,9 @@ pnpm start:dev
 
 Make sure QPS has Firebase credentials configured:
 ```bash
-export FIREBASE_PROJECT_ID="your-project"
-export FIREBASE_CLIENT_EMAIL="firebase-adminsdk-xxx@your-project.iam.gserviceaccount.com"
-export FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+export FIREBASE_IOS_PROJECT_ID="your-project"
+export FIREBASE_IOS_CLIENT_EMAIL="firebase-adminsdk-xxx@your-project.iam.gserviceaccount.com"
+export FIREBASE_IOS_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 ```
 
 ## Usage
@@ -118,7 +118,7 @@ Both events use acknowledgment callbacks. The response `status` field will be `s
 
 ### "Registration failed: Push service not available"
 - QPS server needs Firebase credentials configured
-- Check that `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY` are set
+- Check that `FIREBASE_IOS_PROJECT_ID`, `FIREBASE_IOS_CLIENT_EMAIL`, and `FIREBASE_IOS_PRIVATE_KEY` are set
 
 ### "Device token no longer valid — re-register"
 - The FCM token has expired or been revoked; click "Register Device" again after getting a fresh token
