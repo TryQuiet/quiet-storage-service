@@ -5,6 +5,7 @@ import { jest } from '@jest/globals'
 import { Test, type TestingModule } from '@nestjs/testing'
 import { PushService } from './push.service.js'
 import { PushErrorCode } from './push.types.js'
+import { AWSSecretsService } from '../../utils/aws/aws-secrets.service.js'
 
 // Mock firebase-admin
 jest.unstable_mockModule('firebase-admin', () => ({
@@ -27,6 +28,9 @@ interface PushServicePrivate {
 describe('PushService', () => {
   let module: TestingModule | undefined = undefined
   let pushService: PushService | undefined = undefined
+  let awsSecretsServiceMock:
+    | Pick<AWSSecretsService, 'getSecretEnvVar'>
+    | undefined = undefined
 
   // Helper to access private members for testing
   const getPrivate = (): PushServicePrivate =>
@@ -54,8 +58,22 @@ describe('PushService', () => {
     process.env.FIREBASE_IOS_PRIVATE_KEY =
       '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----'
 
+    awsSecretsServiceMock = {
+      getSecretEnvVar: jest
+        .fn<(secretName: string) => Promise<string | undefined>>()
+        .mockImplementation(
+          async secretName => await Promise.resolve(process.env[secretName]),
+        ),
+    }
+
     module = await Test.createTestingModule({
-      providers: [PushService],
+      providers: [
+        PushService,
+        {
+          provide: AWSSecretsService,
+          useValue: awsSecretsServiceMock,
+        },
+      ],
     }).compile()
 
     pushService = module.get<PushService>(PushService)
