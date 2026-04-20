@@ -333,23 +333,4 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
       if (stored.expiry < now) this.challenges.delete(id)
     }
   }
-
-  /**
-   * Returns the JWT signing secret.  Called statically by the module factory
-   * so the secret is available before any instance is created.
-   * Set NSE_JWT_SECRET env var in production (required for multi-instance).
-   */
-  static getJwtSecret(): string {
-    const secret = process.env.NSE_JWT_SECRET
-    if (secret != null && secret !== '') return secret
-    if (NseAuthService._fallbackSecret == null) {
-      logger.warn(
-        'NSE_JWT_SECRET not set — tokens will be invalid after process restart',
-      )
-      NseAuthService._fallbackSecret = base58Encode(randomBytes(32))
-    }
-    return NseAuthService._fallbackSecret
-  }
-
-  private static _fallbackSecret: string | undefined
 }

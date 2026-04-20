@@ -49,6 +49,8 @@ export enum EnvVars {
 
   // hcaptcha settings
   HCAPTCHA_SECRET_KEY = 'HCAPTCHA_SECRET_KEY',
+  HCAPTCHA_SITE_KEY = 'HCAPTCHA_SITE_KEY',
+  NSE_JWT_SECRET = 'NSE_JWT_SECRET',
 
   // QPS (Quiet Push Service) settings
   QPS_ENABLED = 'QPS_ENABLED',

@@ -4,6 +4,7 @@ import type { AuthConnection } from '../../../communities/auth/auth.connection.j
 import type { BaseHandlerConfig } from '../../ws.types.js'
 import type { LogEntrySyncStorageService } from '../../../communities/storage/log-entry-sync.storage.service.js'
 import type { LogEntrySyncManager } from '../../../communities/sync/log-entry-sync.service.js'
+import type { CaptchaService } from '../../../utils/captcha.js'
 
 export interface CommunitiesHandlerConfig extends BaseHandlerConfig {
   storage: CommunitiesStorageService
@@ -17,6 +18,10 @@ export interface CommunitiesAuthHandlerConfig extends CommunitiesHandlerConfig {
 
 export interface LogEntrySyncHandlerConfig extends BaseHandlerConfig {
   syncManager: LogEntrySyncManager
+}
+
+export interface CaptchaHandlerConfig extends BaseHandlerConfig {
+  captchaService: CaptchaService
 }
 
 export enum CommunityOperationStatus {

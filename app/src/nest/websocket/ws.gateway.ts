@@ -18,6 +18,7 @@ import { registerCommunitiesHandlers } from './handlers/communities.handler.js'
 import { CommunitiesStorageService } from '../communities/storage/communities.storage.service.js'
 import { CommunitiesManagerService } from '../communities/communities-manager.service.js'
 import {
+  CaptchaHandlerConfig,
   CommunitiesHandlerConfig,
   LogEntrySyncHandlerConfig,
   QPSHandlerConfig,
@@ -29,6 +30,7 @@ import { registerCaptchaHandlers } from './handlers/captcha.handler.js'
 import { registerQpsHandlers } from './handlers/qps.handler.js'
 import { LogEntrySyncManager } from '../communities/sync/log-entry-sync.service.js'
 import { QPSService } from '../qps/qps.service.js'
+import { CaptchaService } from '../utils/captcha.js'
 
 /**
  * Websocket gateway configuration
@@ -61,6 +63,7 @@ export class WebsocketGateway
     private readonly communitiesDataStorageService: LogEntrySyncStorageService,
     private readonly communitiesManager: CommunitiesManagerService,
     private readonly logEntrySyncManager: LogEntrySyncManager,
+    private readonly captchaService: CaptchaService,
     @Optional() @Inject(QPSService) private readonly qpsService?: QPSService,
   ) {}
 
@@ -126,9 +129,13 @@ export class WebsocketGateway
       ...baseConfig,
       syncManager: this.logEntrySyncManager,
     }
+    const captchaConfig: CaptchaHandlerConfig = {
+      ...baseConfig,
+      captchaService: this.captchaService,
+    }
     registerCommunitiesHandlers(communitiesConfig)
     registerCommunitiesAuthHandlers(communitiesConfig)
-    registerCaptchaHandlers(communitiesConfig)
+    registerCaptchaHandlers(captchaConfig)
     registerLogEntrySyncHandlers(syncConfig)
 
     if (this.qpsService != null) {

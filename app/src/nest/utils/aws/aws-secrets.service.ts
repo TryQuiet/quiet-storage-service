@@ -6,10 +6,10 @@ import {
   GetSecretValueCommand,
   GetSecretValueCommandInput,
   GetSecretValueCommandOutput,
-  ServiceOutputTypes,
   SecretsManagerClientConfig,
   CreateSecretCommandInput,
   CreateSecretCommand,
+  CreateSecretCommandOutput,
 } from '@aws-sdk/client-secrets-manager'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '../config/config.service.js'
@@ -31,9 +31,9 @@ export class AWSSecretsService {
    */
   private readonly local: boolean
   /**
-   * Configuration for connecting to the AWS secrets manager
+   * AWS Secrets Manager client for non-local environments
    */
-  private readonly clientConfig: SecretsManagerClientConfig | undefined
+  private readonly client: SecretsManagerClient | undefined
 
   private readonly logger = createLogger(`Utils:${AWSSecretsService.name}`)
 
@@ -59,11 +59,13 @@ export class AWSSecretsService {
         )
       }
 
-      this.clientConfig = {
+      const clientConfig: SecretsManagerClientConfig = {
         region: this.awsRegion,
       }
+      this.client = new SecretsManagerClient(clientConfig)
     } else {
       this.local = true
+      this.client = undefined
       this.logger.warn(`Creating local ${AWSSecretsService.name}`)
       if (!this.redisClient.enabled) {
         throw new Error(
@@ -93,13 +95,35 @@ export class AWSSecretsService {
         SecretId: secretName,
       }
       const command = new GetSecretValueCommand(commandInput)
-      const response: GetSecretValueCommandOutput =
-        await this.executeCommandAws(command)
+      const response = await this.executeGetSecretValueCommandAws(command)
       return response.SecretString ?? response.SecretBinary
     } catch (e) {
       this.logger.error('Error retrieving secret from AWS', e)
       return undefined
     }
+  }
+
+  public async getSecretEnvVar(
+    secretName: string,
+  ): Promise<string | undefined> {
+    const env = ConfigService.getEnv()
+    if ([Environment.Local, Environment.Test].includes(env)) {
+      return ConfigService.getString(secretName)
+    }
+    const secret = await this.get(secretName)
+    let secretString =
+      secret == null ? undefined : AWSSecretsService.parseSecretString(secret)
+    if (secretString == null) {
+      const localSecret = ConfigService.getString(secretName)
+      if (localSecret == null) {
+        this.logger.error(
+          `Secret ${secretName} not found in AWS secrets manager or local environment variables!`,
+        )
+        return undefined
+      }
+      secretString = localSecret
+    }
+    return secretString
   }
 
   /**
@@ -132,7 +156,7 @@ export class AWSSecretsService {
       }
 
       const command = new CreateSecretCommand(commandInput)
-      await this.executeCommandAws(command)
+      await this.executeCreateSecretCommandAws(command)
     } catch (e) {
       this.logger.error('Error putting secret:', e)
       throw new CompoundError('Error putting secret into AWS', e as Error)
@@ -148,18 +172,51 @@ export class AWSSecretsService {
     }
   }
 
-  /**
-   * Execute a command in the AWS secrets manager and return result
-   *
-   * @param command AWS secrets manager command object
-   * @returns Result of command
-   */
-  private async executeCommandAws(command: any): Promise<ServiceOutputTypes> {
-    if (this.clientConfig == null) {
+  private static parseSecretString(
+    secret: string | Uint8Array,
+  ): string | undefined {
+    const rawSecret =
+      typeof secret === 'string' ? secret : Buffer.from(secret).toString()
+
+    try {
+      const parsedSecret: unknown = JSON.parse(rawSecret)
+      if (typeof parsedSecret === 'string') {
+        return parsedSecret
+      }
+      if (AWSSecretsService.isSecretPayload(parsedSecret)) {
+        return parsedSecret.secret
+      }
+      return undefined
+    } catch {
+      return rawSecret
+    }
+  }
+
+  private static isSecretPayload(value: unknown): value is { secret: string } {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      'secret' in value &&
+      typeof (value as { secret?: unknown }).secret === 'string'
+    )
+  }
+
+  private getAwsClient(): SecretsManagerClient {
+    if (this.client == null) {
       throw new Error(`Must configure a client config to use the AWS SDK`)
     }
-    const client = new SecretsManagerClient(this.clientConfig)
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- the actual type here is weird
-    return await client.send(command)
+    return this.client
+  }
+
+  private async executeGetSecretValueCommandAws(
+    command: GetSecretValueCommand,
+  ): Promise<GetSecretValueCommandOutput> {
+    return await this.getAwsClient().send(command)
+  }
+
+  private async executeCreateSecretCommandAws(
+    command: CreateSecretCommand,
+  ): Promise<CreateSecretCommandOutput> {
+    return await this.getAwsClient().send(command)
   }
 }

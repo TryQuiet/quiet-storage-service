@@ -4,10 +4,9 @@
 
 import { WebsocketEvents } from '../ws.types.js'
 import { createLogger } from '../../app/logger/logger.js'
-import { verifyHCaptchaToken } from '../../utils/captcha.js'
 import {
   CommunityOperationStatus,
-  type CommunitiesHandlerConfig,
+  type CaptchaHandlerConfig,
 } from './types/common.types.js'
 import type {
   CaptchaVerifyMessage,
@@ -16,7 +15,6 @@ import type {
   GetCaptchaSiteKeyResponse,
 } from './types/captcha.types.js'
 import { DateTime } from 'luxon'
-import { ConfigService } from '../../utils/config/config.service.js'
 
 const baseLogger = createLogger('Websocket:Event:Communities')
 
@@ -25,9 +23,7 @@ const baseLogger = createLogger('Websocket:Event:Communities')
  *
  * @param config Websocket handler config
  */
-export function registerCaptchaHandlers(
-  config: CommunitiesHandlerConfig,
-): void {
+export function registerCaptchaHandlers(config: CaptchaHandlerConfig): void {
   const _logger = baseLogger.extend(config.socket.id)
   _logger.debug(`Initializing captcha WS event handlers`)
   /**
@@ -49,7 +45,9 @@ export function registerCaptchaHandlers(
         callback(response)
         return
       }
-      const hcaptchaResponse = await verifyHCaptchaToken(message.payload.token)
+      const hcaptchaResponse = await config.captchaService.verifyToken(
+        message.payload.token,
+      )
       if (hcaptchaResponse.success) {
         config.socket.data.verifiedCaptcha = true
         config.socket.data.usedCaptchaForKeys = false
@@ -82,10 +80,7 @@ export function registerCaptchaHandlers(
     callback: (response: GetCaptchaSiteKeyResponse) => void,
   ): void {
     try {
-      const siteKey = ConfigService.getString('HCAPTCHA_SITE_KEY')
-      if (siteKey == null) {
-        throw new Error('hCaptcha site key not configured')
-      }
+      const siteKey = config.captchaService.getSiteKey()
       const response: GetCaptchaSiteKeyResponse = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.SUCCESS,

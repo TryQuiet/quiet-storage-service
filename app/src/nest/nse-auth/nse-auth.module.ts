@@ -4,15 +4,16 @@ import { NseAuthController } from './nse-auth.controller.js'
 import { NseAuthService } from './nse-auth.service.js'
 import { NseJwtAuthGuard } from './nse-jwt-auth.guard.js'
 import { CommunitiesModule } from '../communities/communities.module.js'
+import { AWSModule } from '../utils/aws/aws.module.js'
+import { NseJwtOptionsService } from './nse-jwt-options.service.js'
 
 @Module({
   imports: [
     CommunitiesModule,
+    AWSModule,
     JwtModule.registerAsync({
-      useFactory: () => ({
-        secret: NseAuthService.getJwtSecret(),
-        signOptions: { expiresIn: 900 },
-      }),
+      imports: [AWSModule],
+      useClass: NseJwtOptionsService,
     }),
   ],
   controllers: [NseAuthController],
