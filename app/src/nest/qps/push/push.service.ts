@@ -263,7 +263,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       EnvVars.FIREBASE_IOS_CLIENT_EMAIL,
     )
     // <DEV|PROD>_FIREBASE_IOS_PRIVATE_KEY to allow separate secrets for different environments if needed without changing code
-    const envScopedPrivateKeyName = `${ConfigService.getString(EnvVars.ENV)?.toUpperCase() === 'DEV' ? 'DEV' : 'PROD'}_${EnvVars.FIREBASE_IOS_PRIVATE_KEY}`
+    const envScopedPrivateKeyName = `${ConfigService.getString(EnvVars.ENV)?.toLowerCase() === 'development' ? 'DEV' : 'PROD'}_${EnvVars.FIREBASE_IOS_PRIVATE_KEY}`
     const privateKey = await this.awsSecretsService.getSecretEnvVar(
       envScopedPrivateKeyName,
     )
@@ -314,7 +314,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       EnvVars.FIREBASE_ANDROID_CLIENT_EMAIL,
     )
     // <DEV|PROD>_FIREBASE_ANDROID_PRIVATE_KEY to allow separate secrets for different environments if needed without changing code
-    const envScopedPrivateKeyName = `${ConfigService.getString(EnvVars.ENV)?.toUpperCase() === 'DEV' ? 'DEV' : 'PROD'}_${EnvVars.FIREBASE_ANDROID_PRIVATE_KEY}`
+    const envScopedPrivateKeyName = `${ConfigService.getString(EnvVars.ENV)?.toLowerCase() === 'development' ? 'DEV' : 'PROD'}_${EnvVars.FIREBASE_ANDROID_PRIVATE_KEY}`
     const privateKey = await this.awsSecretsService.getSecretEnvVar(
       envScopedPrivateKeyName,
     )
