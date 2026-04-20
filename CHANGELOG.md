@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.2-alpha.1 (2026-04-20)</small>
+
+- chore(release): publish v1.0.2-alpha.0 ([cd0daf9](https://github.com/TryQuiet/quiet-storage-service/commit/cd0daf9))
+- add a default title and body so that message is not treated as silent ([391802a](https://github.com/TryQuiet/quiet-storage-service/commit/391802a))
+- Add index to log entry table for community ID + hashedDbId + receivedAt (#26) ([0b5402d](https://github.com/TryQuiet/quiet-storage-service/commit/0b5402d)), closes [#26](https://github.com/TryQuiet/quiet-storage-service/issues/26)
+- Android Firebase Configuration (#31) ([49e0e3e](https://github.com/TryQuiet/quiet-storage-service/commit/49e0e3e)), closes [#31](https://github.com/TryQuiet/quiet-storage-service/issues/31)
+- Batch push notifications (#23) ([a337f38](https://github.com/TryQuiet/quiet-storage-service/commit/a337f38)), closes [#23](https://github.com/TryQuiet/quiet-storage-service/issues/23)
+- NSE Sync Protocol (#30) ([aadb8b5](https://github.com/TryQuiet/quiet-storage-service/commit/aadb8b5)), closes [#30](https://github.com/TryQuiet/quiet-storage-service/issues/30)
+- Secrets Management for Firebase (#32) ([74e1853](https://github.com/TryQuiet/quiet-storage-service/commit/74e1853)), closes [#32](https://github.com/TryQuiet/quiet-storage-service/issues/32)
+- Test change: forgot to set the ruleset to active (#28) ([c026e9f](https://github.com/TryQuiet/quiet-storage-service/commit/c026e9f)), closes [#28](https://github.com/TryQuiet/quiet-storage-service/issues/28)
+- Test commit: should be blocked by branch rules ([faa2b67](https://github.com/TryQuiet/quiet-storage-service/commit/faa2b67))
+- Update app package CHANGELOG.md ([2e43e19](https://github.com/TryQuiet/quiet-storage-service/commit/2e43e19))
+- fix: Allow more fuzziness in team link timestamp validations and use updated logging (#27) ([2e41cc4](https://github.com/TryQuiet/quiet-storage-service/commit/2e41cc4)), closes [#27](https://github.com/TryQuiet/quiet-storage-service/issues/27)
+- fix: Handle auth errors on QSS (#25) ([b10f52a](https://github.com/TryQuiet/quiet-storage-service/commit/b10f52a)), closes [#25](https://github.com/TryQuiet/quiet-storage-service/issues/25)
+
 ## <small>1.0.2-alpha.0 (2026-04-20)</small>
 
 - add a default title and body so that message is not treated as silent ([391802a](https://github.com/TryQuiet/quiet-storage-service/commit/391802a))
