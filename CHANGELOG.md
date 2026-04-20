@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.2-alpha.5 (2026-04-20)</small>
+
+- fix matching ([1acaa0e](https://github.com/TryQuiet/quiet-storage-service/commit/1acaa0e))
+- Update app package CHANGELOG.md ([727f9c9](https://github.com/TryQuiet/quiet-storage-service/commit/727f9c9))
+
 ## <small>1.0.2-alpha.4 (2026-04-20)</small>
 
 - fix private key env scoped format ([98b2064](https://github.com/TryQuiet/quiet-storage-service/commit/98b2064))
