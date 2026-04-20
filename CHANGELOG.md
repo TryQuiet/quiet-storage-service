@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.2-alpha.0 (2026-04-20)</small>
+
+- add a default title and body so that message is not treated as silent ([391802a](https://github.com/TryQuiet/quiet-storage-service/commit/391802a))
+- Add index to log entry table for community ID + hashedDbId + receivedAt (#26) ([0b5402d](https://github.com/TryQuiet/quiet-storage-service/commit/0b5402d)), closes [#26](https://github.com/TryQuiet/quiet-storage-service/issues/26)
+- add NSE_JWT_SECRET to .env.local.docker + fix nse-auth lint ([f75262e](https://github.com/TryQuiet/quiet-storage-service/commit/f75262e))
+- Batch push notifications (#23) ([a337f38](https://github.com/TryQuiet/quiet-storage-service/commit/a337f38)), closes [#23](https://github.com/TryQuiet/quiet-storage-service/issues/23)
+- monotonic increases ([4e6d257](https://github.com/TryQuiet/quiet-storage-service/commit/4e6d257))
+- reimplement legacy cursor pagination for log entries and enhance sync sequence handling in concurren ([40c4a94](https://github.com/TryQuiet/quiet-storage-service/commit/40c4a94))
+- rm test variables ([774d212](https://github.com/TryQuiet/quiet-storage-service/commit/774d212))
+- Test change: forgot to set the ruleset to active (#28) ([c026e9f](https://github.com/TryQuiet/quiet-storage-service/commit/c026e9f)), closes [#28](https://github.com/TryQuiet/quiet-storage-service/issues/28)
+- Test commit: should be blocked by branch rules ([faa2b67](https://github.com/TryQuiet/quiet-storage-service/commit/faa2b67))
+- Update app package CHANGELOG.md ([2e43e19](https://github.com/TryQuiet/quiet-storage-service/commit/2e43e19))
+- refactor: update .dockerignore and .gitignore for environment file inclusion; improve sync sequence ([7e9ef18](https://github.com/TryQuiet/quiet-storage-service/commit/7e9ef18))
+- fix: Allow more fuzziness in team link timestamp validations and use updated logging (#27) ([2e41cc4](https://github.com/TryQuiet/quiet-storage-service/commit/2e41cc4)), closes [#27](https://github.com/TryQuiet/quiet-storage-service/issues/27)
+- fix: Handle auth errors on QSS (#25) ([b10f52a](https://github.com/TryQuiet/quiet-storage-service/commit/b10f52a)), closes [#25](https://github.com/TryQuiet/quiet-storage-service/issues/25)
+
 ## <small>1.0.1-alpha.11 (2026-03-20)</small>
 
 - fix: Handle auth errors on QSS (#25) ([b10f52a](https://github.com/TryQuiet/quiet-storage-service/commit/b10f52a)), closes [#25](https://github.com/TryQuiet/quiet-storage-service/issues/25)
