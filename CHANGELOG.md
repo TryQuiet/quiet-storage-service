@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.2-alpha.7 (2026-04-21)</small>
+
+- refactor: simplify secret key retrieval for secret env vars ([f1caae8](https://github.com/TryQuiet/quiet-storage-service/commit/f1caae8))
+- Update app package CHANGELOG.md ([4ee8241](https://github.com/TryQuiet/quiet-storage-service/commit/4ee8241))
+
 ## <small>1.0.2-alpha.6 (2026-04-21)</small>
 
 - Update app package CHANGELOG.md ([dbaaf07](https://github.com/TryQuiet/quiet-storage-service/commit/dbaaf07))
