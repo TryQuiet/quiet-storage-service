@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.2-alpha.6 (2026-04-21)</small>
+
+- Update app package CHANGELOG.md ([dbaaf07](https://github.com/TryQuiet/quiet-storage-service/commit/dbaaf07))
+- use real captcha in dev server ([2fdc03c](https://github.com/TryQuiet/quiet-storage-service/commit/2fdc03c))
+
 ## <small>1.0.2-alpha.5 (2026-04-20)</small>
 
 - fix matching ([1acaa0e](https://github.com/TryQuiet/quiet-storage-service/commit/1acaa0e))
