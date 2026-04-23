@@ -3,15 +3,16 @@
  */
 
 import { Injectable, OnModuleInit } from '@nestjs/common'
+import type { Cursor } from '@mikro-orm/core'
 import { createLogger } from '../../app/logger/logger.js'
 import { LogSyncEntry } from '../types.js'
 import { LogEntrySync as LogEntrySyncEntity } from './entities/log-sync.entity.js'
 import { PostgresClient } from '../../storage/postgres/postgres.client.js'
 import { PostgresRepo } from '../../storage/postgres/postgres.repo.js'
 import { MikroORM } from '@mikro-orm/postgresql'
-import type { Cursor } from '@mikro-orm/core'
 import { DateTime } from 'luxon'
 import { TableNames } from '../../storage/postgres/const.js'
+import { isDuplicateKeyError } from './log-entry-sync.storage.util.js'
 
 interface StoredSyncPosition {
   receivedAtMs: number
@@ -135,21 +136,9 @@ export class LogEntrySyncStorageService implements OnModuleInit {
       } else {
         error = new Error(String(e))
       }
-      if (error.name === 'UniqueConstraintViolationException') {
+      if (isDuplicateKeyError(e)) {
         this.logger.warn('Entry ID already exists in database!')
-        const existingEntity = await this.repository.findOne(payload.cid)
-        if (existingEntity == null) {
-          this.logger.error(
-            `Duplicate log sync entry ${payload.cid} was not readable after unique violation`,
-          )
-          return undefined
-        }
-        return {
-          receivedAtMs: DateTime.fromJSDate(new Date(existingEntity.receivedAt))
-            .toUTC()
-            .toMillis(),
-          syncSeq: toSyncSeq(existingEntity.syncSeq),
-        }
+        return await this.getStoredPositionById(payload.cid)
       }
       this.logger.error(`Error while writing log sync data to storage`, error)
       return undefined
@@ -311,6 +300,25 @@ export class LogEntrySyncStorageService implements OnModuleInit {
     await this.orm.em
       .getConnection()
       .execute(`delete from "${TableNames.LOG_ENTRY_SYNC_COUNTER}"`)
+  }
+
+  private async getStoredPositionById(
+    cid: string,
+  ): Promise<StoredSyncPosition | undefined> {
+    const existingEntity = await this.repository.findOne(cid)
+    if (existingEntity == null) {
+      this.logger.error(
+        `Duplicate log sync entry ${cid} was not readable after unique violation`,
+      )
+      return undefined
+    }
+
+    return {
+      receivedAtMs: DateTime.fromJSDate(new Date(existingEntity.receivedAt))
+        .toUTC()
+        .toMillis(),
+      syncSeq: toSyncSeq(existingEntity.syncSeq),
+    }
   }
 
   private entityToPayload(entity: LogEntrySyncEntity): LogSyncEntry {
