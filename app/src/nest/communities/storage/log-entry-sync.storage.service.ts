@@ -55,7 +55,7 @@ export class LogEntrySyncStorageService implements OnModuleInit {
   ): Promise<StoredSyncPosition | undefined> {
     const receivedAtMs = payload.receivedAt.toUTC().toMillis()
     try {
-      this.logger.log(
+      this.logger.info(
         `Adding new log sync data with ID ${payload.cid} to community ${payload.communityId}`,
       )
       const createdAt = DateTime.utc().toISO()
@@ -130,7 +130,7 @@ export class LogEntrySyncStorageService implements OnModuleInit {
         receivedAtMs,
         syncSeq: toSyncSeq(inserted.sync_seq),
       }
-      this.logger.log(
+      this.logger.info(
         `[addLogEntry] cid=${payload.cid} communityId=${payload.communityId} committed syncSeq=${stored.syncSeq}`,
       )
       return stored
