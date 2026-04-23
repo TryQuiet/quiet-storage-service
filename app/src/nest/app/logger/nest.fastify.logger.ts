@@ -119,7 +119,7 @@ export class NestFastifyLogger implements FastifyBaseLogger {
           id: request.id,
           remoteAddr: request.ip,
           params: JSON.stringify(request.params, null, 2),
-          headers: JSON.stringify(request.headers, null, 2),
+          // headers: JSON.stringify(request.headers, null, 2),
           method: request.method,
           query: JSON.stringify(request.query, null, 2),
           socket: {
