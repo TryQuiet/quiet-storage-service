@@ -16,12 +16,16 @@ import {
 } from './nse-auth.service.js'
 import { NseJwtAuthGuard } from './nse-jwt-auth.guard.js'
 import { createLogger } from '../app/logger/logger.js'
+import { LogEntrySyncStorageService } from '../communities/storage/log-entry-sync.storage.service.js'
 
 const logger = createLogger('NseAuth:Controller')
 
 @Controller('nse-auth')
 export class NseAuthController {
-  constructor(private readonly nseAuthService: NseAuthService) {}
+  constructor(
+    private readonly nseAuthService: NseAuthService,
+    private readonly logEntrySyncStorage: LogEntrySyncStorageService,
+  ) {}
 
   /**
    * POST /nse-auth/challenge
@@ -82,10 +86,31 @@ export class NseAuthController {
       : parsedAfterSeq
     const parsedSince = since !== '' ? parseInt(since, 10) : NaN
     const sinceMs = Number.isNaN(parsedSince) ? undefined : parsedSince
-    return await this.nseAuthService.getLogEntriesAfterSeq(
+    const resolvedAfterSeq =
+      afterSeqNum ??
+      (await this.logEntrySyncStorage.resolveSyncSeqForTimestamp(
+        teamId,
+        sinceMs ?? 0,
+      ))
+    const entries = await this.logEntrySyncStorage.getLogEntriesForCommunity(
       teamId,
-      afterSeqNum,
-      sinceMs,
+      resolvedAfterSeq,
     )
+
+    if (entries == null) {
+      return { entries: [], resolvedAfterSeq }
+    }
+
+    return {
+      entries: entries.map(e => ({
+        cid: e.cid,
+        hashedDbId: e.hashedDbId,
+        communityId: e.communityId,
+        entry: { type: 'Buffer' as const, data: Array.from(e.entry) },
+        receivedAt: e.receivedAt.toUTC().toISO() ?? '',
+        syncSeq: e.syncSeq ?? 0,
+      })),
+      resolvedAfterSeq,
+    }
   }
 }
