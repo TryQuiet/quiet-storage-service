@@ -9,7 +9,7 @@ import { LogEntrySync as LogEntrySyncEntity } from './entities/log-sync.entity.j
 import { PostgresClient } from '../../storage/postgres/postgres.client.js'
 import { PostgresRepo } from '../../storage/postgres/postgres.repo.js'
 import { MikroORM } from '@mikro-orm/postgresql'
-import type { Cursor, Transaction } from '@mikro-orm/core'
+import type { Cursor } from '@mikro-orm/core'
 import { DateTime } from 'luxon'
 import { TableNames } from '../../storage/postgres/const.js'
 
@@ -54,77 +54,79 @@ export class LogEntrySyncStorageService implements OnModuleInit {
   ): Promise<StoredSyncPosition | undefined> {
     const receivedAtMs = payload.receivedAt.toUTC().toMillis()
     try {
-      this.logger.log(`Adding new log sync data with ID ${payload.cid}`)
-      const stored = await this.orm.em.fork().transactional(async em => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-redundant-type-constituents -- Transaction<T = any> is typed as `any` in MikroORM; the cast is intentional
-        const trx: Transaction | undefined = em.getTransactionContext()
-        await em.getConnection().execute(
-          `insert into "${TableNames.LOG_ENTRY_SYNC_COUNTER}" ("community_id", "next_sync_seq")
-             values (?, 1)
-             on conflict ("community_id") do nothing`,
-          [payload.communityId],
-          'run',
-          trx,
-        )
-
-        const executedRows: Array<{ next_sync_seq: number | string }> = await em
+      this.logger.log(
+        `Adding new log sync data with ID ${payload.cid} to community ${payload.communityId}`,
+      )
+      const createdAt = DateTime.utc().toISO()
+      const receivedAt = payload.receivedAt.toUTC().toISO()
+      const insertedRows: Array<{ sync_seq: number | string }> =
+        await this.orm.em
+          .fork()
           .getConnection()
           .execute(
-            `select "next_sync_seq"
-             from "${TableNames.LOG_ENTRY_SYNC_COUNTER}"
-            where "community_id" = ?
-            for update`,
-            [payload.communityId],
+            // Allocate and insert in one statement so Postgres keeps the counter
+            // consistent with minimal lock time, even if the counter row drifts.
+            `with allocated as (
+             insert into "${TableNames.LOG_ENTRY_SYNC_COUNTER}" ("community_id", "next_sync_seq")
+                  values (?, 2)
+             on conflict ("community_id") do update
+                   set "next_sync_seq" = greatest(
+                         "${TableNames.LOG_ENTRY_SYNC_COUNTER}"."next_sync_seq",
+                         coalesce(
+                           (
+                             select "sync_seq" + 1
+                               from "${TableNames.LOG_ENTRY_SYNC}"
+                              where "community_id" = excluded."community_id"
+                              order by "sync_seq" desc
+                              limit 1
+                           ),
+                           1::bigint
+                         )
+                       ) + 1
+             returning "next_sync_seq" - 1 as "sync_seq"
+           ),
+           inserted as (
+             insert into "${TableNames.LOG_ENTRY_SYNC}" (
+               "id",
+               "community_id",
+               "hashed_db_id",
+               "entry",
+               "received_at",
+               "sync_seq",
+               "created_at"
+             )
+             select ?, ?, ?, ?, ?, "sync_seq", ?
+               from allocated
+             returning "sync_seq"
+           )
+           select "sync_seq"
+             from inserted`,
+            [
+              payload.communityId,
+              payload.cid,
+              payload.communityId,
+              payload.hashedDbId,
+              payload.entry,
+              receivedAt,
+              createdAt,
+            ],
             'all',
-            trx,
           )
-        const [lockedCounter] = executedRows
+      const inserted = insertedRows.at(0)
 
-        if (lockedCounter == null) {
-          throw new Error(
-            `Unable to allocate sync sequence for community ${payload.communityId}`,
-          )
-        }
-
-        const repo = em.getRepository(LogEntrySyncEntity)
-        const existingEntity = await repo.findOne({ id: { $eq: payload.cid } })
-        if (existingEntity != null) {
-          this.logger.log(
-            `[addLogEntry] cid=${payload.cid} already exists with syncSeq=${toSyncSeq(existingEntity.syncSeq)}, skipping insert`,
-          )
-          return {
-            receivedAtMs: DateTime.fromJSDate(
-              new Date(existingEntity.receivedAt),
-            )
-              .toUTC()
-              .toMillis(),
-            syncSeq: toSyncSeq(existingEntity.syncSeq),
-          }
-        }
-
-        const syncSeq = toSyncSeq(lockedCounter.next_sync_seq)
-        this.logger.log(
-          `[addLogEntry] cid=${payload.cid} communityId=${payload.communityId} allocating syncSeq=${syncSeq} next_sync_seq_raw=${lockedCounter.next_sync_seq}`,
+      if (inserted == null) {
+        throw new Error(
+          `Unable to allocate sync sequence for community ${payload.communityId}`,
         )
-        const entity = this.payloadToEntity({ ...payload, syncSeq })
-        await repo.insert(entity)
-        await em.getConnection().execute(
-          `update "${TableNames.LOG_ENTRY_SYNC_COUNTER}"
-                set "next_sync_seq" = ?
-              where "community_id" = ?`,
-          [syncSeq + 1, payload.communityId],
-          'run',
-          trx,
-        )
-        this.logger.log(
-          `[addLogEntry] cid=${payload.cid} committed syncSeq=${syncSeq} updated counter to ${syncSeq + 1}`,
-        )
+      }
 
-        return {
-          receivedAtMs,
-          syncSeq,
-        }
-      })
+      const stored = {
+        receivedAtMs,
+        syncSeq: toSyncSeq(inserted.sync_seq),
+      }
+      this.logger.log(
+        `[addLogEntry] cid=${payload.cid} communityId=${payload.communityId} committed syncSeq=${stored.syncSeq}`,
+      )
       return stored
     } catch (e) {
       let error: Error
@@ -169,11 +171,10 @@ export class LogEntrySyncStorageService implements OnModuleInit {
       },
       { orderBy: { syncSeq: 'ASC' } },
     )
-    if (result == null) {
+    if (result.length === 0) {
       this.logger.warn(
         `No log entries found in storage for community ID ${communityId} after sync seq ${afterSeq}`,
       )
-      return undefined
     }
     return result.map(entity => this.entityToPayload(entity))
   }
@@ -310,24 +311,6 @@ export class LogEntrySyncStorageService implements OnModuleInit {
     await this.orm.em
       .getConnection()
       .execute(`delete from "${TableNames.LOG_ENTRY_SYNC_COUNTER}"`)
-  }
-
-  private payloadToEntity(payload: LogSyncEntry): LogEntrySyncEntity {
-    if (payload.syncSeq == null) {
-      throw new Error(`syncSeq must be provided when writing log sync data`)
-    }
-
-    const entity = new LogEntrySyncEntity()
-    entity.assign({
-      id: payload.cid,
-      communityId: payload.communityId,
-      entry: payload.entry,
-      hashedDbId: payload.hashedDbId,
-      receivedAt: payload.receivedAt.toUTC().toISO(),
-      syncSeq: payload.syncSeq,
-      createdAt: DateTime.utc().toISO(),
-    })
-    return entity
   }
 
   private entityToPayload(entity: LogEntrySyncEntity): LogSyncEntry {
