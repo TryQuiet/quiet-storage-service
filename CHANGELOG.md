@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.2-alpha.8 (2026-04-23)</small>
+
+- refactor: change log level from log to info for log entry addition ([e6f5b7d](https://github.com/TryQuiet/quiet-storage-service/commit/e6f5b7d))
+- refactor: enhance log entry sync handling and improve transaction management ([f141fad](https://github.com/TryQuiet/quiet-storage-service/commit/f141fad))
+- refactor: improve error handling for duplicate log entries and extract utility function ([cd2cfa9](https://github.com/TryQuiet/quiet-storage-service/commit/cd2cfa9))
+- feat: add debug logging for log entries retrieval in NseAuthController ([87b221d](https://github.com/TryQuiet/quiet-storage-service/commit/87b221d))
+- feat: add debug logging for nse log entries request and response handling ([0387d7c](https://github.com/TryQuiet/quiet-storage-service/commit/0387d7c))
+- fix: harden log entry sync sequence allocation ([04d6d92](https://github.com/TryQuiet/quiet-storage-service/commit/04d6d92))
+- refactor nse-auth module to generalized nse-module ([8804bd8](https://github.com/TryQuiet/quiet-storage-service/commit/8804bd8))
+- stop logging headers ([77ceef9](https://github.com/TryQuiet/quiet-storage-service/commit/77ceef9))
+- Update app package CHANGELOG.md ([2849e2c](https://github.com/TryQuiet/quiet-storage-service/commit/2849e2c))
+
 ## <small>1.0.2-alpha.7 (2026-04-21)</small>
 
 - refactor: simplify secret key retrieval for secret env vars ([f1caae8](https://github.com/TryQuiet/quiet-storage-service/commit/f1caae8))
