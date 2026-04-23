@@ -80,6 +80,9 @@ export class NseAuthController {
     if (req.user.teamId !== teamId) {
       throw new UnauthorizedException('Token teamId does not match path')
     }
+    logger.debug(
+      `Log entries request for team ${teamId} afterSeq ${afterSeq} since ${since}`,
+    )
     const parsedAfterSeq = afterSeq !== '' ? parseInt(afterSeq, 10) : NaN
     const afterSeqNum = Number.isNaN(parsedAfterSeq)
       ? undefined
@@ -98,6 +101,9 @@ export class NseAuthController {
     )
 
     if (entries == null) {
+      logger.debug(
+        `No log entries found for team ${teamId} afterSeq ${afterSeq} since ${since}`,
+      )
       return { entries: [], resolvedAfterSeq }
     }
 
