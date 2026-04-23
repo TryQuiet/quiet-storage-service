@@ -12,7 +12,7 @@ import { PostgresRepo } from '../../storage/postgres/postgres.repo.js'
 import { MikroORM } from '@mikro-orm/postgresql'
 import { DateTime } from 'luxon'
 import { TableNames } from '../../storage/postgres/const.js'
-import { isDuplicateKeyError } from './log-entry-sync.storage.util.js'
+import { isDuplicateLogEntryIdError } from './log-entry-sync.storage.util.js'
 
 interface StoredSyncPosition {
   receivedAtMs: number
@@ -67,22 +67,26 @@ export class LogEntrySyncStorageService implements OnModuleInit {
           .execute(
             // Allocate and insert in one statement so Postgres keeps the counter
             // consistent with minimal lock time, even if the counter row drifts.
-            `with allocated as (
+            `with recovered as (
+             select coalesce(
+                      (
+                        select "sync_seq" + 1
+                          from "${TableNames.LOG_ENTRY_SYNC}"
+                         where "community_id" = ?
+                         order by "sync_seq" desc
+                         limit 1
+                      ),
+                      1::bigint
+                    ) as "sync_seq"
+           ),
+           allocated as (
              insert into "${TableNames.LOG_ENTRY_SYNC_COUNTER}" ("community_id", "next_sync_seq")
-                  values (?, 2)
+             select ?, "sync_seq" + 1
+               from recovered
              on conflict ("community_id") do update
                    set "next_sync_seq" = greatest(
                          "${TableNames.LOG_ENTRY_SYNC_COUNTER}"."next_sync_seq",
-                         coalesce(
-                           (
-                             select "sync_seq" + 1
-                               from "${TableNames.LOG_ENTRY_SYNC}"
-                              where "community_id" = excluded."community_id"
-                              order by "sync_seq" desc
-                              limit 1
-                           ),
-                           1::bigint
-                         )
+                         excluded."next_sync_seq" - 1
                        ) + 1
              returning "next_sync_seq" - 1 as "sync_seq"
            ),
@@ -103,6 +107,7 @@ export class LogEntrySyncStorageService implements OnModuleInit {
            select "sync_seq"
              from inserted`,
             [
+              payload.communityId,
               payload.communityId,
               payload.cid,
               payload.communityId,
@@ -136,7 +141,7 @@ export class LogEntrySyncStorageService implements OnModuleInit {
       } else {
         error = new Error(String(e))
       }
-      if (isDuplicateKeyError(e)) {
+      if (isDuplicateLogEntryIdError(e)) {
         this.logger.warn('Entry ID already exists in database!')
         return await this.getStoredPositionById(payload.cid)
       }

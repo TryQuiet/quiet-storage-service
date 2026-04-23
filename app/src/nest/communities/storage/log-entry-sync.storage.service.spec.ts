@@ -282,6 +282,34 @@ describe('LogEntrySyncStorageService', () => {
     expect(third?.syncSeq).toBe(3)
   })
 
+  it('recovers when the sync counter row is missing for existing entries', async () => {
+    const payloads: LogSyncEntry[] = Array.from({ length: 3 }, (_, i) => ({
+      cid: sodiumHelper!.sodium.to_hex(
+        sodiumHelper!.sodium.randombytes_buf(32),
+      ),
+      hashedDbId: 'hashedDbId-counter-missing',
+      entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
+      communityId: 'communityId',
+      receivedAt: DateTime.utc().plus({ seconds: i }),
+    }))
+
+    const first = await logSyncStorageService!.addLogEntry(payloads[0])
+    const second = await logSyncStorageService!.addLogEntry(payloads[1])
+
+    expect(first?.syncSeq).toBe(1)
+    expect(second?.syncSeq).toBe(2)
+
+    await orm!.em.getConnection().execute(
+      `delete from "${TableNames.LOG_ENTRY_SYNC_COUNTER}"
+        where "community_id" = ?`,
+      ['communityId'],
+    )
+
+    const third = await logSyncStorageService!.addLogEntry(payloads[2])
+
+    expect(third?.syncSeq).toBe(3)
+  })
+
   it('should return no records when filtering for a community ID that has no records', async () => {
     const payloads: LogSyncEntry[] = []
     for (let i = 0; i < 3; i += 1) {
