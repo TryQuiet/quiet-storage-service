@@ -107,6 +107,9 @@ export class NseAuthController {
       return { entries: [], resolvedAfterSeq }
     }
 
+    logger.debug(
+      `Found ${entries.length} log entries for team ${teamId} afterSeq ${afterSeq} since ${since}, resolvedAfterSeq ${resolvedAfterSeq}`,
+    )
     return {
       entries: entries.map(e => ({
         cid: e.cid,
