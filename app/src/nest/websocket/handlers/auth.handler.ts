@@ -19,6 +19,10 @@ import { CaptchaErrorMessages } from './types/captcha.types.js'
 
 const baseLogger = createLogger('Websocket:Event:Communities:Auth')
 
+// Mirrors AUTH_SYNC_LARGE_MESSAGE_BYTES on the send side. Flag any inbound
+// auth-sync payload large enough to be worth investigating.
+const AUTH_SYNC_LARGE_PAYLOAD_BYTES = 512 * 1024
+
 /**
  * Adds event handlers for auth-related events
  *
@@ -120,9 +124,13 @@ export function registerCommunitiesAuthHandlers(
         )
       }
       // push the sync message onto the auth sync connection
-      authConnection.lfaConnection.deliver(
-        uint8arrays.fromString(message.payload.message, 'base64'),
-      )
+      const decoded = uint8arrays.fromString(message.payload.message, 'base64')
+      if (decoded.byteLength >= AUTH_SYNC_LARGE_PAYLOAD_BYTES) {
+        _logger.warn(
+          `Inbound auth-sync message is large: ${decoded.byteLength} bytes (user=${message.payload.userId}, team=${message.payload.teamId})`,
+        )
+      }
+      authConnection.lfaConnection.deliver(decoded)
     } catch (e) {
       _logger.error(`Error while processing auth sync event`, e)
       authConnection?.lfaConnection.emit('localError', {
