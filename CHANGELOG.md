@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.2-alpha.9 (2026-04-27)</small>
+
+- Update app package CHANGELOG.md ([57d51e4](https://github.com/TryQuiet/quiet-storage-service/commit/57d51e4))
+- Use a shared winston logger so that logs properly rotate ([fe881b5](https://github.com/TryQuiet/quiet-storage-service/commit/fe881b5))
+
 ## <small>1.0.2-alpha.8 (2026-04-23)</small>
 
 - refactor: change log level from log to info for log entry addition ([e6f5b7d](https://github.com/TryQuiet/quiet-storage-service/commit/e6f5b7d))
