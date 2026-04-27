@@ -95,6 +95,15 @@
           "length": 6,
           "mappedType": "datetime"
         },
+        "sync_seq": {
+          "name": "sync_seq",
+          "type": "bigint",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "mappedType": "bigint"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamptz",
@@ -120,6 +129,17 @@
           "constraint": false,
           "primary": false,
           "unique": false
+        },
+        {
+          "keyName": "entries_by_syncSeq_idx",
+          "columnNames": [
+            "community_id",
+            "sync_seq"
+          ],
+          "composite": true,
+          "constraint": true,
+          "primary": false,
+          "unique": true
         },
         {
           "keyName": "log_entry_sync_pkey",

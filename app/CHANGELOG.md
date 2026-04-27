@@ -3,6 +3,94 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.2-alpha.9 (2026-04-27)</small>
+
+- Update app package CHANGELOG.md ([57d51e4](https://github.com/TryQuiet/quiet-storage-service/commit/57d51e4))
+- Use a shared winston logger so that logs properly rotate ([fe881b5](https://github.com/TryQuiet/quiet-storage-service/commit/fe881b5))
+
+## <small>1.0.2-alpha.8 (2026-04-23)</small>
+
+- refactor: change log level from log to info for log entry addition ([e6f5b7d](https://github.com/TryQuiet/quiet-storage-service/commit/e6f5b7d))
+- refactor: enhance log entry sync handling and improve transaction management ([f141fad](https://github.com/TryQuiet/quiet-storage-service/commit/f141fad))
+- refactor: improve error handling for duplicate log entries and extract utility function ([cd2cfa9](https://github.com/TryQuiet/quiet-storage-service/commit/cd2cfa9))
+- feat: add debug logging for log entries retrieval in NseAuthController ([87b221d](https://github.com/TryQuiet/quiet-storage-service/commit/87b221d))
+- feat: add debug logging for nse log entries request and response handling ([0387d7c](https://github.com/TryQuiet/quiet-storage-service/commit/0387d7c))
+- fix: harden log entry sync sequence allocation ([04d6d92](https://github.com/TryQuiet/quiet-storage-service/commit/04d6d92))
+- refactor nse-auth module to generalized nse-module ([8804bd8](https://github.com/TryQuiet/quiet-storage-service/commit/8804bd8))
+- stop logging headers ([77ceef9](https://github.com/TryQuiet/quiet-storage-service/commit/77ceef9))
+- Update app package CHANGELOG.md ([2849e2c](https://github.com/TryQuiet/quiet-storage-service/commit/2849e2c))
+
+## <small>1.0.2-alpha.7 (2026-04-21)</small>
+
+- refactor: simplify secret key retrieval for secret env vars ([f1caae8](https://github.com/TryQuiet/quiet-storage-service/commit/f1caae8))
+- Update app package CHANGELOG.md ([4ee8241](https://github.com/TryQuiet/quiet-storage-service/commit/4ee8241))
+
+## <small>1.0.2-alpha.6 (2026-04-21)</small>
+
+- Update app package CHANGELOG.md ([dbaaf07](https://github.com/TryQuiet/quiet-storage-service/commit/dbaaf07))
+- use real captcha in dev server ([2fdc03c](https://github.com/TryQuiet/quiet-storage-service/commit/2fdc03c))
+
+## <small>1.0.2-alpha.5 (2026-04-20)</small>
+
+- fix matching ([1acaa0e](https://github.com/TryQuiet/quiet-storage-service/commit/1acaa0e))
+- Update app package CHANGELOG.md ([727f9c9](https://github.com/TryQuiet/quiet-storage-service/commit/727f9c9))
+
+## <small>1.0.2-alpha.4 (2026-04-20)</small>
+
+- fix private key env scoped format ([98b2064](https://github.com/TryQuiet/quiet-storage-service/commit/98b2064))
+- Update app package CHANGELOG.md ([eb1b822](https://github.com/TryQuiet/quiet-storage-service/commit/eb1b822))
+
+## <small>1.0.2-alpha.3 (2026-04-20)</small>
+
+- Update app package CHANGELOG.md ([dc544c4](https://github.com/TryQuiet/quiet-storage-service/commit/dc544c4))
+
+## <small>1.0.2-alpha.2 (2026-04-20)</small>
+
+- chore(release): publish v1.0.2-alpha.0 ([4359b85](https://github.com/TryQuiet/quiet-storage-service/commit/4359b85))
+- chore(release): publish v1.0.2-alpha.1 ([3f6360d](https://github.com/TryQuiet/quiet-storage-service/commit/3f6360d))
+- add a default title and body so that message is not treated as silent ([391802a](https://github.com/TryQuiet/quiet-storage-service/commit/391802a))
+- Add index to log entry table for community ID + hashedDbId + receivedAt (#26) ([0b5402d](https://github.com/TryQuiet/quiet-storage-service/commit/0b5402d)), closes [#26](https://github.com/TryQuiet/quiet-storage-service/issues/26)
+- Android Firebase Configuration (#31) ([49e0e3e](https://github.com/TryQuiet/quiet-storage-service/commit/49e0e3e)), closes [#31](https://github.com/TryQuiet/quiet-storage-service/issues/31)
+- Batch push notifications (#23) ([a337f38](https://github.com/TryQuiet/quiet-storage-service/commit/a337f38)), closes [#23](https://github.com/TryQuiet/quiet-storage-service/issues/23)
+- NSE Sync Protocol (#30) ([aadb8b5](https://github.com/TryQuiet/quiet-storage-service/commit/aadb8b5)), closes [#30](https://github.com/TryQuiet/quiet-storage-service/issues/30)
+- Secrets Management for Firebase (#32) ([74e1853](https://github.com/TryQuiet/quiet-storage-service/commit/74e1853)), closes [#32](https://github.com/TryQuiet/quiet-storage-service/issues/32)
+- Test change: forgot to set the ruleset to active (#28) ([c026e9f](https://github.com/TryQuiet/quiet-storage-service/commit/c026e9f)), closes [#28](https://github.com/TryQuiet/quiet-storage-service/issues/28)
+- Test commit: should be blocked by branch rules ([faa2b67](https://github.com/TryQuiet/quiet-storage-service/commit/faa2b67))
+- Update app package CHANGELOG.md ([8a76d2c](https://github.com/TryQuiet/quiet-storage-service/commit/8a76d2c))
+- Update app package CHANGELOG.md ([2e43e19](https://github.com/TryQuiet/quiet-storage-service/commit/2e43e19))
+- fix: Allow more fuzziness in team link timestamp validations and use updated logging (#27) ([2e41cc4](https://github.com/TryQuiet/quiet-storage-service/commit/2e41cc4)), closes [#27](https://github.com/TryQuiet/quiet-storage-service/issues/27)
+- fix: Handle auth errors on QSS (#25) ([b10f52a](https://github.com/TryQuiet/quiet-storage-service/commit/b10f52a)), closes [#25](https://github.com/TryQuiet/quiet-storage-service/issues/25)
+
+## <small>1.0.2-alpha.1 (2026-04-20)</small>
+
+- add a default title and body so that message is not treated as silent ([391802a](https://github.com/TryQuiet/quiet-storage-service/commit/391802a))
+- Add index to log entry table for community ID + hashedDbId + receivedAt (#26) ([0b5402d](https://github.com/TryQuiet/quiet-storage-service/commit/0b5402d)), closes [#26](https://github.com/TryQuiet/quiet-storage-service/issues/26)
+- Android Firebase Configuration (#31) ([49e0e3e](https://github.com/TryQuiet/quiet-storage-service/commit/49e0e3e)), closes [#31](https://github.com/TryQuiet/quiet-storage-service/issues/31)
+- Batch push notifications (#23) ([a337f38](https://github.com/TryQuiet/quiet-storage-service/commit/a337f38)), closes [#23](https://github.com/TryQuiet/quiet-storage-service/issues/23)
+- NSE Sync Protocol (#30) ([aadb8b5](https://github.com/TryQuiet/quiet-storage-service/commit/aadb8b5)), closes [#30](https://github.com/TryQuiet/quiet-storage-service/issues/30)
+- Secrets Management for Firebase (#32) ([74e1853](https://github.com/TryQuiet/quiet-storage-service/commit/74e1853)), closes [#32](https://github.com/TryQuiet/quiet-storage-service/issues/32)
+- Test change: forgot to set the ruleset to active (#28) ([c026e9f](https://github.com/TryQuiet/quiet-storage-service/commit/c026e9f)), closes [#28](https://github.com/TryQuiet/quiet-storage-service/issues/28)
+- Test commit: should be blocked by branch rules ([faa2b67](https://github.com/TryQuiet/quiet-storage-service/commit/faa2b67))
+- Update app package CHANGELOG.md ([8a76d2c](https://github.com/TryQuiet/quiet-storage-service/commit/8a76d2c))
+- Update app package CHANGELOG.md ([2e43e19](https://github.com/TryQuiet/quiet-storage-service/commit/2e43e19))
+- chore(release): publish v1.0.2-alpha.0 ([4359b85](https://github.com/TryQuiet/quiet-storage-service/commit/4359b85))
+- fix: Allow more fuzziness in team link timestamp validations and use updated logging (#27) ([2e41cc4](https://github.com/TryQuiet/quiet-storage-service/commit/2e41cc4)), closes [#27](https://github.com/TryQuiet/quiet-storage-service/issues/27)
+- fix: Handle auth errors on QSS (#25) ([b10f52a](https://github.com/TryQuiet/quiet-storage-service/commit/b10f52a)), closes [#25](https://github.com/TryQuiet/quiet-storage-service/issues/25)
+
+## <small>1.0.2-alpha.0 (2026-04-20)</small>
+
+- add a default title and body so that message is not treated as silent ([391802a](https://github.com/TryQuiet/quiet-storage-service/commit/391802a))
+- Add index to log entry table for community ID + hashedDbId + receivedAt (#26) ([0b5402d](https://github.com/TryQuiet/quiet-storage-service/commit/0b5402d)), closes [#26](https://github.com/TryQuiet/quiet-storage-service/issues/26)
+- Android Firebase Configuration (#31) ([49e0e3e](https://github.com/TryQuiet/quiet-storage-service/commit/49e0e3e)), closes [#31](https://github.com/TryQuiet/quiet-storage-service/issues/31)
+- Batch push notifications (#23) ([a337f38](https://github.com/TryQuiet/quiet-storage-service/commit/a337f38)), closes [#23](https://github.com/TryQuiet/quiet-storage-service/issues/23)
+- NSE Sync Protocol (#30) ([aadb8b5](https://github.com/TryQuiet/quiet-storage-service/commit/aadb8b5)), closes [#30](https://github.com/TryQuiet/quiet-storage-service/issues/30)
+- Secrets Management for Firebase (#32) ([74e1853](https://github.com/TryQuiet/quiet-storage-service/commit/74e1853)), closes [#32](https://github.com/TryQuiet/quiet-storage-service/issues/32)
+- Test change: forgot to set the ruleset to active (#28) ([c026e9f](https://github.com/TryQuiet/quiet-storage-service/commit/c026e9f)), closes [#28](https://github.com/TryQuiet/quiet-storage-service/issues/28)
+- Test commit: should be blocked by branch rules ([faa2b67](https://github.com/TryQuiet/quiet-storage-service/commit/faa2b67))
+- Update app package CHANGELOG.md ([2e43e19](https://github.com/TryQuiet/quiet-storage-service/commit/2e43e19))
+- fix: Allow more fuzziness in team link timestamp validations and use updated logging (#27) ([2e41cc4](https://github.com/TryQuiet/quiet-storage-service/commit/2e41cc4)), closes [#27](https://github.com/TryQuiet/quiet-storage-service/issues/27)
+- fix: Handle auth errors on QSS (#25) ([b10f52a](https://github.com/TryQuiet/quiet-storage-service/commit/b10f52a)), closes [#25](https://github.com/TryQuiet/quiet-storage-service/issues/25)
+
 ## <small>1.0.1-alpha.11 (2026-03-20)</small>
 
 - fix: Handle auth errors on QSS (#25) ([b10f52a](https://github.com/TryQuiet/quiet-storage-service/commit/b10f52a)), closes [#25](https://github.com/TryQuiet/quiet-storage-service/issues/25)

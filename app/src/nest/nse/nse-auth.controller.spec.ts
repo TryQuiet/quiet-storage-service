@@ -2,10 +2,13 @@ import { jest } from '@jest/globals'
 import { Test, type TestingModule } from '@nestjs/testing'
 import { UnauthorizedException } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
-import { NseAuthController } from './nse-auth.controller.js'
+import { DateTime } from 'luxon'
+import { NseAuthController } from './nse.controller.js'
 import { NseAuthService } from './nse-auth.service.js'
-import type { NseLogEntriesResponse, NseLogEntry } from './nse-auth.service.js'
+import type { NseLogEntriesResponse } from './nse-auth.service.js'
 import { NseJwtAuthGuard } from './nse-jwt-auth.guard.js'
+import { LogEntrySyncStorageService } from '../communities/storage/log-entry-sync.storage.service.js'
+import type { LogSyncEntry } from '../communities/types.js'
 
 const TEAM_ID = 'test-team-id'
 const DEVICE_ID = 'test-device-id'
@@ -22,9 +25,12 @@ describe('NseAuthController', () => {
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- assigned in beforeEach
   let controller!: NseAuthController
   let mockService: jest.Mocked<
+    Pick<NseAuthService, 'issueChallenge' | 'verifyAndIssueToken'>
+  >
+  let mockLogEntrySyncStorage: jest.Mocked<
     Pick<
-      NseAuthService,
-      'issueChallenge' | 'verifyAndIssueToken' | 'getLogEntriesAfterSeq'
+      LogEntrySyncStorageService,
+      'getLogEntriesForCommunity' | 'resolveSyncSeqForTimestamp'
     >
   >
 
@@ -32,7 +38,12 @@ describe('NseAuthController', () => {
     mockService = {
       issueChallenge: jest.fn<NseAuthService['issueChallenge']>(),
       verifyAndIssueToken: jest.fn<NseAuthService['verifyAndIssueToken']>(),
-      getLogEntriesAfterSeq: jest.fn<NseAuthService['getLogEntriesAfterSeq']>(),
+    }
+    mockLogEntrySyncStorage = {
+      getLogEntriesForCommunity:
+        jest.fn<LogEntrySyncStorageService['getLogEntriesForCommunity']>(),
+      resolveSyncSeqForTimestamp:
+        jest.fn<LogEntrySyncStorageService['resolveSyncSeqForTimestamp']>(),
     }
 
     module = await Test.createTestingModule({
@@ -45,6 +56,10 @@ describe('NseAuthController', () => {
       controllers: [NseAuthController],
       providers: [
         { provide: NseAuthService, useValue: mockService },
+        {
+          provide: LogEntrySyncStorageService,
+          useValue: mockLogEntrySyncStorage,
+        },
         NseJwtAuthGuard,
       ],
     }).compile()
@@ -127,55 +142,92 @@ describe('NseAuthController', () => {
   describe('getLogEntries', () => {
     const req = { user: { teamId: TEAM_ID } }
 
-    it('delegates to service and wraps result in { entries }', async () => {
-      const fakeEntries: NseLogEntry[] = []
+    it('loads entries from storage using afterSeq when provided', async () => {
+      const storageEntries: LogSyncEntry[] = [
+        {
+          cid: 'cid-1',
+          hashedDbId: 'hashed-db-id-1',
+          communityId: TEAM_ID,
+          entry: Buffer.from([1, 2, 3]),
+          receivedAt: DateTime.fromISO('2024-01-01T00:00:00.000Z'),
+          syncSeq: 7,
+        },
+      ]
       const response: NseLogEntriesResponse = {
-        entries: fakeEntries,
-        resolvedAfterSeq: 0,
+        entries: [
+          {
+            cid: 'cid-1',
+            hashedDbId: 'hashed-db-id-1',
+            communityId: TEAM_ID,
+            entry: { type: 'Buffer', data: [1, 2, 3] },
+            receivedAt: '2024-01-01T00:00:00.000Z',
+            syncSeq: 7,
+          },
+        ],
+        resolvedAfterSeq: 5,
       }
-      mockService.getLogEntriesAfterSeq.mockResolvedValue(response)
-
-      const result = await controller.getLogEntries(TEAM_ID, '0', '', req)
-
-      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock; method ref is safe
-      expect(mockService.getLogEntriesAfterSeq).toHaveBeenCalledWith(
-        TEAM_ID,
-        0,
-        undefined,
+      mockLogEntrySyncStorage.getLogEntriesForCommunity.mockResolvedValue(
+        storageEntries,
       )
+
+      const result = await controller.getLogEntries(TEAM_ID, '5', '', req)
+
+      expect(
+        mockLogEntrySyncStorage.resolveSyncSeqForTimestamp,
+      ).not.toHaveBeenCalled()
+      expect(
+        mockLogEntrySyncStorage.getLogEntriesForCommunity,
+      ).toHaveBeenCalledWith(TEAM_ID, 5)
       expect(result).toEqual(response)
     })
 
-    it('uses since=0 when query param is empty', async () => {
-      mockService.getLogEntriesAfterSeq.mockResolvedValue({
-        entries: [],
-        resolvedAfterSeq: 0,
-      })
+    it('uses since=0 when query params are empty', async () => {
+      mockLogEntrySyncStorage.resolveSyncSeqForTimestamp.mockResolvedValue(0)
+      mockLogEntrySyncStorage.getLogEntriesForCommunity.mockResolvedValue([])
 
       await controller.getLogEntries(TEAM_ID, '', '', req)
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock; method ref is safe
-      expect(mockService.getLogEntriesAfterSeq).toHaveBeenCalledWith(
-        TEAM_ID,
-        undefined,
-        undefined,
-      )
+      expect(
+        mockLogEntrySyncStorage.resolveSyncSeqForTimestamp,
+      ).toHaveBeenCalledWith(TEAM_ID, 0)
+      expect(
+        mockLogEntrySyncStorage.getLogEntriesForCommunity,
+      ).toHaveBeenCalledWith(TEAM_ID, 0)
     })
 
-    it('passes parsed since timestamp to service', async () => {
-      mockService.getLogEntriesAfterSeq.mockResolvedValue({
+    it('returns [] when storage returns null', async () => {
+      mockLogEntrySyncStorage.resolveSyncSeqForTimestamp.mockResolvedValue(0)
+      mockLogEntrySyncStorage.getLogEntriesForCommunity.mockResolvedValue(null)
+
+      const result = await controller.getLogEntries(TEAM_ID, '', '', req)
+
+      expect(result).toEqual({
         entries: [],
-        resolvedAfterSeq: 1700000000000,
+        resolvedAfterSeq: 0,
       })
+    })
 
-      await controller.getLogEntries(TEAM_ID, '', '1700000000000', req)
+    it('resolves a parsed since timestamp to syncSeq', async () => {
+      mockLogEntrySyncStorage.resolveSyncSeqForTimestamp.mockResolvedValue(17)
+      mockLogEntrySyncStorage.getLogEntriesForCommunity.mockResolvedValue([])
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock; method ref is safe
-      expect(mockService.getLogEntriesAfterSeq).toHaveBeenCalledWith(
+      const result = await controller.getLogEntries(
         TEAM_ID,
-        undefined,
-        1700000000000,
+        '',
+        '1700000000000',
+        req,
       )
+
+      expect(
+        mockLogEntrySyncStorage.resolveSyncSeqForTimestamp,
+      ).toHaveBeenCalledWith(TEAM_ID, 1700000000000)
+      expect(
+        mockLogEntrySyncStorage.getLogEntriesForCommunity,
+      ).toHaveBeenCalledWith(TEAM_ID, 17)
+      expect(result).toEqual({
+        entries: [],
+        resolvedAfterSeq: 17,
+      })
     })
 
     it('throws UnauthorizedException if req.user.teamId does not match path teamId', async () => {
@@ -183,12 +235,16 @@ describe('NseAuthController', () => {
         controller.getLogEntries('other-team', '0', '', req),
       ).rejects.toThrow(UnauthorizedException)
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock; method ref is safe
-      expect(mockService.getLogEntriesAfterSeq).not.toHaveBeenCalled()
+      expect(
+        mockLogEntrySyncStorage.resolveSyncSeqForTimestamp,
+      ).not.toHaveBeenCalled()
+      expect(
+        mockLogEntrySyncStorage.getLogEntriesForCommunity,
+      ).not.toHaveBeenCalled()
     })
 
-    it('propagates UnauthorizedException from service', async () => {
-      mockService.getLogEntriesAfterSeq.mockRejectedValue(
+    it('propagates UnauthorizedException from storage', async () => {
+      mockLogEntrySyncStorage.getLogEntriesForCommunity.mockRejectedValue(
         new UnauthorizedException('Storage error'),
       )
 

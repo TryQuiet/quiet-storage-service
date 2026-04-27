@@ -105,12 +105,16 @@ export class AWSSecretsService {
 
   public async getSecretEnvVar(
     secretName: string,
+    useEnvScopedName = true,
   ): Promise<string | undefined> {
     const env = ConfigService.getEnv()
     if ([Environment.Local, Environment.Test].includes(env)) {
       return ConfigService.getString(secretName)
     }
-    const secret = await this.get(secretName)
+    const envScopedSecretName = useEnvScopedName
+      ? `${ConfigService.getString(EnvVars.ENV)?.toLowerCase() === 'development' ? 'DEV' : 'PROD'}_${secretName}`
+      : secretName
+    const secret = await this.get(envScopedSecretName)
     let secretString =
       secret == null ? undefined : AWSSecretsService.parseSecretString(secret)
     if (secretString == null) {

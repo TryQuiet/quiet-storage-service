@@ -16,9 +16,7 @@ import sodium from 'libsodium-wrappers-sumo'
 import { pack } from 'msgpackr'
 import { randomBytes } from 'node:crypto'
 import { createLogger } from '../app/logger/logger.js'
-import { LogEntrySyncStorageService } from '../communities/storage/log-entry-sync.storage.service.js'
 import { CommunitiesManagerService } from '../communities/communities-manager.service.js'
-import type { LogSyncEntry } from '../communities/types.js'
 
 const logger = createLogger('NseAuth:Service')
 
@@ -110,7 +108,6 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly jwtService: JwtService,
-    private readonly logEntrySyncStorage: LogEntrySyncStorageService,
     private readonly communitiesManager: CommunitiesManagerService,
   ) {}
 
@@ -284,46 +281,6 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
         error,
       )
       throw new UnauthorizedException('Unknown device for team')
-    }
-  }
-
-  /**
-   * Fetch log entries for a team since the given millisecond timestamp.
-   * Caller must have already validated the JWT and matched the teamId.
-   */
-  async getLogEntriesAfterSeq(
-    teamId: string,
-    afterSeq?: number,
-    legacySince?: number,
-  ): Promise<NseLogEntriesResponse> {
-    const resolvedAfterSeq =
-      afterSeq ??
-      (await this.logEntrySyncStorage.resolveSyncSeqForTimestamp(
-        teamId,
-        legacySince ?? 0,
-      ))
-    const entries: LogSyncEntry[] | undefined | null =
-      await this.logEntrySyncStorage.getLogEntriesForCommunity(
-        teamId,
-        resolvedAfterSeq,
-      )
-
-    if (entries == null) {
-      return { entries: [], resolvedAfterSeq }
-    }
-
-    return {
-      entries: entries.map(e => ({
-        cid: e.cid,
-        hashedDbId: e.hashedDbId,
-        communityId: e.communityId,
-        // Serialize Buffer as Node.js JSON so the Swift Data decoder works:
-        //   LogEntry.init(from:) decodes { "type": "Buffer", "data": [...] }
-        entry: { type: 'Buffer' as const, data: Array.from(e.entry) },
-        receivedAt: e.receivedAt.toUTC().toISO() ?? '',
-        syncSeq: e.syncSeq ?? 0,
-      })),
-      resolvedAfterSeq,
     }
   }
 
