@@ -296,7 +296,6 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         ...this.communities.get(teamId)!,
         expiryMs: undefined,
       })
-      this.logger.verbose(this.communities.get(teamId))
     }
   }
 

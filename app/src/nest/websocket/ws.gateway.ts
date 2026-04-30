@@ -12,7 +12,12 @@ import {
 import { Server } from 'socket.io'
 import { Inject, OnModuleDestroy, Optional } from '@nestjs/common'
 
-import { BaseHandlerConfig, QuietSocket } from './ws.types.js'
+import {
+  formatSocketAttribution,
+  formatSocketPeer,
+  type BaseHandlerConfig,
+  type QuietSocket,
+} from './ws.types.js'
 import { createLogger } from '../app/logger/logger.js'
 import { registerCommunitiesHandlers } from './handlers/communities.handler.js'
 import { CommunitiesStorageService } from '../communities/storage/communities.storage.service.js'
@@ -85,13 +90,15 @@ export class WebsocketGateway
    * @param args Extra arguments to the connection
    */
   handleConnection(client: QuietSocket, ...args: unknown[]): void {
-    const _logger = this.logger.extend(client.id)
-    const { sockets } = this.io.sockets
+    const { id, rooms } = client
+    const { io, logger } = this
+    const _logger = logger.extend(id)
+    const { sockets: namespace } = io
+    const { sockets } = namespace
 
-    _logger.log(
-      `Client id: ${client.id} connected, Rooms: ${JSON.stringify([...client.rooms])}`,
+    _logger.debug(
+      `Client connected: ${formatSocketAttribution(client)} ${formatSocketPeer(client)} rooms=${JSON.stringify([...rooms])} connectedClients=${sockets.size}`,
     )
-    _logger.debug(`Number of connected clients: ${sockets.size}`)
 
     // register all websocket event handlers on this socket
     this._registerEventHandlers(client)
@@ -103,8 +110,15 @@ export class WebsocketGateway
    * @param client Socket connection with a new client
    */
   handleDisconnect(client: QuietSocket): void {
-    const _logger = this.logger.extend(client.id)
-    _logger.log(`Client id:${client.id} disconnected`)
+    const { id } = client
+    const { io, logger } = this
+    const _logger = logger.extend(id)
+    const { sockets: namespace } = io
+    const { sockets } = namespace
+
+    _logger.debug(
+      `Client disconnected: ${formatSocketAttribution(client)} ${formatSocketPeer(client)} connectedClients=${sockets.size}`,
+    )
   }
 
   /**
