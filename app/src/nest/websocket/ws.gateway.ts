@@ -143,6 +143,7 @@ export class WebsocketGateway
     _logger.debug(
       `Client connected: ${formatSocketAttribution(client)} ${formatSocketPeer(client)} rooms=${JSON.stringify([...rooms])} connectedClients=${sockets.size}`,
     )
+    _logger.debug(`Current connected clients: ${sockets.size}`)
 
     // register all websocket event handlers on this socket
     this._registerEventHandlers(client)
