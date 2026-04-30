@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.2-alpha.10 (2026-04-30)</small>
+
+- captcha logger naming fix ([08457f5](https://github.com/TryQuiet/quiet-storage-service/commit/08457f5))
+- Update app package CHANGELOG.md ([611807b](https://github.com/TryQuiet/quiet-storage-service/commit/611807b))
+- refactor: enhance websocket handlers with socket attribution management ([00e3f1a](https://github.com/TryQuiet/quiet-storage-service/commit/00e3f1a))
+
 ## <small>1.0.2-alpha.9 (2026-04-27)</small>
 
 - Update app package CHANGELOG.md ([57d51e4](https://github.com/TryQuiet/quiet-storage-service/commit/57d51e4))
