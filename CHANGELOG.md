@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.2-alpha.11 (2026-04-30)</small>
+
+- feat: log current connected clients in websocket connection handler ([a004f58](https://github.com/TryQuiet/quiet-storage-service/commit/a004f58))
+- add ws rate limiting ([6e53ca7](https://github.com/TryQuiet/quiet-storage-service/commit/6e53ca7))
+- Update app package CHANGELOG.md ([8ae98f7](https://github.com/TryQuiet/quiet-storage-service/commit/8ae98f7))
+
 ## <small>1.0.2-alpha.10 (2026-04-30)</small>
 
 - captcha logger naming fix ([08457f5](https://github.com/TryQuiet/quiet-storage-service/commit/08457f5))
