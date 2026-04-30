@@ -16,10 +16,10 @@ import type {
 } from './types/captcha.types.js'
 import { DateTime } from 'luxon'
 
-const baseLogger = createLogger('Websocket:Event:Communities')
+const baseLogger = createLogger('Websocket:Event:Captcha')
 
 /**
- * Adds event handlers for community-related events
+ * Adds event handlers for captcha-related events
  *
  * @param config Websocket handler config
  */
