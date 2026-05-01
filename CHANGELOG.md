@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.2-alpha.12 (2026-05-01)</small>
+
+- only reuse auth connection if it's with the same socket ([d0fccbf](https://github.com/TryQuiet/quiet-storage-service/commit/d0fccbf))
+- Update app package CHANGELOG.md ([61a0cc1](https://github.com/TryQuiet/quiet-storage-service/commit/61a0cc1))
+- update submodule pointer ([30e371f](https://github.com/TryQuiet/quiet-storage-service/commit/30e371f))
+
 ## <small>1.0.2-alpha.11 (2026-04-30)</small>
 
 - feat: log current connected clients in websocket connection handler ([a004f58](https://github.com/TryQuiet/quiet-storage-service/commit/a004f58))
