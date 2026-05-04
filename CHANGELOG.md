@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.2-alpha.13 (2026-05-04)</small>
+
+- Configure QSS to use new domain (#34) ([3132f61](https://github.com/TryQuiet/quiet-storage-service/commit/3132f61)), closes [#34](https://github.com/TryQuiet/quiet-storage-service/issues/34)
+- Update app package CHANGELOG.md ([c696bcf](https://github.com/TryQuiet/quiet-storage-service/commit/c696bcf))
+
 ## <small>1.0.2-alpha.12 (2026-05-01)</small>
 
 - only reuse auth connection if it's with the same socket ([d0fccbf](https://github.com/TryQuiet/quiet-storage-service/commit/d0fccbf))
