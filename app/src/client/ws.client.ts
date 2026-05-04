@@ -19,9 +19,10 @@ export class WebsocketClient {
 
   public async createSocket(): Promise<ClientSocket> {
     this.logger.log(`Creating client socket`)
+    const prefix = this.serverPort === 443 ? 'wss' : 'ws'
 
     this.clientSocket = connect(
-      `ws://${this.serverHostname}:${this.serverPort}`,
+      `${prefix}://${this.serverHostname}:${this.serverPort}`,
       {
         autoConnect: false,
         forceNew: true,
