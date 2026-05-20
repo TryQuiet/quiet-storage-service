@@ -6,11 +6,23 @@ import { SodiumHelper } from '../../encryption/sodium.helper.js'
 import { EncryptionModule } from '../../encryption/enc.module.js'
 import { LogEntrySyncStorageService } from './log-entry-sync.storage.service.js'
 import { DateTime } from 'luxon'
+import { MikroORM } from '@mikro-orm/postgresql'
+import { TableNames } from '../../storage/postgres/const.js'
 
 describe('LogEntrySyncStorageService', () => {
   let logSyncStorageService: LogEntrySyncStorageService | undefined = undefined
   let sodiumHelper: SodiumHelper | undefined = undefined
   let module: TestingModule | undefined = undefined
+  let orm: MikroORM | undefined = undefined
+
+  const requireStoredPosition = (
+    position: Awaited<ReturnType<LogEntrySyncStorageService['addLogEntry']>>,
+  ): { receivedAtMs: number; syncSeq: number } => {
+    if (position == null) {
+      throw new Error('Expected addLogEntry to return a stored position')
+    }
+    return position
+  }
 
   beforeEach(async () => {
     module = await Test.createTestingModule({
@@ -22,6 +34,7 @@ describe('LogEntrySyncStorageService', () => {
       LogEntrySyncStorageService,
     )
     sodiumHelper = module.get<SodiumHelper>(SodiumHelper)
+    orm = module.get<MikroORM>(MikroORM)
   })
 
   afterEach(async () => {
@@ -154,10 +167,9 @@ describe('LogEntrySyncStorageService', () => {
     const positions: Array<{ receivedAtMs: number; syncSeq: number }> = []
     for (const payload of payloads) {
       positions.push(
-        (await logSyncStorageService?.addLogEntry(payload)) as {
-          receivedAtMs: number
-          syncSeq: number
-        },
+        requireStoredPosition(
+          await logSyncStorageService?.addLogEntry(payload),
+        ),
       )
     }
 
@@ -197,10 +209,9 @@ describe('LogEntrySyncStorageService', () => {
     const positions: Array<{ receivedAtMs: number; syncSeq: number }> = []
     for (const payload of payloads) {
       positions.push(
-        (await logSyncStorageService?.addLogEntry(payload)) as {
-          receivedAtMs: number
-          syncSeq: number
-        },
+        requireStoredPosition(
+          await logSyncStorageService?.addLogEntry(payload),
+        ),
       )
     }
 
@@ -213,8 +224,7 @@ describe('LogEntrySyncStorageService', () => {
     expect(result?.[0].cid).toBe(payloads[1].cid)
   })
 
-  // COUNT is kept below the connection pool limit — each concurrent transaction holds a
-  // connection while waiting for the FOR UPDATE lock, so COUNT=10 exhausts the pool
+  // Keep the count modest so the test stresses concurrency without depending on pool sizing.
   it('assigns unique, contiguous sync sequences under concurrent writes', async () => {
     const COUNT = 10
     const payloads: LogSyncEntry[] = Array.from({ length: COUNT }, () => ({
@@ -241,6 +251,63 @@ describe('LogEntrySyncStorageService', () => {
     for (let i = 1; i < seqs.length; i++) {
       expect(seqs[i]).toBe(seqs[i - 1] + 1)
     }
+  })
+
+  it('recovers when the sync counter falls behind the highest stored sequence', async () => {
+    const payloads: LogSyncEntry[] = Array.from({ length: 3 }, (_, i) => ({
+      cid: sodiumHelper!.sodium.to_hex(
+        sodiumHelper!.sodium.randombytes_buf(32),
+      ),
+      hashedDbId: 'hashedDbId-counter-recovery',
+      entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
+      communityId: 'communityId',
+      receivedAt: DateTime.utc().plus({ seconds: i }),
+    }))
+
+    const first = await logSyncStorageService!.addLogEntry(payloads[0])
+    const second = await logSyncStorageService!.addLogEntry(payloads[1])
+
+    expect(first?.syncSeq).toBe(1)
+    expect(second?.syncSeq).toBe(2)
+
+    await orm!.em.getConnection().execute(
+      `update "${TableNames.LOG_ENTRY_SYNC_COUNTER}"
+          set "next_sync_seq" = 1
+        where "community_id" = ?`,
+      ['communityId'],
+    )
+
+    const third = await logSyncStorageService!.addLogEntry(payloads[2])
+
+    expect(third?.syncSeq).toBe(3)
+  })
+
+  it('recovers when the sync counter row is missing for existing entries', async () => {
+    const payloads: LogSyncEntry[] = Array.from({ length: 3 }, (_, i) => ({
+      cid: sodiumHelper!.sodium.to_hex(
+        sodiumHelper!.sodium.randombytes_buf(32),
+      ),
+      hashedDbId: 'hashedDbId-counter-missing',
+      entry: Buffer.from(sodiumHelper!.sodium.randombytes_buf(256)),
+      communityId: 'communityId',
+      receivedAt: DateTime.utc().plus({ seconds: i }),
+    }))
+
+    const first = await logSyncStorageService!.addLogEntry(payloads[0])
+    const second = await logSyncStorageService!.addLogEntry(payloads[1])
+
+    expect(first?.syncSeq).toBe(1)
+    expect(second?.syncSeq).toBe(2)
+
+    await orm!.em.getConnection().execute(
+      `delete from "${TableNames.LOG_ENTRY_SYNC_COUNTER}"
+        where "community_id" = ?`,
+      ['communityId'],
+    )
+
+    const third = await logSyncStorageService!.addLogEntry(payloads[2])
+
+    expect(third?.syncSeq).toBe(3)
   })
 
   it('should return no records when filtering for a community ID that has no records', async () => {
@@ -304,10 +371,9 @@ describe('LogEntrySyncStorageService', () => {
     const positions: Array<{ receivedAtMs: number; syncSeq: number }> = []
     for (const payload of payloads) {
       positions.push(
-        (await logSyncStorageService?.addLogEntry(payload)) as {
-          receivedAtMs: number
-          syncSeq: number
-        },
+        requireStoredPosition(
+          await logSyncStorageService?.addLogEntry(payload),
+        ),
       )
     }
 

@@ -9,7 +9,7 @@ import { CommunitiesModule } from '../communities/communities.module.js'
 import { HealthModule } from '../rest/health/health.module.js'
 import { AWSModule } from '../utils/aws/aws.module.js'
 import { UtilsModule } from '../utils/utils.module.js'
-import { NseAuthModule } from '../nse-auth/nse-auth.module.js'
+import { NseModule } from '../nse/nse.module.js'
 @Module({
   imports: [
     UtilsModule,
@@ -21,7 +21,7 @@ import { NseAuthModule } from '../nse-auth/nse-auth.module.js'
     StorageModule,
     HealthModule,
     AWSModule,
-    NseAuthModule,
+    NseModule,
   ],
   controllers: [],
   providers: [],

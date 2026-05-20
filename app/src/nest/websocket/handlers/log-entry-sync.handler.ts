@@ -2,7 +2,11 @@
  * Communities data sync websocket event handlers
  */
 
-import { WebsocketEvents } from '../ws.types.js'
+import {
+  formatSocketAttribution,
+  setSocketAttribution,
+  WebsocketEvents,
+} from '../ws.types.js'
 import { DateTime } from 'luxon'
 import { createLogger } from '../../app/logger/logger.js'
 import {
@@ -46,10 +50,23 @@ export function registerLogEntrySyncHandlers(
   ): Promise<void> {
     _logger.debug(`Handling community log entry sync message`)
     try {
+      const { payload } = message
+      const { teamId } = payload
+      if (
+        setSocketAttribution(config.socket, {
+          teamId,
+          source: WebsocketEvents.LogEntrySync,
+        })
+      ) {
+        _logger.debug(
+          `Socket attribution updated: ${formatSocketAttribution(config.socket)}`,
+        )
+      }
+
       // Check that the user has authenticated on this community and then write to the DB
       const storedPosition =
         await config.syncManager.processIncomingLogEntrySyncMessage(
-          message.payload,
+          payload,
           config.socket,
         )
 
@@ -60,7 +77,7 @@ export function registerLogEntrySyncHandlers(
       const fanoutMessage: LogEntrySyncMessage = {
         ...message,
         payload: {
-          ...message.payload,
+          ...payload,
           receivedAt: storedPosition.receivedAt,
           syncSeq: storedPosition.syncSeq,
         },
@@ -68,7 +85,7 @@ export function registerLogEntrySyncHandlers(
 
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions -- testing
       config.socketServer
-        .to(message.payload.teamId)
+        .to(teamId)
         .except(config.socket.id)
         .emit(WebsocketEvents.LogEntrySync, fanoutMessage)
 
@@ -78,11 +95,11 @@ export function registerLogEntrySyncHandlers(
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.SUCCESS,
         payload: {
-          hash: message.payload.hash,
-          hashedDbId: message.payload.hashedDbId,
+          hash: payload.hash,
+          hashedDbId: payload.hashedDbId,
           receivedAt: storedPosition.receivedAt,
           syncSeq: storedPosition.syncSeq,
-          teamId: message.payload.teamId,
+          teamId,
         },
       }
       callback(response)
@@ -118,8 +135,22 @@ export function registerLogEntrySyncHandlers(
   ): Promise<void> {
     _logger.debug(`Handling community log entry pull message`)
     try {
+      const { payload } = message
+      const { teamId, userId } = payload
+      if (
+        setSocketAttribution(config.socket, {
+          teamId,
+          userId,
+          source: WebsocketEvents.LogEntryPull,
+        })
+      ) {
+        _logger.debug(
+          `Socket attribution updated: ${formatSocketAttribution(config.socket)}`,
+        )
+      }
+
       const result = await config.syncManager.getPaginatedLogEntries(
-        message.payload,
+        payload,
         config.socket,
       )
       const responsePayload = {

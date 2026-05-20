@@ -14,11 +14,30 @@ import {
   CLOUDWATCH_LOG_STREAM_BASE_NAME,
   DEFAULT_LOG_LEVEL,
 } from './const.js'
+import fs from 'fs'
 import path from 'path'
 // @ts-expect-error no types for this package
 import CloudWatchTransport from 'winston-aws-cloudwatch'
 import { Environment } from '../../utils/config/types.js'
 import _ from 'lodash'
+
+const DEFAULT_LOG_MAX_SIZE = '20m'
+const DEFAULT_LOG_MAX_FILES = '14d'
+// CloudWatch PutLogEvents rejects events >1 MiB. Cap well under that to leave
+// room for the 26-byte per-event overhead AWS adds and any UTF-8 expansion.
+const CLOUDWATCH_MAX_EVENT_BYTES = 500_000
+const CLOUDWATCH_TRUNCATION_SUFFIX = '…[truncated]'
+
+const truncateUtf8 = (value: string, maxBytes: number): string => {
+  const buf = Buffer.from(value, 'utf8')
+  if (buf.byteLength <= maxBytes) return value
+  const suffixBytes = Buffer.byteLength(CLOUDWATCH_TRUNCATION_SUFFIX, 'utf8')
+  const sliceEnd = Math.max(0, maxBytes - suffixBytes)
+  // toString may split a multibyte char; that's fine — we just append the marker.
+  return (
+    buf.subarray(0, sliceEnd).toString('utf8') + CLOUDWATCH_TRUNCATION_SUFFIX
+  )
+}
 
 export const createWinstonLogger = (
   context?: string,
@@ -35,9 +54,10 @@ export const createWinstonLogger = (
 }
 
 export class QuietWinstonNestLogger extends ConsoleLogger {
-  private readonly winstonLogger: Logger
+  private static sharedWinstonLogger: Logger | undefined = undefined
+
+  private winstonLogger: Logger
   public readonly context?: string
-  private readonly logDir: string
 
   constructor(context?: string, options?: ConsoleLoggerOptions) {
     context != null
@@ -46,42 +66,75 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
         : super(context)
       : super()
     this.context = context
-    this.logDir = ConfigService.getString(EnvVars.LOG_DIR, 'logs/')!
-    this.winstonLogger = this.initWinston()
+    this.winstonLogger = QuietWinstonNestLogger.getOrCreateWinstonLogger(
+      this.options.logLevels ?? [DEFAULT_LOG_LEVEL],
+    )
   }
 
-  private initWinston(): Logger {
+  private static getOrCreateWinstonLogger(logLevels: LogLevel[]): Logger {
+    QuietWinstonNestLogger.sharedWinstonLogger ??=
+      QuietWinstonNestLogger.initWinston(logLevels)
+    return QuietWinstonNestLogger.sharedWinstonLogger
+  }
+
+  public static resetSharedLoggerForTests(): void {
+    QuietWinstonNestLogger.sharedWinstonLogger?.close()
+    QuietWinstonNestLogger.sharedWinstonLogger = undefined
+  }
+
+  private static initWinston(logLevels: LogLevel[]): Logger {
+    const logDir = ConfigService.getString(EnvVars.LOG_DIR, 'logs/')!
+    fs.mkdirSync(logDir, { recursive: true })
+    const logMaxSize = ConfigService.getString(
+      EnvVars.LOG_MAX_SIZE,
+      DEFAULT_LOG_MAX_SIZE,
+    )!
+    const logMaxFiles = ConfigService.getString(
+      EnvVars.LOG_MAX_FILES,
+      DEFAULT_LOG_MAX_FILES,
+    )!
     const ourTransports: winston.transport[] = [
-      new transports.DailyRotateFile({
-        // %DATE will be replaced by the current date
-        filename: path.join(this.logDir, `error_%DATE%.log`),
-        level: 'error',
-        format: format.combine(format.timestamp(), format.json()),
-        datePattern: 'YYYY-MM-DD',
-        zippedArchive: false, // don't want to zip our logs
-        maxFiles: '30d', // will keep log until they are older than 30 days
-      }),
+      QuietWinstonNestLogger.withTransportErrorHandler(
+        new transports.DailyRotateFile({
+          // %DATE will be replaced by the current date
+          filename: path.join(logDir, `error_%DATE%.log`),
+          level: 'error',
+          format: format.combine(format.timestamp(), format.json()),
+          datePattern: 'YYYY-MM-DD',
+          zippedArchive: false, // don't want to zip our logs
+          maxSize: logMaxSize,
+          maxFiles: logMaxFiles,
+        }),
+        'daily-error-file',
+      ),
       // same for all levels
-      new transports.DailyRotateFile({
-        filename: path.join(this.logDir, `log_%DATE%.log`),
-        format: format.combine(format.timestamp(), format.json()),
-        datePattern: 'YYYY-MM-DD',
-        zippedArchive: false,
-        maxFiles: '30d',
-      }),
-      new transports.Console({
-        format: format.combine(
-          format.cli({ all: true }),
-          format.splat(),
-          format.timestamp(),
-          format.errors(),
-          format.printf(
-            info =>
-              // eslint-disable-next-line @typescript-eslint/restrict-template-expressions, @typescript-eslint/no-unsafe-return -- from example
-              `${colors.whiteBright.bold(info.timestamp as string).trim()} ${colors.magenta(info.context as string).trim()} ${colors.italic(info.level).trim()}: ${colors.bold(info.message as string).trim()} ${(info.params as any[]).map(param => param).join(' ')}`,
+      QuietWinstonNestLogger.withTransportErrorHandler(
+        new transports.DailyRotateFile({
+          filename: path.join(logDir, `log_%DATE%.log`),
+          format: format.combine(format.timestamp(), format.json()),
+          datePattern: 'YYYY-MM-DD',
+          zippedArchive: false,
+          maxSize: logMaxSize,
+          maxFiles: logMaxFiles,
+        }),
+        'daily-file',
+      ),
+      QuietWinstonNestLogger.withTransportErrorHandler(
+        new transports.Console({
+          format: format.combine(
+            format.cli({ all: true }),
+            format.splat(),
+            format.timestamp(),
+            format.errors(),
+            format.printf(
+              info =>
+                // eslint-disable-next-line @typescript-eslint/restrict-template-expressions, @typescript-eslint/no-unsafe-return -- from example
+                `${colors.whiteBright.bold(info.timestamp as string).trim()} ${colors.magenta(info.context as string).trim()} ${colors.italic(info.level).trim()}: ${colors.bold(info.message as string).trim()} ${((info.params as any[] | undefined) ?? []).map(param => param).join(' ')}`,
+            ),
           ),
-        ),
-      }),
+        }),
+        'console',
+      ),
     ]
 
     if (
@@ -89,37 +142,72 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
       false
     ) {
       ourTransports.push(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is typing nonsense
-        new CloudWatchTransport({
-          logGroupName: CLOUDWATCH_LOG_GROUP,
-          logStreamName: `${CLOUDWATCH_LOG_STREAM_BASE_NAME}-${ConfigService.getEnv() === Environment.Production ? 'prod' : 'dev'}`,
-          createLogGroup: true,
-          createLogStream: true,
-          submissionInterval: 2000,
-          submissionRetryCount: 1,
-          batchSize: 20,
-          awsConfig: {
-            accessKeyId: ConfigService.getString(EnvVars.AWS_ACCESS_KEY_ID),
-            secretAccessKey: ConfigService.getString(EnvVars.AWS_SECRET_KEY),
-            region: ConfigService.getString(EnvVars.AWS_REGION),
-          },
-          formatLog: (item: { level: any; message: any; meta: unknown }) =>
-            `${item.level}: [${this.context}] ${item.message} ${JSON.stringify(item.meta)}`,
-        }) as winston.transport,
+        QuietWinstonNestLogger.withTransportErrorHandler(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is typing nonsense
+          new CloudWatchTransport({
+            logGroupName: CLOUDWATCH_LOG_GROUP,
+            logStreamName: `${CLOUDWATCH_LOG_STREAM_BASE_NAME}-${ConfigService.getEnv() === Environment.Production ? 'prod' : 'dev'}`,
+            createLogGroup: true,
+            createLogStream: true,
+            submissionInterval: 2000,
+            submissionRetryCount: 1,
+            batchSize: 20,
+            awsConfig: {
+              accessKeyId: ConfigService.getString(EnvVars.AWS_ACCESS_KEY_ID),
+              secretAccessKey: ConfigService.getString(EnvVars.AWS_SECRET_KEY),
+              region: ConfigService.getString(EnvVars.AWS_REGION),
+            },
+            formatLog: (item: { level: any; message: any; meta: unknown }) => {
+              const meta = item.meta as { context?: string }
+              const formatted = `${item.level}: [${meta.context ?? ''}] ${item.message} ${QuietWinstonNestLogger.stringifyMeta(item.meta)}`
+              return truncateUtf8(formatted, CLOUDWATCH_MAX_EVENT_BYTES)
+            },
+          }) as winston.transport,
+          'cloudwatch',
+        ),
       )
     }
 
     const logger = winston.createLogger({
-      defaultMeta: {
-        context: this.context,
-      },
-      level: QuietWinstonNestLogger._nestToWinstonLogLevel(
-        this.options.logLevels ?? [DEFAULT_LOG_LEVEL],
-      ),
+      level: QuietWinstonNestLogger._nestToWinstonLogLevel(logLevels),
       levels: winston.config.cli.levels,
       transports: ourTransports,
     })
     return logger
+  }
+
+  private static withTransportErrorHandler<T extends winston.transport>(
+    transport: T,
+    name: string,
+  ): T {
+    transport.on('error', (error: unknown) => {
+      const formattedError =
+        error instanceof Error
+          ? (error.stack ?? `${error.name}: ${error.message}`)
+          : String(error)
+      process.stderr.write(
+        `[QSS logger] ${name} transport error: ${formattedError}\n`,
+      )
+    })
+    return transport
+  }
+
+  private static stringifyMeta(meta: unknown): string {
+    try {
+      return JSON.stringify(meta)
+    } catch (e) {
+      return '[unserializable-meta]'
+    }
+  }
+
+  private getActiveWinstonLogger(): Logger {
+    if (this.winstonLogger.transports.length === 0) {
+      this.winstonLogger = QuietWinstonNestLogger.getOrCreateWinstonLogger(
+        this.options.logLevels ?? [DEFAULT_LOG_LEVEL],
+      )
+    }
+
+    return this.winstonLogger
   }
 
   public extend(context: string): QuietWinstonNestLogger {
@@ -131,7 +219,8 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
   public log(message: unknown, context?: string): void
   public log(message: unknown, ...rest: [...any, string?]): void
   public log(message: unknown, ...rest: unknown[]): void {
-    this.winstonLogger.info(message as string, {
+    this.getActiveWinstonLogger().info(message as string, {
+      context: this.context,
       params: this._parseParams(rest),
     })
   }
@@ -139,7 +228,8 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
   public info(message: unknown, context?: string): void
   public info(message: unknown, ...rest: [...any, string?]): void
   public info(message: unknown, ...rest: unknown[]): void {
-    this.winstonLogger.info(message as string, {
+    this.getActiveWinstonLogger().info(message as string, {
+      context: this.context,
       params: this._parseParams(rest),
     })
   }
@@ -147,7 +237,8 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
   public warn(message: unknown, context?: string): void
   public warn(message: unknown, ...rest: [...any, string?]): void
   public warn(message: unknown, ...rest: unknown[]): void {
-    this.winstonLogger.warn(message as string, {
+    this.getActiveWinstonLogger().warn(message as string, {
+      context: this.context,
       params: this._parseParams(rest),
     })
   }
@@ -155,7 +246,8 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
   public debug(message: unknown, context?: string): void
   public debug(message: unknown, ...rest: [...any, string?]): void
   public debug(message: unknown, ...rest: unknown[]): void {
-    this.winstonLogger.debug(message as string, {
+    this.getActiveWinstonLogger().debug(message as string, {
+      context: this.context,
       params: this._parseParams(rest),
     })
   }
@@ -163,7 +255,8 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
   public verbose(message: unknown, context?: string): void
   public verbose(message: unknown, ...rest: [...any, string?]): void
   public verbose(message: unknown, ...rest: unknown[]): void {
-    this.winstonLogger.verbose(message as string, {
+    this.getActiveWinstonLogger().verbose(message as string, {
+      context: this.context,
       params: this._parseParams(rest),
     })
   }
@@ -180,7 +273,8 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
       message = this._formatError(message, 'error')
     }
 
-    this.winstonLogger.error(message as string, {
+    this.getActiveWinstonLogger().error(message as string, {
+      context: this.context,
       params: this._parseParams(rest),
     })
   }
@@ -192,7 +286,8 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
       message = this._formatError(message, 'fatal')
     }
 
-    this.winstonLogger.error(message as string, {
+    this.getActiveWinstonLogger().error(message as string, {
+      context: this.context,
       params: this._parseParams(rest),
     })
   }
