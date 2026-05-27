@@ -1,5 +1,6 @@
 # local only env
 .env
+/app/.env.local.docker.private
 
 # compiled output
 /dist

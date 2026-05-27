@@ -110,6 +110,18 @@
       "schema": "public",
       "indexes": [
         {
+          "keyName": "entries_by_receivedAt_idx",
+          "columnNames": [
+            "community_id",
+            "received_at",
+            "hashed_db_id"
+          ],
+          "composite": true,
+          "constraint": false,
+          "primary": false,
+          "unique": false
+        },
+        {
           "keyName": "log_entry_sync_pkey",
           "columnNames": [
             "id"

@@ -47,21 +47,30 @@ export function registerLogEntrySyncHandlers(
     _logger.debug(`Handling community log entry sync message`)
     try {
       // Check that the user has authenticated on this community and then write to the DB
-      const success =
+      const storedPosition =
         await config.syncManager.processIncomingLogEntrySyncMessage(
           message.payload,
           config.socket,
         )
 
-      if (!success) {
+      if (storedPosition == null) {
         throw new Error('Failed to write log entry sync message to the DB')
+      }
+
+      const fanoutMessage: LogEntrySyncMessage = {
+        ...message,
+        payload: {
+          ...message.payload,
+          receivedAt: storedPosition.receivedAt,
+          syncSeq: storedPosition.syncSeq,
+        },
       }
 
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions -- testing
       config.socketServer
         .to(message.payload.teamId)
         .except(config.socket.id)
-        .emit(WebsocketEvents.LogEntrySync, message)
+        .emit(WebsocketEvents.LogEntrySync, fanoutMessage)
 
       // form and return a success response to the user
       let response: LogEntrySyncResponseMessage | undefined = undefined
@@ -71,6 +80,8 @@ export function registerLogEntrySyncHandlers(
         payload: {
           hash: message.payload.hash,
           hashedDbId: message.payload.hashedDbId,
+          receivedAt: storedPosition.receivedAt,
+          syncSeq: storedPosition.syncSeq,
           teamId: message.payload.teamId,
         },
       }
@@ -111,11 +122,14 @@ export function registerLogEntrySyncHandlers(
         message.payload,
         config.socket,
       )
+      const responsePayload = {
+        ...result,
+      } satisfies LogEntryPullResponseMessage['payload']
 
       const response: LogEntryPullResponseMessage = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.SUCCESS,
-        payload: { ...result },
+        payload: responsePayload,
       }
       callback(response)
     } catch (e) {

@@ -43,12 +43,24 @@ export const registerDevice = async (
     },
   })
 
+  const platformRaw = await input({
+    message: 'Enter the platform (ios/android):',
+    default: 'ios',
+    validate: (value: string | undefined) => {
+      if (value !== 'ios' && value !== 'android') {
+        return 'Platform must be ios or android'
+      }
+      return true
+    },
+  })
+  const platform = platformRaw as 'ios' | 'android'
+
   const result = await promiseWithSpinner(
     async () => {
       const message: RegisterDeviceMessage = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.SENDING,
-        payload: { deviceToken, bundleId },
+        payload: { deviceToken, bundleId, platform },
       }
 
       const response = await client.sendMessage<RegisterDeviceResponse>(

@@ -1,10 +1,18 @@
-import { Entity, Property } from '@mikro-orm/core'
+import { Entity, Index, Property } from '@mikro-orm/core'
 import { TableNames } from '../../../storage/postgres/const.js'
 import { BasicEntityWithId } from '../../../storage/postgres/basic-id.entity.js'
 
 // https://docs.google.com/document/d/1yBrcXCkiHkSTQ1Nd3yLFo9H9S_yvmq_p86xaH2lQa84/edit?tab=t.0#heading=h.34r38ks7imul
 // NOTE: id field corresponds to encrypted cid of entry as a hex string
 @Entity({ tableName: TableNames.LOG_ENTRY_SYNC })
+@Index({
+  name: 'entries_by_receivedAt_idx',
+  properties: ['communityId', 'receivedAt', 'hashedDbId'],
+})
+@Index({
+  name: 'entries_by_syncSeq_idx',
+  properties: ['communityId', 'syncSeq'],
+})
 export class LogEntrySync extends BasicEntityWithId {
   @Property({
     type: 'string',
@@ -26,6 +34,13 @@ export class LogEntrySync extends BasicEntityWithId {
 
   @Property({ type: 'timestamptz', fieldName: 'received_at' })
   receivedAt!: string // set when the message is originally recieved on the websocket
+
+  @Property({
+    fieldName: 'sync_seq',
+    type: 'bigint',
+    runtimeType: 'number',
+  })
+  syncSeq!: number
 
   @Property({ type: 'timestamptz', fieldName: 'created_at' })
   createdAt!: string // datetime when the record was added to the DB

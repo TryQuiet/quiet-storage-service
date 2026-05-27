@@ -26,6 +26,7 @@ export interface PushCapability {
  */
 export interface UcanFacts {
   bundleId: string
+  platform: 'ios' | 'android'
 }
 
 /**
@@ -35,6 +36,7 @@ export interface UcanValidationResult {
   valid: boolean
   deviceToken?: string
   bundleId?: string
+  platform?: 'ios' | 'android'
   error?: string
 }
 

@@ -76,7 +76,11 @@ describe('QPS WebSocket Handlers', () => {
         {
           ts: Date.now(),
           status: '',
-          payload: { deviceToken: 'fcm-token', bundleId: 'com.test.app' },
+          payload: {
+            deviceToken: 'fcm-token',
+            bundleId: 'com.test.app',
+            platform: 'android',
+          },
         },
         callback,
       )
@@ -85,6 +89,7 @@ describe('QPS WebSocket Handlers', () => {
       expect(mockQpsService.registerDevice).toHaveBeenCalledWith(
         'fcm-token',
         'com.test.app',
+        'android',
       )
       expect(callback).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -106,7 +111,11 @@ describe('QPS WebSocket Handlers', () => {
         {
           ts: Date.now(),
           status: '',
-          payload: { deviceToken: 'fcm-token', bundleId: 'com.test.app' },
+          payload: {
+            deviceToken: 'fcm-token',
+            bundleId: 'com.test.app',
+            platform: 'android',
+          },
         },
         callback,
       )
@@ -130,7 +139,11 @@ describe('QPS WebSocket Handlers', () => {
         {
           ts: Date.now(),
           status: '',
-          payload: { deviceToken: 'fcm-token', bundleId: 'com.test.app' },
+          payload: {
+            deviceToken: 'fcm-token',
+            bundleId: 'com.test.app',
+            platform: 'android',
+          },
         },
         callback,
       )
