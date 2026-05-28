@@ -2,7 +2,11 @@
  * Communities websocket event handlers
  */
 
-import { WebsocketEvents } from '../ws.types.js'
+import {
+  formatSocketAttribution,
+  setSocketAttribution,
+  WebsocketEvents,
+} from '../ws.types.js'
 import { DateTime } from 'luxon'
 import { createLogger } from '../../app/logger/logger.js'
 import {
@@ -69,16 +73,31 @@ export function registerCommunitiesHandlers(
         callback(errorResponse)
         return
       }
+      const { payload } = message
+      const { community, teamKeyring, userId } = payload
+      const { teamId } = community
+      if (
+        setSocketAttribution(config.socket, {
+          teamId,
+          userId,
+          source: WebsocketEvents.CreateCommunity,
+        })
+      ) {
+        _logger.debug(
+          `Socket attribution updated: ${formatSocketAttribution(config.socket)}`,
+        )
+      }
+
       // Create the community and start syncing the sigchain with this user
       await config.communitiesManager.create(
-        message.payload.userId,
-        message.payload.community,
-        message.payload.teamKeyring,
+        userId,
+        community,
+        teamKeyring,
         config.socket,
       )
       config.socket.data.usedCaptchaForCreateCommunity = true
 
-      await config.socket.join(message.payload.community.teamId)
+      await config.socket.join(teamId)
 
       // form and return a success response to the user
       let response: CreateCommunityResponse | undefined = undefined
@@ -113,7 +132,20 @@ export function registerCommunitiesHandlers(
       if (message.payload == null) {
         throw new Error(`Payload was nullish!`)
       }
-      const { teamId, userId } = message.payload
+      const { payload } = message
+      const { teamId, userId } = payload
+      if (
+        setSocketAttribution(config.socket, {
+          teamId,
+          userId,
+          source: WebsocketEvents.SignInCommunity,
+        })
+      ) {
+        _logger.debug(
+          `Socket attribution updated: ${formatSocketAttribution(config.socket)}`,
+        )
+      }
+
       // get the community and return an error response if not found
       if ((await config.communitiesManager.get(teamId)) == null) {
         _logger.warn(
@@ -146,7 +178,8 @@ export function registerCommunitiesHandlers(
         e instanceof AuthenticationError ||
         e instanceof CommunityNotFoundError
       ) {
-        reason = e.message
+        const { message: errorMessage } = e
+        reason = errorMessage
       }
       const errorResponse: CommunitySignInMessage = {
         ts: DateTime.utc().toMillis(),
@@ -172,10 +205,21 @@ export function registerCommunitiesHandlers(
     }
 
     try {
+      const { payload } = message
+      const { id: teamId } = payload
+      if (
+        setSocketAttribution(config.socket, {
+          teamId,
+          source: WebsocketEvents.GetCommunity,
+        })
+      ) {
+        _logger.debug(
+          `Socket attribution updated: ${formatSocketAttribution(config.socket)}`,
+        )
+      }
+
       // get the community and return a success or error response based on result
-      const managedCommunity = await config.communitiesManager.get(
-        message.payload.id,
-      )
+      const managedCommunity = await config.communitiesManager.get(teamId)
       let response: GetCommunityResponse | undefined = undefined
       if (managedCommunity == null) {
         response = {
@@ -201,7 +245,8 @@ export function registerCommunitiesHandlers(
         e instanceof AuthenticationError ||
         e instanceof CommunityNotFoundError
       ) {
-        reason = e.message
+        const { message: errorMessage } = e
+        reason = errorMessage
       }
       const errorResponse: GetCommunityResponse = {
         ts: DateTime.utc().toMillis(),

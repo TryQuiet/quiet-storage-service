@@ -1,4 +1,4 @@
-import { Entity, Index, Property } from '@mikro-orm/core'
+import { Entity, Index, Property, Unique } from '@mikro-orm/core'
 import { TableNames } from '../../../storage/postgres/const.js'
 import { BasicEntityWithId } from '../../../storage/postgres/basic-id.entity.js'
 
@@ -9,7 +9,7 @@ import { BasicEntityWithId } from '../../../storage/postgres/basic-id.entity.js'
   name: 'entries_by_receivedAt_idx',
   properties: ['communityId', 'receivedAt', 'hashedDbId'],
 })
-@Index({
+@Unique({
   name: 'entries_by_syncSeq_idx',
   properties: ['communityId', 'syncSeq'],
 })

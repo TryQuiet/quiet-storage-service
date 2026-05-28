@@ -3,7 +3,6 @@ import { Test, type TestingModule } from '@nestjs/testing'
 import { UnauthorizedException } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { NseAuthService } from './nse-auth.service.js'
-import { LogEntrySyncStorageService } from '../communities/storage/log-entry-sync.storage.service.js'
 import { CommunitiesManagerService } from '../communities/communities-manager.service.js'
 import { signatures } from '@localfirst/crypto'
 
@@ -15,23 +14,11 @@ describe('NseAuthService', () => {
   let module: TestingModule | undefined
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- assigned in beforeEach
   let service!: NseAuthService
-  let mockLogEntrySyncStorage: jest.Mocked<
-    Pick<
-      LogEntrySyncStorageService,
-      'getLogEntriesForCommunity' | 'resolveSyncSeqForTimestamp'
-    >
-  >
   let mockCommunitiesManager: jest.Mocked<
     Pick<CommunitiesManagerService, 'get'>
   >
 
   beforeEach(async () => {
-    mockLogEntrySyncStorage = {
-      getLogEntriesForCommunity:
-        jest.fn<LogEntrySyncStorageService['getLogEntriesForCommunity']>(),
-      resolveSyncSeqForTimestamp:
-        jest.fn<LogEntrySyncStorageService['resolveSyncSeqForTimestamp']>(),
-    }
     mockCommunitiesManager = {
       get: jest.fn<CommunitiesManagerService['get']>(),
     }
@@ -45,10 +32,6 @@ describe('NseAuthService', () => {
       ],
       providers: [
         NseAuthService,
-        {
-          provide: LogEntrySyncStorageService,
-          useValue: mockLogEntrySyncStorage,
-        },
         {
           provide: CommunitiesManagerService,
           useValue: mockCommunitiesManager,
@@ -235,59 +218,6 @@ describe('NseAuthService', () => {
       await expect(
         service.verifyAndIssueToken(challengeId, DEVICE_ID, PROOF),
       ).rejects.toThrow(UnauthorizedException)
-    })
-  })
-
-  describe('getLogEntriesAfterSeq', () => {
-    it('returns [] when storage returns null', async () => {
-      mockLogEntrySyncStorage.getLogEntriesForCommunity.mockResolvedValue(null)
-
-      const result = await service.getLogEntriesAfterSeq(TEAM_ID, 0)
-
-      expect(result).toEqual({ entries: [], resolvedAfterSeq: 0 })
-    })
-
-    it('returns [] when storage returns undefined', async () => {
-      mockLogEntrySyncStorage.getLogEntriesForCommunity.mockResolvedValue(
-        undefined,
-      )
-
-      const result = await service.getLogEntriesAfterSeq(TEAM_ID, 0)
-
-      expect(result).toEqual({ entries: [], resolvedAfterSeq: 0 })
-    })
-
-    it('delegates to storage with afterSeq when provided', async () => {
-      mockLogEntrySyncStorage.getLogEntriesForCommunity.mockResolvedValue([])
-
-      await service.getLogEntriesAfterSeq(TEAM_ID, 42)
-
-      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock; method ref is safe
-      expect(
-        mockLogEntrySyncStorage.getLogEntriesForCommunity,
-      ).toHaveBeenCalledWith(TEAM_ID, 42)
-      expect(
-        mockLogEntrySyncStorage.resolveSyncSeqForTimestamp,
-      ).not.toHaveBeenCalled()
-    })
-
-    it('resolves a legacy timestamp to syncSeq when afterSeq is absent', async () => {
-      mockLogEntrySyncStorage.resolveSyncSeqForTimestamp.mockResolvedValue(17)
-      mockLogEntrySyncStorage.getLogEntriesForCommunity.mockResolvedValue([])
-
-      const result = await service.getLogEntriesAfterSeq(
-        TEAM_ID,
-        undefined,
-        1700000000000,
-      )
-
-      expect(
-        mockLogEntrySyncStorage.resolveSyncSeqForTimestamp,
-      ).toHaveBeenCalledWith(TEAM_ID, 1700000000000)
-      expect(
-        mockLogEntrySyncStorage.getLogEntriesForCommunity,
-      ).toHaveBeenCalledWith(TEAM_ID, 17)
-      expect(result).toEqual({ entries: [], resolvedAfterSeq: 17 })
     })
   })
 })

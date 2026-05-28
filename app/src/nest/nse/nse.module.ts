@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
-import { NseAuthController } from './nse-auth.controller.js'
+import { NseAuthController } from './nse.controller.js'
 import { NseAuthService } from './nse-auth.service.js'
 import { NseJwtAuthGuard } from './nse-jwt-auth.guard.js'
 import { CommunitiesModule } from '../communities/communities.module.js'
@@ -19,4 +19,4 @@ import { NseJwtOptionsService } from './nse-jwt-options.service.js'
   controllers: [NseAuthController],
   providers: [NseAuthService, NseJwtAuthGuard],
 })
-export class NseAuthModule {}
+export class NseModule {}

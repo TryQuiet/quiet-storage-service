@@ -16,6 +16,8 @@ import { WebsocketEvents } from '../../websocket/ws.types.js'
 import { createLogger } from '../../app/logger/logger.js'
 import { DateTime } from 'luxon'
 import * as uint8arrays from 'uint8arrays'
+import { ConfigService } from '../../utils/config/config.service.js'
+import { Environment } from '../../utils/config/types.js'
 import {
   type AuthSyncMessage,
   CommunityOperationStatus,
@@ -24,6 +26,11 @@ import type { QuietLogger } from '../../app/logger/types.js'
 import { type AuthConnectionConfig, AuthStatus } from './types.js'
 import EventEmitter from 'events'
 import { type AuthDisconnectedPayload, AuthEvents } from './auth.events.js'
+
+// Warn when an auth-sync payload approaches socket.io's per-message buffer cap.
+// Default cap is 1 MiB; we run with 8 MiB plus deflate, but anything ≥512 KiB
+// is worth flagging so we notice graph growth before it bites.
+const AUTH_SYNC_LARGE_MESSAGE_BYTES = 512 * 1024
 
 export class AuthConnection extends EventEmitter {
   /**
@@ -82,6 +89,11 @@ export class AuthConnection extends EventEmitter {
     this.lfaConnection = new LFAConnection({
       context: this.userContext,
       sendMessage: (message: Uint8Array) => {
+        if (message.byteLength >= AUTH_SYNC_LARGE_MESSAGE_BYTES) {
+          this.logger.warn(
+            `Outbound auth-sync message is large: ${message.byteLength} bytes (user=${user.userId}, team=${this.sigChain.team.id})`,
+          )
+        }
         const socketMessage: AuthSyncMessage = {
           ts: DateTime.utc().toMillis(),
           status: CommunityOperationStatus.SUCCESS,
@@ -93,7 +105,9 @@ export class AuthConnection extends EventEmitter {
         }
         this.config.socket.emit(WebsocketEvents.AuthSync, socketMessage)
       },
-      createLogger: this.createLfaLogger,
+      ...(ConfigService.getEnv() !== Environment.Production && {
+        createLogger: this.createLfaLogger,
+      }),
     })
   }
 

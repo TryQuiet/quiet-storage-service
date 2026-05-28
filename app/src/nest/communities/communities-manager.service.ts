@@ -36,7 +36,7 @@ import { HOSTNAME, SERIALIZER } from '../app/const.js'
 import { SigChain } from './auth/sigchain.js'
 import { AuthConnection } from './auth/auth.connection.js'
 import { NativeServerWebsocketEvents } from '../websocket/ws.types.js'
-import { AuthConnectionConfig } from './auth/types.js'
+import { AuthConnectionConfig, AuthStatus } from './auth/types.js'
 import { Socket } from 'socket.io'
 import { AuthDisconnectedPayload, AuthEvents } from './auth/auth.events.js'
 import { DateTime } from 'luxon'
@@ -237,14 +237,26 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       throw new CommunityNotFoundError(teamId)
     }
 
-    // return an existing auth connection, if found
+    // return an existing auth connection, if found and still valid for this socket
     const authConnections: AuthConnectionMap =
       managedCommunity.authConnections ?? (new Map() as AuthConnectionMap)
-    if (authConnections.get(userId) != null) {
+    const existingConn = authConnections.get(userId)
+    if (existingConn != null) {
+      if (
+        existingConn.socketId === config.socket.id &&
+        existingConn.status !== AuthStatus.REJECTED_OR_CLOSED
+      ) {
+        this.logger.debug(
+          'Already had an active auth connection for this user on the same socket, reusing...',
+        )
+        return
+      }
+      // Stale connection: belongs to a previous socket or is dead. Stop it before creating a new one.
       this.logger.debug(
-        'Already had an auth connection for this user, reusing...',
+        `Replacing stale auth connection for user ${userId} (oldSocket=${existingConn.socketId}, newSocket=${config.socket.id}, status=${existingConn.status})`,
       )
-      return
+      existingConn.stop()
+      authConnections.delete(userId)
     }
 
     // create and start a new LFA auth sync connection with this user
@@ -296,7 +308,6 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         ...this.communities.get(teamId)!,
         expiryMs: undefined,
       })
-      this.logger.verbose(this.communities.get(teamId))
     }
   }
 

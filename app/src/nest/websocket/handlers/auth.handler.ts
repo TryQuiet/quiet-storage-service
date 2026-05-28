@@ -2,7 +2,11 @@
  * Auth websocket event handlers
  */
 
-import { WebsocketEvents } from '../ws.types.js'
+import {
+  formatSocketAttribution,
+  setSocketAttribution,
+  WebsocketEvents,
+} from '../ws.types.js'
 import { DateTime } from 'luxon'
 import { createLogger } from '../../app/logger/logger.js'
 import {
@@ -18,6 +22,10 @@ import { AllowedServerKeyState } from '../../communities/types.js'
 import { CaptchaErrorMessages } from './types/captcha.types.js'
 
 const baseLogger = createLogger('Websocket:Event:Communities:Auth')
+
+// Mirrors AUTH_SYNC_LARGE_MESSAGE_BYTES on the send side. Flag any inbound
+// auth-sync payload large enough to be worth investigating.
+const AUTH_SYNC_LARGE_PAYLOAD_BYTES = 512 * 1024
 
 /**
  * Adds event handlers for auth-related events
@@ -44,6 +52,18 @@ export function registerCommunitiesAuthHandlers(
       if (message.payload == null) {
         throw new Error('Payload missing from generate public keys message')
       }
+      const { payload } = message
+      const { teamId } = payload
+      if (
+        setSocketAttribution(config.socket, {
+          teamId,
+          source: WebsocketEvents.GeneratePublicKeys,
+        })
+      ) {
+        _logger.info(
+          `Socket attribution updated: ${formatSocketAttribution(config.socket)}`,
+        )
+      }
 
       if (config.socket.data.verifiedCaptcha !== true) {
         _logger.warn(
@@ -68,7 +88,7 @@ export function registerCommunitiesAuthHandlers(
       }
       // generate the keys for this community and return to the user
       const keysetWithSecrets = await config.communitiesManager.getServerKeys(
-        message.payload.teamId,
+        teamId,
         AllowedServerKeyState.NOT_STORED,
       )
       config.socket.data.usedCaptchaForKeys = true
@@ -77,7 +97,7 @@ export function registerCommunitiesAuthHandlers(
         status: CommunityOperationStatus.SUCCESS,
         payload: {
           keys: redactKeys(keysetWithSecrets) as Keyset,
-          teamId: message.payload.teamId,
+          teamId,
         },
       }
       callback(response)
@@ -100,29 +120,41 @@ export function registerCommunitiesAuthHandlers(
   async function handleAuthSync(message: AuthSyncMessage): Promise<void> {
     let authConnection: AuthConnection | undefined = undefined
     try {
-      if (message.payload == null) {
-        throw new Error(`Payload was nullish during auth sync!`)
+      const { payload } = message
+      const { teamId, userId } = payload
+      if (
+        setSocketAttribution(config.socket, {
+          teamId,
+          userId,
+          source: WebsocketEvents.AuthSync,
+        })
+      ) {
+        _logger.debug(
+          `Socket attribution updated: ${formatSocketAttribution(config.socket)}`,
+        )
       }
 
       // get the managed community by ID and return an error if not found
-      const community = await config.communitiesManager.get(
-        message.payload.teamId,
-      )
+      const community = await config.communitiesManager.get(teamId)
       if (community == null) {
         throw new Error(`No community found`)
       }
 
       // get the existing auth connection for this user and return an error if not found
-      authConnection = community.authConnections?.get(message.payload.userId)
+      authConnection = community.authConnections?.get(userId)
       if (authConnection == null) {
         throw new Error(
           `No auth connection was established for this user on this community`,
         )
       }
       // push the sync message onto the auth sync connection
-      authConnection.lfaConnection.deliver(
-        uint8arrays.fromString(message.payload.message, 'base64'),
-      )
+      const decoded = uint8arrays.fromString(message.payload.message, 'base64')
+      if (decoded.byteLength >= AUTH_SYNC_LARGE_PAYLOAD_BYTES) {
+        _logger.warn(
+          `Inbound auth-sync message is large: ${decoded.byteLength} bytes (user=${userId}, team=${teamId})`,
+        )
+      }
+      authConnection.lfaConnection.deliver(decoded)
     } catch (e) {
       _logger.error(`Error while processing auth sync event`, e)
       authConnection?.lfaConnection.emit('localError', {
