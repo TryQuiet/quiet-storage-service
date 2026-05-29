@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.3-alpha.1 (2026-05-29)</small>
+
+- Add back notifications on CI deploy job ([00d806b](https://github.com/TryQuiet/quiet-storage-service/commit/00d806b))
+- Update app package CHANGELOG.md ([cea852e](https://github.com/TryQuiet/quiet-storage-service/commit/cea852e))
+
 ## <small>1.0.3-alpha.0 (2026-05-29)</small>
 
 - 1.0.2 (#33) ([87c5922](https://github.com/TryQuiet/quiet-storage-service/commit/87c5922)), closes [#33](https://github.com/TryQuiet/quiet-storage-service/issues/33) [#34](https://github.com/TryQuiet/quiet-storage-service/issues/34)
