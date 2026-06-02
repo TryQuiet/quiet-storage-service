@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.3-alpha.2 (2026-06-02)</small>
+
+- feat(3256) Update auth to make private channel operations admin-only (#36) ([4b0a6dd](https://github.com/TryQuiet/quiet-storage-service/commit/4b0a6dd)), closes [#36](https://github.com/TryQuiet/quiet-storage-service/issues/36)
+- Update app package CHANGELOG.md ([f52db20](https://github.com/TryQuiet/quiet-storage-service/commit/f52db20))
+
 ## <small>1.0.3-alpha.1 (2026-05-29)</small>
 
 - Add back notifications on CI deploy job ([00d806b](https://github.com/TryQuiet/quiet-storage-service/commit/00d806b))
