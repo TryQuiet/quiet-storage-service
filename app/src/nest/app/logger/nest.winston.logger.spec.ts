@@ -1,7 +1,7 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import { afterAll, beforeEach, describe, expect, it } from '@jest/globals'
+import { afterAll, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import type { Logger } from 'winston'
 
 import {
@@ -28,8 +28,78 @@ interface DailyRotateFileTransport {
   }
 }
 
+interface WinstonLogMeta {
+  params: string[]
+}
+
+interface SanitizedLogParam {
+  payload: string
+  token: string
+  bytes: {
+    type: string
+    byteLength: number
+    previewHex: string
+    truncated: boolean
+  }
+}
+
 const getWinstonLogger = (logger: QuietWinstonNestLogger): Logger =>
   (logger as unknown as { winstonLogger: Logger }).winstonLogger
+
+const getLoggedMeta = (calls: unknown[][]): WinstonLogMeta => {
+  const [firstCall] = calls
+  if (firstCall == null) {
+    throw new Error('Expected winston log call')
+  }
+  const [, meta] = firstCall
+  if (!isWinstonLogMeta(meta)) {
+    throw new Error('Expected winston log metadata')
+  }
+  return meta
+}
+
+const isWinstonLogMeta = (value: unknown): value is WinstonLogMeta => {
+  if (typeof value !== 'object' || value == null) return false
+  const { params } = value as { params?: unknown }
+  return Array.isArray(params) && params.every(item => typeof item === 'string')
+}
+
+const parseSanitizedLogParam = (value: string): SanitizedLogParam => {
+  const parsed = JSON.parse(value) as unknown
+  if (!isSanitizedLogParam(parsed)) {
+    throw new Error('Expected sanitized log param')
+  }
+  return parsed
+}
+
+const isSanitizedLogParam = (value: unknown): value is SanitizedLogParam => {
+  if (typeof value !== 'object' || value == null) return false
+  const candidate = value as {
+    payload?: unknown
+    token?: unknown
+    bytes?: unknown
+  }
+  const { payload, token, bytes: byteValue } = candidate
+  if (typeof payload !== 'string' || typeof token !== 'string') {
+    return false
+  }
+  if (typeof byteValue !== 'object' || byteValue == null) {
+    return false
+  }
+  const bytes = byteValue as {
+    type?: unknown
+    byteLength?: unknown
+    previewHex?: unknown
+    truncated?: unknown
+  }
+  const { type, byteLength, previewHex, truncated } = bytes
+  return (
+    typeof type === 'string' &&
+    typeof byteLength === 'number' &&
+    typeof previewHex === 'string' &&
+    typeof truncated === 'boolean'
+  )
+}
 
 const isDailyRotateFileTransport = (
   transport: unknown,
@@ -125,5 +195,57 @@ describe(QuietWinstonNestLogger.name, () => {
       expect(transport.options.maxSize).toBe('5m')
       expect(transport.options.maxFiles).toBe('3d')
     }
+  })
+
+  it('sanitizes metadata before passing it to winston', () => {
+    const quietLogger = createWinstonLogger('Sanitized')
+    const logger = getWinstonLogger(quietLogger)
+    const infoSpy = jest.spyOn(logger, 'info').mockImplementation(() => logger)
+
+    quietLogger.info('payload', {
+      payload: 'x'.repeat(300),
+      token: 'secret-token',
+      bytes: Buffer.from([1, 2, 3]),
+    })
+
+    expect(infoSpy).toHaveBeenCalledWith(
+      'payload',
+      expect.objectContaining({
+        params: [expect.any(String)],
+      }),
+    )
+    const meta = getLoggedMeta(infoSpy.mock.calls as unknown[][])
+    const loggedParam = parseSanitizedLogParam(meta.params[0])
+
+    expect(loggedParam.payload).toHaveLength(256)
+    expect(loggedParam.payload.endsWith('...[truncated]')).toBe(true)
+    expect(loggedParam.token).toBe('[redacted]')
+    expect(loggedParam.bytes).toEqual({
+      type: 'Buffer',
+      byteLength: 3,
+      previewHex: '010203',
+      truncated: false,
+    })
+  })
+
+  it('skips formatting when the active log level drops the message', () => {
+    QuietWinstonNestLogger.resetSharedLoggerForTests()
+    process.env.LOG_LEVEL = 'warn'
+    const quietLogger = createWinstonLogger('Skipped')
+    const logger = getWinstonLogger(quietLogger)
+    const debugSpy = jest
+      .spyOn(logger, 'debug')
+      .mockImplementation(() => logger)
+    const payload: Record<string, unknown> = {}
+    const getExpensiveValue = jest.fn(() => 'expensive')
+    Object.defineProperty(payload, 'expensive', {
+      enumerable: true,
+      get: getExpensiveValue,
+    })
+
+    quietLogger.debug('dropped', payload)
+
+    expect(debugSpy).not.toHaveBeenCalled()
+    expect(getExpensiveValue).not.toHaveBeenCalled()
   })
 })

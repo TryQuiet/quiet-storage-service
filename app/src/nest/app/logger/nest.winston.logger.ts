@@ -20,6 +20,7 @@ import path from 'path'
 import CloudWatchTransport from 'winston-aws-cloudwatch'
 import { Environment } from '../../utils/config/types.js'
 import _ from 'lodash'
+import { sanitizeLogValue } from './log-sanitizer.js'
 
 const DEFAULT_LOG_MAX_SIZE = '20m'
 const DEFAULT_LOG_MAX_FILES = '14d'
@@ -194,7 +195,7 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
 
   private static stringifyMeta(meta: unknown): string {
     try {
-      return JSON.stringify(meta)
+      return JSON.stringify(sanitizeLogValue(meta))
     } catch (e) {
       return '[unserializable-meta]'
     }
@@ -219,7 +220,10 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
   public log(message: unknown, context?: string): void
   public log(message: unknown, ...rest: [...any, string?]): void
   public log(message: unknown, ...rest: unknown[]): void {
-    this.getActiveWinstonLogger().info(message as string, {
+    const logger = this.getActiveWinstonLogger()
+    if (!logger.isLevelEnabled('info')) return
+
+    logger.info(this._formatMessage(message), {
       context: this.context,
       params: this._parseParams(rest),
     })
@@ -228,7 +232,10 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
   public info(message: unknown, context?: string): void
   public info(message: unknown, ...rest: [...any, string?]): void
   public info(message: unknown, ...rest: unknown[]): void {
-    this.getActiveWinstonLogger().info(message as string, {
+    const logger = this.getActiveWinstonLogger()
+    if (!logger.isLevelEnabled('info')) return
+
+    logger.info(this._formatMessage(message), {
       context: this.context,
       params: this._parseParams(rest),
     })
@@ -237,7 +244,10 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
   public warn(message: unknown, context?: string): void
   public warn(message: unknown, ...rest: [...any, string?]): void
   public warn(message: unknown, ...rest: unknown[]): void {
-    this.getActiveWinstonLogger().warn(message as string, {
+    const logger = this.getActiveWinstonLogger()
+    if (!logger.isLevelEnabled('warn')) return
+
+    logger.warn(this._formatMessage(message), {
       context: this.context,
       params: this._parseParams(rest),
     })
@@ -246,7 +256,10 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
   public debug(message: unknown, context?: string): void
   public debug(message: unknown, ...rest: [...any, string?]): void
   public debug(message: unknown, ...rest: unknown[]): void {
-    this.getActiveWinstonLogger().debug(message as string, {
+    const logger = this.getActiveWinstonLogger()
+    if (!logger.isLevelEnabled('debug')) return
+
+    logger.debug(this._formatMessage(message), {
       context: this.context,
       params: this._parseParams(rest),
     })
@@ -255,7 +268,10 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
   public verbose(message: unknown, context?: string): void
   public verbose(message: unknown, ...rest: [...any, string?]): void
   public verbose(message: unknown, ...rest: unknown[]): void {
-    this.getActiveWinstonLogger().verbose(message as string, {
+    const logger = this.getActiveWinstonLogger()
+    if (!logger.isLevelEnabled('verbose')) return
+
+    logger.verbose(this._formatMessage(message), {
       context: this.context,
       params: this._parseParams(rest),
     })
@@ -269,11 +285,14 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
     ...rest: unknown[]
   ): void
   public error(message: unknown, ...rest: [...any, string?, string?]): void {
+    const logger = this.getActiveWinstonLogger()
+    if (!logger.isLevelEnabled('error')) return
+
     if (message instanceof Error) {
       message = this._formatError(message, 'error')
     }
 
-    this.getActiveWinstonLogger().error(message as string, {
+    logger.error(this._formatMessage(message), {
       context: this.context,
       params: this._parseParams(rest),
     })
@@ -282,11 +301,14 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
   public fatal(message: unknown, context?: string): void
   public fatal(message: unknown, ...rest: [...any, string?]): void
   public fatal(message: unknown, ...rest: unknown[]): void {
+    const logger = this.getActiveWinstonLogger()
+    if (!logger.isLevelEnabled('error')) return
+
     if (message instanceof Error) {
       message = this._formatError(message, 'fatal')
     }
 
-    this.getActiveWinstonLogger().error(message as string, {
+    logger.error(this._formatMessage(message), {
       context: this.context,
       params: this._parseParams(rest),
     })
@@ -314,20 +336,35 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
   }
 
   private _formatParam(param: unknown): unknown {
-    let formatted: any = undefined
     if (['string', 'number', 'boolean', 'bigint'].includes(typeof param)) {
-      formatted = param
-    } else if (param == null) {
-      formatted = 'undefined'
-    } else {
-      try {
-        formatted = JSON.stringify(param, null, 2)
-      } catch (e) {
-        formatted = param
-      }
+      return param
+    }
+    if (param == null) {
+      return 'undefined'
     }
 
-    return formatted
+    const sanitized = sanitizeLogValue(param)
+    try {
+      return JSON.stringify(sanitized, null, 2)
+    } catch (e) {
+      return '[unserializable-param]'
+    }
+  }
+
+  private _formatMessage(message: unknown): string {
+    if (['string', 'number', 'boolean', 'bigint'].includes(typeof message)) {
+      return String(message)
+    }
+    if (message == null) {
+      return 'undefined'
+    }
+
+    const formatted = this._formatParam(message)
+    if (typeof formatted === 'string') {
+      return formatted
+    }
+
+    return String(formatted)
   }
 
   protected override formatContext(context?: string): string {
