@@ -30,7 +30,7 @@ export class TestUtils {
     this.module = testingModule
     this.adapter = new FastifyAdapter(
       Fastify({
-        logger: new NestFastifyLogger(),
+        loggerInstance: new NestFastifyLogger(),
       }),
     )
     this.app = this.module.createNestApplication<NestFastifyApplication>(

@@ -14,10 +14,9 @@ import {
   CLOUDWATCH_LOG_STREAM_BASE_NAME,
   DEFAULT_LOG_LEVEL,
 } from './const.js'
+import { CloudWatchLogsTransport } from './cloudwatch-logs.transport.js'
 import fs from 'fs'
 import path from 'path'
-// @ts-expect-error no types for this package
-import CloudWatchTransport from 'winston-aws-cloudwatch'
 import { Environment } from '../../utils/config/types.js'
 import _ from 'lodash'
 
@@ -26,7 +25,7 @@ const DEFAULT_LOG_MAX_FILES = '14d'
 // CloudWatch PutLogEvents rejects events >1 MiB. Cap well under that to leave
 // room for the 26-byte per-event overhead AWS adds and any UTF-8 expansion.
 const CLOUDWATCH_MAX_EVENT_BYTES = 500_000
-const CLOUDWATCH_TRUNCATION_SUFFIX = '…[truncated]'
+const CLOUDWATCH_TRUNCATION_SUFFIX = '...[truncated]'
 
 const truncateUtf8 = (value: string, maxBytes: number): string => {
   const buf = Buffer.from(value, 'utf8')
@@ -143,8 +142,7 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
     ) {
       ourTransports.push(
         QuietWinstonNestLogger.withTransportErrorHandler(
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is typing nonsense
-          new CloudWatchTransport({
+          new CloudWatchLogsTransport({
             logGroupName: CLOUDWATCH_LOG_GROUP,
             logStreamName: `${CLOUDWATCH_LOG_STREAM_BASE_NAME}-${ConfigService.getEnv() === Environment.Production ? 'prod' : 'dev'}`,
             createLogGroup: true,

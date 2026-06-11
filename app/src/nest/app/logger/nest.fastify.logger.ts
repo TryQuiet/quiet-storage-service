@@ -27,7 +27,6 @@ export class NestFastifyLogger implements FastifyBaseLogger {
   level: pino.LevelWithSilentOrString
   private readonly nestLogger = createLogger(Fastify.name)
 
-  // @ts-expect-error This is fine
   public child(bindings: Bindings, options?: ChildLoggerOptions): this {
     return this
   }

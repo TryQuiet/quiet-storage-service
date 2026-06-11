@@ -19,6 +19,7 @@ export default [
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/prefer-destructuring': 'warn',
       '@typescript-eslint/no-unsafe-type-assertion': 'warn',
+      '@typescript-eslint/no-unnecessary-type-assertion': 'warn',
       '@typescript-eslint/no-misused-promises': 'warn',
       '@typescript-eslint/no-unnecessary-condition': 'warn',
       '@typescript-eslint/init-declarations': 'off',
@@ -35,7 +36,7 @@ export default [
       reportUnusedDisableDirectives: 'off',
     },
   },
-    {
+  {
     plugins: {
       jest,
     },

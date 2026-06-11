@@ -27,7 +27,7 @@ import { EnvVars } from '../../utils/config/env_vars.js'
         fastifyLogger: NestFastifyLogger,
       ): ReturnType<typeof Fastify> => {
         const fastify = Fastify({
-          logger: fastifyLogger,
+          loggerInstance: fastifyLogger,
           requestTimeout: 120, // https://fastify.dev/docs/latest/Reference/Server/#requesttimeout,
           disableRequestLogging: false,
         })
@@ -39,7 +39,6 @@ import { EnvVars } from '../../utils/config/env_vars.js'
     {
       provide: FASTIFY_ADAPTER,
       useFactory: (fastify: FastifyInstance): FastifyAdapter =>
-        // @ts-expect-error Not sure why it disagrees with the typing here
         new FastifyAdapter(fastify),
       inject: [FASTIFY],
     },
