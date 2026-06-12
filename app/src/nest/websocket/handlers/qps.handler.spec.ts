@@ -4,14 +4,43 @@ import { WebsocketEvents } from '../ws.types.js'
 import { CommunityOperationStatus } from './types/common.types.js'
 import type { QPSHandlerConfig } from './types/qps.types.js'
 import type { QPSService } from '../../qps/qps.service.js'
+import type { CommunitiesManagerService } from '../../communities/communities-manager.service.js'
+import { AuthStatus } from '../../communities/auth/types.js'
 import type { Server } from 'socket.io'
 import type { QuietSocket } from '../ws.types.js'
 
+interface AuthConnectionState {
+  socketId: string
+  status: AuthStatus
+}
+
+interface ManagedCommunityAuthState {
+  authConnections: Map<string, AuthConnectionState>
+}
+
 describe('QPS WebSocket Handlers', () => {
+  const teamId = 'test-team-id'
+  const userId = 'test-user-id'
+
   let mockQpsService: jest.Mocked<QPSService>
+  let mockCommunitiesManager: { get: jest.Mock }
   let mockSocket: jest.Mocked<QuietSocket>
   let mockServer: jest.Mocked<Server>
   let handlers: Map<string, (...args: unknown[]) => unknown>
+
+  function createManagedCommunity(
+    status = AuthStatus.JOINED,
+    socketId = 'test-socket-id',
+  ): ManagedCommunityAuthState {
+    const authConnection: AuthConnectionState = {
+      socketId,
+      status,
+    }
+
+    return {
+      authConnections: new Map([[userId, authConnection]]),
+    }
+  }
 
   beforeEach(() => {
     mockQpsService = {
@@ -20,10 +49,18 @@ describe('QPS WebSocket Handlers', () => {
       sendBatchPush: jest.fn(),
     } as unknown as jest.Mocked<QPSService>
 
+    mockCommunitiesManager = {
+      get: jest.fn(async () => await Promise.resolve(createManagedCommunity())),
+    }
+
     handlers = new Map()
 
     mockSocket = {
       id: 'test-socket-id',
+      data: {
+        teamId,
+        userId,
+      },
       on: jest.fn((event: string, handler: (...args: unknown[]) => unknown) => {
         handlers.set(event, handler)
         return mockSocket
@@ -36,6 +73,8 @@ describe('QPS WebSocket Handlers', () => {
       socketServer: mockServer,
       socket: mockSocket,
       qpsService: mockQpsService,
+      communitiesManager:
+        mockCommunitiesManager as unknown as CommunitiesManagerService,
     }
 
     registerQpsHandlers(config)
@@ -64,6 +103,34 @@ describe('QPS WebSocket Handlers', () => {
   })
 
   describe('handleRegisterDevice', () => {
+    it('should return ERROR and not register device when unauthenticated', async () => {
+      mockSocket.data = {}
+
+      const callback = jest.fn()
+      const handler = handlers.get(WebsocketEvents.QPSRegisterDevice)!
+      await handler(
+        {
+          ts: Date.now(),
+          status: '',
+          payload: {
+            deviceToken: 'fcm-token',
+            bundleId: 'com.test.app',
+            platform: 'android',
+          },
+        },
+        callback,
+      )
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
+      expect(mockQpsService.registerDevice).not.toHaveBeenCalled()
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: CommunityOperationStatus.ERROR,
+          reason: 'Authentication required',
+        }),
+      )
+    })
+
     it('should return SUCCESS with ucan on successful registration', async () => {
       mockQpsService.registerDevice.mockResolvedValue({
         success: true,
@@ -158,6 +225,30 @@ describe('QPS WebSocket Handlers', () => {
   })
 
   describe('handleSendPush', () => {
+    it('should return ERROR and not send push when unauthenticated', async () => {
+      mockSocket.data = {}
+
+      const callback = jest.fn()
+      const handler = handlers.get(WebsocketEvents.QPSSendPush)!
+      await handler(
+        {
+          ts: Date.now(),
+          status: '',
+          payload: { ucan: 'valid-ucan' },
+        },
+        callback,
+      )
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
+      expect(mockQpsService.sendPush).not.toHaveBeenCalled()
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: CommunityOperationStatus.ERROR,
+          reason: 'Authentication required',
+        }),
+      )
+    })
+
     it('should return SUCCESS on successful push', async () => {
       mockQpsService.sendPush.mockResolvedValue({ success: true })
 
@@ -267,6 +358,64 @@ describe('QPS WebSocket Handlers', () => {
   })
 
   describe('handleSendBatchPush', () => {
+    it('should return ERROR and not send batch push when auth has not joined', async () => {
+      mockCommunitiesManager.get.mockResolvedValue(
+        createManagedCommunity(AuthStatus.JOINING),
+      )
+
+      const callback = jest.fn()
+      const handler = handlers.get(WebsocketEvents.QPSSendBatchPush)!
+      await handler(
+        {
+          ts: Date.now(),
+          status: '',
+          payload: {
+            ucans: ['ucan-1'],
+          },
+        },
+        callback,
+      )
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
+      expect(mockQpsService.sendBatchPush).not.toHaveBeenCalled()
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: CommunityOperationStatus.ERROR,
+          reason: 'Authentication required',
+          payload: { invalidTokens: [] },
+        }),
+      )
+    })
+
+    it('should return ERROR and not call service when auth belongs to another socket', async () => {
+      mockCommunitiesManager.get.mockResolvedValue(
+        createManagedCommunity(AuthStatus.JOINED, 'other-socket-id'),
+      )
+
+      const callback = jest.fn()
+      const handler = handlers.get(WebsocketEvents.QPSSendBatchPush)!
+      await handler(
+        {
+          ts: Date.now(),
+          status: '',
+          payload: {
+            ucans: ['ucan-1'],
+          },
+        },
+        callback,
+      )
+
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
+      expect(mockQpsService.sendBatchPush).not.toHaveBeenCalled()
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: CommunityOperationStatus.ERROR,
+          reason: 'Authentication required',
+          payload: { invalidTokens: [] },
+        }),
+      )
+    })
+
     it('should return SUCCESS with invalidTokens on successful batch push', async () => {
       mockQpsService.sendBatchPush.mockResolvedValue({
         success: true,
