@@ -17,7 +17,7 @@ import { createLogger } from '../../app/logger/logger.js'
 import { DateTime } from 'luxon'
 import * as uint8arrays from 'uint8arrays'
 import { ConfigService } from '../../utils/config/config.service.js'
-import { Environment } from '../../utils/config/types.js'
+import { EnvVars } from '../../utils/config/env_vars.js'
 import {
   type AuthSyncMessage,
   CommunityOperationStatus,
@@ -57,7 +57,7 @@ export class AuthConnection extends EventEmitter {
    * @returns New logger instance for a given LFA connection
    */
   private readonly createLfaLogger = (loggingContext: string): QuietLogger =>
-    createLogger(`Localfirst:${loggingContext}`)
+    createLogger(`Localfirst:${loggingContext}`, { logLevel: 'debug' })
 
   private readonly logger = createLogger(`Communities:Auth:Connection`)
 
@@ -105,7 +105,10 @@ export class AuthConnection extends EventEmitter {
         }
         this.config.socket.emit(WebsocketEvents.AuthSync, socketMessage)
       },
-      ...(ConfigService.getEnv() !== Environment.Production && {
+      ...(ConfigService.getBool(
+        EnvVars.LOCALFIRST_DEBUG_LOGGING_ENABLED,
+        false,
+      ) === true && {
         createLogger: this.createLfaLogger,
       }),
     })
