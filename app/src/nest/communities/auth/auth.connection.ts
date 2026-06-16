@@ -57,7 +57,7 @@ export class AuthConnection extends EventEmitter {
    * @returns New logger instance for a given LFA connection
    */
   private readonly createLfaLogger = (loggingContext: string): QuietLogger =>
-    createLogger(`Localfirst:${loggingContext}`, { logLevel: 'debug' })
+    createLogger(`Localfirst:${loggingContext}`)
 
   private readonly logger = createLogger(`Communities:Auth:Connection`)
 

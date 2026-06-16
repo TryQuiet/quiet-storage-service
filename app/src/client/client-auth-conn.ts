@@ -60,7 +60,6 @@ export class QSSClientAuthConnection extends EventEmitter {
     this.createLfaLogger = (packageName: string) =>
       createLogger(
         `localfirst:qss:client:${this.context.user.userId}:${packageName}`,
-        { logLevel: 'debug' },
       )
   }
 
