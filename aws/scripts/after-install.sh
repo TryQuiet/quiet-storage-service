@@ -1,6 +1,6 @@
-cd /home/ubuntu/qss
+cd /home/ec2-user/qss
 
-source /home/ubuntu/.bashrc
+source /home/ec2-user/.bashrc
 
 echo "Bootstrapping QSS"
 
