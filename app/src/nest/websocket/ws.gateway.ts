@@ -14,7 +14,7 @@ import { Inject, OnModuleDestroy, Optional } from '@nestjs/common'
 
 import {
   formatSocketAttribution,
-  formatSocketPeer,
+  formatSocketPeerForSecurityLog,
   getClientIp,
   type BaseHandlerConfig,
   type QuietSocket,
@@ -116,7 +116,7 @@ export class WebsocketGateway
     }
     if (concurrentCount >= MAX_CONCURRENT_PER_IP) {
       _logger.warn(
-        `Max concurrent connections (${MAX_CONCURRENT_PER_IP}) exceeded for ${formatSocketPeer(client)}, disconnecting`,
+        `Max concurrent connections (${MAX_CONCURRENT_PER_IP}) exceeded for ${formatSocketPeerForSecurityLog(client)}, disconnecting`,
       )
       client.disconnect(true)
       return
@@ -132,7 +132,7 @@ export class WebsocketGateway
     this._connectionRates.set(ip, recentTimestamps)
     if (recentTimestamps.length > RATE_LIMIT_MAX_IN_WINDOW) {
       _logger.warn(
-        `Rate limit exceeded (${recentTimestamps.length} connections in ${RATE_LIMIT_WINDOW_MS}ms) for ${formatSocketPeer(client)}, disconnecting`,
+        `Rate limit exceeded (${recentTimestamps.length} connections in ${RATE_LIMIT_WINDOW_MS}ms) for ${formatSocketPeerForSecurityLog(client)}, disconnecting`,
       )
       client.disconnect(true)
       return
@@ -141,7 +141,7 @@ export class WebsocketGateway
     this._socketIps.set(id, ip)
 
     _logger.debug(
-      `Client connected: ${formatSocketAttribution(client)} ${formatSocketPeer(client)} rooms=${JSON.stringify([...rooms])} connectedClients=${sockets.size}`,
+      `Client connected: ${formatSocketAttribution(client)} roomsCount=${rooms.size} connectedClients=${sockets.size}`,
     )
     _logger.debug(`Current connected clients: ${sockets.size}`)
 
@@ -164,7 +164,7 @@ export class WebsocketGateway
     this._socketIps.delete(id)
 
     _logger.debug(
-      `Client disconnected: ${formatSocketAttribution(client)} ${formatSocketPeer(client)} connectedClients=${sockets.size}`,
+      `Client disconnected: ${formatSocketAttribution(client)} connectedClients=${sockets.size}`,
     )
   }
 

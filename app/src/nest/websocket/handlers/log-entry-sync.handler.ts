@@ -2,11 +2,7 @@
  * Communities data sync websocket event handlers
  */
 
-import {
-  formatSocketAttribution,
-  setSocketAttribution,
-  WebsocketEvents,
-} from '../ws.types.js'
+import { WebsocketEvents } from '../ws.types.js'
 import { DateTime } from 'luxon'
 import { createLogger } from '../../app/logger/logger.js'
 import {
@@ -52,16 +48,6 @@ export function registerLogEntrySyncHandlers(
     try {
       const { payload } = message
       const { teamId } = payload
-      if (
-        setSocketAttribution(config.socket, {
-          teamId,
-          source: WebsocketEvents.LogEntrySync,
-        })
-      ) {
-        _logger.debug(
-          `Socket attribution updated: ${formatSocketAttribution(config.socket)}`,
-        )
-      }
 
       // Check that the user has authenticated on this community and then write to the DB
       const storedPosition =
@@ -83,6 +69,7 @@ export function registerLogEntrySyncHandlers(
         },
       }
 
+      // Note: membership to teamId room should be handled by processIncomingLogEntrySyncMessage when the user authenticates, so we can just emit to the room here without needing to manage socket joins/rooms in this handler
       // eslint-disable-next-line @typescript-eslint/restrict-template-expressions -- testing
       config.socketServer
         .to(teamId)
@@ -136,18 +123,6 @@ export function registerLogEntrySyncHandlers(
     _logger.debug(`Handling community log entry pull message`)
     try {
       const { payload } = message
-      const { teamId, userId } = payload
-      if (
-        setSocketAttribution(config.socket, {
-          teamId,
-          userId,
-          source: WebsocketEvents.LogEntryPull,
-        })
-      ) {
-        _logger.debug(
-          `Socket attribution updated: ${formatSocketAttribution(config.socket)}`,
-        )
-      }
 
       const result = await config.syncManager.getPaginatedLogEntries(
         payload,

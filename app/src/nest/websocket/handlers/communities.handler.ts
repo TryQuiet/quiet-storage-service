@@ -134,17 +134,6 @@ export function registerCommunitiesHandlers(
       }
       const { payload } = message
       const { teamId, userId } = payload
-      if (
-        setSocketAttribution(config.socket, {
-          teamId,
-          userId,
-          source: WebsocketEvents.SignInCommunity,
-        })
-      ) {
-        _logger.debug(
-          `Socket attribution updated: ${formatSocketAttribution(config.socket)}`,
-        )
-      }
 
       // get the community and return an error response if not found
       if ((await config.communitiesManager.get(teamId)) == null) {
@@ -165,6 +154,18 @@ export function registerCommunitiesHandlers(
         `Found community for ID ${teamId}, initializing sync connection`,
       )
       config.communitiesManager.startAuthSyncConnection(userId, teamId, config)
+
+      if (
+        setSocketAttribution(config.socket, {
+          teamId,
+          userId,
+          source: WebsocketEvents.SignInCommunity,
+        })
+      ) {
+        _logger.debug(
+          `Socket attribution updated: ${formatSocketAttribution(config.socket)}`,
+        )
+      }
 
       const response: CommunitySignInMessage = {
         ts: DateTime.utc().toMillis(),
@@ -207,16 +208,6 @@ export function registerCommunitiesHandlers(
     try {
       const { payload } = message
       const { id: teamId } = payload
-      if (
-        setSocketAttribution(config.socket, {
-          teamId,
-          source: WebsocketEvents.GetCommunity,
-        })
-      ) {
-        _logger.debug(
-          `Socket attribution updated: ${formatSocketAttribution(config.socket)}`,
-        )
-      }
 
       // get the community and return a success or error response based on result
       const managedCommunity = await config.communitiesManager.get(teamId)
