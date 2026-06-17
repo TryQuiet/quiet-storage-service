@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.4-alpha.1 (2026-06-17)</small>
+
+- Update app package CHANGELOG.md ([43feb4d](https://github.com/TryQuiet/quiet-storage-service/commit/43feb4d))
+- Update install scripts to work with amazon linux ([58dceac](https://github.com/TryQuiet/quiet-storage-service/commit/58dceac))
+
 ## <small>1.0.4-alpha.0 (2026-06-17)</small>
 
 - release: 1.0.3 (#39) ([4295a31](https://github.com/TryQuiet/quiet-storage-service/commit/4295a31)), closes [#39](https://github.com/TryQuiet/quiet-storage-service/issues/39) [#36](https://github.com/TryQuiet/quiet-storage-service/issues/36)
