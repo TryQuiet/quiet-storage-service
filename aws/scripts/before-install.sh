@@ -15,13 +15,13 @@ pnpm setup
 echo "Installing pm2"
 pnpm add pm2@latest -g
 
-# delete the app directory and stop the service, if running
-echo "Stopping QSS service and deleting existing directory"
-sudo pm2 stop QSS
-rm -rf /home/ec2-user/qss
+# # delete the app directory and stop the service, if running
+# echo "Stopping QSS service and deleting existing directory"
+# sudo pm2 stop QSS
+# rm -rf /home/ec2-user/qss
 
 # install fluentd
 root soft nofile 65536
 root hard nofile 65536
-curl -fsSL https://fluentd.cdn.cncf.io/sh/install-redhat-fluent-package6-lts.sh | sh
+curl -fsSL https://fluentd.cdn.cncf.io/sh/install-amazon2023-fluent-package6-lts.sh | sh
 sudo systemctl start fluentd.service
