@@ -150,8 +150,8 @@ export class AuthConnection extends EventEmitter {
     })
 
     // handle disconnects
-    this.lfaConnection.on('disconnected', event => {
-      this.logger.log(`LFA Disconnected!`, event)
+    this.lfaConnection.on('disconnected', () => {
+      this.logger.debug(`LFA disconnected`)
       this._status = AuthStatus.REJECTED_OR_CLOSED
       const payload: AuthDisconnectedPayload = {
         userId: this.userId,
