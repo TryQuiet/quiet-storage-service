@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.3 (2026-06-17)</small>
+
+- Update app package CHANGELOG.md ([a6c75a8](https://github.com/TryQuiet/quiet-storage-service/commit/a6c75a8))
+- Update auth (#37) ([63b00eb](https://github.com/TryQuiet/quiet-storage-service/commit/63b00eb)), closes [#37](https://github.com/TryQuiet/quiet-storage-service/issues/37)
+- feat(3155): Update auth module to be compatible with private channels (#35) ([a5692b0](https://github.com/TryQuiet/quiet-storage-service/commit/a5692b0)), closes [#35](https://github.com/TryQuiet/quiet-storage-service/issues/35)
+
 ## <small>1.0.3-alpha.2 (2026-06-02)</small>
 
 - feat(3256) Update auth to make private channel operations admin-only (#36) ([4b0a6dd](https://github.com/TryQuiet/quiet-storage-service/commit/4b0a6dd)), closes [#36](https://github.com/TryQuiet/quiet-storage-service/issues/36)
