@@ -1,5 +1,5 @@
 name: AWS Deploy
-
+description: Deploy code to AWS CodeDeploy
 inputs:
   version:
     description: 'Semantic version string for this release (e.g. 4.0.0-alpha.0)'
@@ -22,12 +22,19 @@ inputs:
   s3_bucket:
     description: 'S3 bucket that code is pushed to'
     required: true
+  environment:
+    description: 'Environment being deployed (e.g. development, production)'
+    required: true
 
 runs:
   using: composite
   steps:
     - name: Build QSS
       uses: ./.github/actions/setup-env
+
+    - name: Write aws environment
+      shell: bash
+      run: echo "${{ inputs.environment }}" >> aws-environment.txt
 
     - name: Remove 3rd-party directory
       shell: bash
