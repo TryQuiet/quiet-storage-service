@@ -10,6 +10,7 @@ sudo yum install -y nodejs
 echo "Installing pnpm 10.6.0"
 npm install -g pnpm@10.6.0
 pnpm setup
+source ~/.bashrc
 
 # install pm2
 echo "Installing pm2"

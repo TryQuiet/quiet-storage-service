@@ -6,7 +6,7 @@ if [ $ENVIRONMENT == "Production" ]
 then
   if [ sudo pm2 list | grep -q "QSS" ]
   then
-    pm2 restart QSS --cron-restart 0
+    sudo pm2 restart QSS --cron-restart 0
   else
     sudo pm2 --name QSS start pnpm -- start:prod
   fi
@@ -14,7 +14,7 @@ elif [ $ENVIRONMENT == "Development" ]
 then
   if [ sudo pm2 list | grep -q "QSS" ]
   then
-    pm2 restart QSS --cron-restart 0
+    sudo pm2 restart QSS --cron-restart 0
   else
     sudo pm2 --name QSS start pnpm -- start:dev
   fi
