@@ -1,14 +1,16 @@
 cd ~/qss
 
+sudo su
+
 echo "Installing git"
-sudo yum install git -y
+yum install git -y
 git version
 
 # install node 22
 echo "Installing node 22.14.0"
-sudo yum install -y curl
-curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
-sudo yum install -y nodejs
+yum install -y curl
+curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
+yum install -y nodejs
 node -v
 
 # install pnpm 10
@@ -30,8 +32,8 @@ pnpm add pm2@latest -g
 root soft nofile 65536
 root hard nofile 65536
 curl -fsSL https://fluentd.cdn.cncf.io/sh/install-amazon2023-fluent-package6-lts.sh | sh
-sudo systemctl start fluentd.service
+systemctl start fluentd.service
 
 # install AWS CLI tools
-sudo snap install aws-cli --classic
+snap install aws-cli --classic
 aws --version
