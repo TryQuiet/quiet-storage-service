@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.4-alpha.7 (2026-06-18)</small>
+
+- Fix pm2 check ([28f1735](https://github.com/TryQuiet/quiet-storage-service/commit/28f1735))
+- Update app package CHANGELOG.md ([1455813](https://github.com/TryQuiet/quiet-storage-service/commit/1455813))
+
 ## <small>1.0.4-alpha.6 (2026-06-18)</small>
 
 - Update app package CHANGELOG.md ([1877880](https://github.com/TryQuiet/quiet-storage-service/commit/1877880))
