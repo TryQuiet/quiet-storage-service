@@ -7,7 +7,7 @@ source /home/ec2-user/.bashrc
 ENVIRONMENT=$(cat aws-environment.txt)
 if [ $ENVIRONMENT == "production" ]
 then
-  if [ pm2 list | grep -q "QSS" ]
+  if [ $(pm2 list | grep -q "QSS") ]
   then
     pm2 restart QSS --cron-restart 0
   else
@@ -15,7 +15,7 @@ then
   fi
 elif [ $ENVIRONMENT == "development" ]
 then
-  if [ sudo pm2 list | grep -q "QSS" ]
+  if [ $(pm2 list | grep -q "QSS") ]
   then
     pm2 restart QSS --cron-restart 0
   else
