@@ -1,5 +1,9 @@
 cd ~/qss
 
+echo "Installing git"
+sudo yum install git -y
+git version
+
 # install node 22
 echo "Installing node 22.14.0"
 sudo yum install -y curl
