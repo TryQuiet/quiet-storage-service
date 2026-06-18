@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.4-alpha.3 (2026-06-18)</small>
+
+- More tweaks for amazon linux ([b4cef16](https://github.com/TryQuiet/quiet-storage-service/commit/b4cef16))
+- Update app package CHANGELOG.md ([414dca5](https://github.com/TryQuiet/quiet-storage-service/commit/414dca5))
+
 ## <small>1.0.4-alpha.2 (2026-06-17)</small>
 
 - More script updates ([d7acaa2](https://github.com/TryQuiet/quiet-storage-service/commit/d7acaa2))
