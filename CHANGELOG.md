@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.4-alpha.4 (2026-06-18)</small>
+
+- Ensure AWS CLI tools are installed ([abdc6ea](https://github.com/TryQuiet/quiet-storage-service/commit/abdc6ea))
+- Skip using aws cli for environment name ([64f40f2](https://github.com/TryQuiet/quiet-storage-service/commit/64f40f2))
+- Update app package CHANGELOG.md ([4557c28](https://github.com/TryQuiet/quiet-storage-service/commit/4557c28))
+
 ## <small>1.0.4-alpha.3 (2026-06-18)</small>
 
 - More tweaks for amazon linux ([b4cef16](https://github.com/TryQuiet/quiet-storage-service/commit/b4cef16))
