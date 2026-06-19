@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.4-alpha.12 (2026-06-19)</small>
+
+- Gracefully stop the QSS process before install ([402a053](https://github.com/TryQuiet/quiet-storage-service/commit/402a053))
+- Update app package CHANGELOG.md ([6e56f52](https://github.com/TryQuiet/quiet-storage-service/commit/6e56f52))
+
 ## <small>1.0.4-alpha.11 (2026-06-19)</small>
 
 - Update app package CHANGELOG.md ([3f2ed66](https://github.com/TryQuiet/quiet-storage-service/commit/3f2ed66))
