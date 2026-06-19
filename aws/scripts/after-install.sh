@@ -5,6 +5,7 @@ source ~/.bashrc
 echo "Bootstrapping QSS"
 
 sudo su
+
 rm -rf dist/
 rm -rf node_modules/
 

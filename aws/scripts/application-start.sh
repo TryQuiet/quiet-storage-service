@@ -15,7 +15,8 @@ then
     pm2 restart QSS --cron-restart 0
   else
     echo "No QSS service found, starting a new service instance"
-    pm2 --name QSS start pnpm -- start:prod
+    pm2 --name QSS start pnpm -- start:prod --kill-timeout 45000
+    pm2 save
   fi
 elif [ $ENVIRONMENT == "development" ]
 then
@@ -25,7 +26,8 @@ then
     pm2 restart QSS --cron-restart 0
   else
     echo "No QSS service found, starting a new service instance"
-    pm2 --name QSS start pnpm -- start:dev
+    pm2 --name QSS start pnpm -- start:dev --kill-timeout 45000
+    pm2 save
   fi
 else
   echo "Unknown environment: $ENVIRONMENT"

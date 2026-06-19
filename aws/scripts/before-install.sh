@@ -23,6 +23,13 @@ source ~/.bashrc
 echo "Installing pm2"
 pnpm add pm2@latest -g
 
+# stop the existing QSS process gracefully
+QSS_EXISTS=$(pm2 list | grep QSS)
+if [ -n "$QSS_EXISTS" ]
+then
+  pm2 stop QSS
+fi
+
 # # delete the app directory and stop the service, if running
 # echo "Stopping QSS service and deleting existing directory"
 # sudo pm2 stop QSS
