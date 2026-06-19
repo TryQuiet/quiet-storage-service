@@ -6,10 +6,10 @@ source ~/.bashrc
 # ENVIRONMENT=$(TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"` && curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/tags/instance/Environment)
 ENVIRONMENT=$(cat aws-environment.txt)
 echo "Starting $ENVIRONMENT QSS"
-echo $(pm2)
+QSS_EXISTS=$(pm2 list | grep QSS)
 if [ $ENVIRONMENT == "production" ]
 then
-  if [ $(pm2 list | grep -q "QSS") ]
+  if [ -n "$QSS_EXISTS" ]
   then
     echo "Existing QSS service, restarting"
     pm2 restart QSS --cron-restart 0
@@ -19,7 +19,7 @@ then
   fi
 elif [ $ENVIRONMENT == "development" ]
 then
-  if [ $(pm2 list | grep -q "QSS") ]
+  if [ -n "$QSS_EXISTS" ]
   then
     echo "Existing QSS service, restarting"
     pm2 restart QSS --cron-restart 0
