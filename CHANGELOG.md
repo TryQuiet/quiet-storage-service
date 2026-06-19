@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.4-alpha.11 (2026-06-19)</small>
+
+- Update app package CHANGELOG.md ([3f2ed66](https://github.com/TryQuiet/quiet-storage-service/commit/3f2ed66))
+
 ## <small>1.0.4-alpha.10 (2026-06-19)</small>
 
 - Fix restart check of QSS service ([8923bfb](https://github.com/TryQuiet/quiet-storage-service/commit/8923bfb))
