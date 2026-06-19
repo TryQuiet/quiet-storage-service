@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.4-alpha.9 (2026-06-19)</small>
+
+- Source correct bashrc ([4e22c4b](https://github.com/TryQuiet/quiet-storage-service/commit/4e22c4b))
+- Update app package CHANGELOG.md ([9439913](https://github.com/TryQuiet/quiet-storage-service/commit/9439913))
+
 ## <small>1.0.4-alpha.8 (2026-06-19)</small>
 
 - Add logs ([cca6cca](https://github.com/TryQuiet/quiet-storage-service/commit/cca6cca))
