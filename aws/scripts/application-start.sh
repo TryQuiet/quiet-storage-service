@@ -6,6 +6,7 @@ source /home/ec2-user/.bashrc
 # ENVIRONMENT=$(TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"` && curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/tags/instance/Environment)
 ENVIRONMENT=$(cat aws-environment.txt)
 echo "Starting $ENVIRONMENT QSS"
+echo $(pm2)
 if [ $ENVIRONMENT == "production" ]
 then
   if [ $(pm2 list | grep -q "QSS") ]
