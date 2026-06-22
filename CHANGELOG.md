@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.6 (2026-06-22)</small>
+
+- Update app package CHANGELOG.md ([4af26c1](https://github.com/TryQuiet/quiet-storage-service/commit/4af26c1))
+- Update prod RDS secret name ([b8c4f8f](https://github.com/TryQuiet/quiet-storage-service/commit/b8c4f8f))
+
 ## <small>1.0.5 (2026-06-22)</small>
 
 - Fix prod release notification ([e05170d](https://github.com/TryQuiet/quiet-storage-service/commit/e05170d))
