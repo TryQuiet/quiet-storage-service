@@ -7,6 +7,7 @@ import type { QPSService } from '../../qps/qps.service.js'
 import { QPS_MAX_BATCH_UCANS, QpsErrorReason } from '../../qps/qps.types.js'
 import type { CommunitiesManagerService } from '../../communities/communities-manager.service.js'
 import { AuthStatus } from '../../communities/auth/types.js'
+import type { ManagedCommunity } from '../../communities/types.js'
 import type { Server } from 'socket.io'
 import type { QuietSocket } from '../ws.types.js'
 
@@ -15,17 +16,15 @@ interface AuthConnectionState {
   status: AuthStatus
 }
 
-interface ManagedCommunityAuthState {
-  authConnections: Map<string, AuthConnectionState>
-}
-
 describe('QPS WebSocket Handlers', () => {
   const teamId = 'test-team-id'
   const otherTeamId = 'other-team-id'
   const userId = 'test-user-id'
 
   let mockQpsService: jest.Mocked<QPSService>
-  let mockCommunitiesManager: { get: jest.Mock }
+  let mockCommunitiesManager: jest.Mocked<
+    Pick<CommunitiesManagerService, 'get'>
+  >
   let mockSocket: jest.Mocked<QuietSocket>
   let mockServer: jest.Mocked<Server>
   let handlers: Map<string, (...args: unknown[]) => unknown>
@@ -33,7 +32,7 @@ describe('QPS WebSocket Handlers', () => {
   function createManagedCommunity(
     status = AuthStatus.JOINED,
     socketId = 'test-socket-id',
-  ): ManagedCommunityAuthState {
+  ): ManagedCommunity {
     const authConnection: AuthConnectionState = {
       socketId,
       status,
@@ -41,7 +40,7 @@ describe('QPS WebSocket Handlers', () => {
 
     return {
       authConnections: new Map([[userId, authConnection]]),
-    }
+    } as unknown as ManagedCommunity
   }
 
   beforeEach(() => {
@@ -53,7 +52,9 @@ describe('QPS WebSocket Handlers', () => {
     } as unknown as jest.Mocked<QPSService>
 
     mockCommunitiesManager = {
-      get: jest.fn(async () => await Promise.resolve(createManagedCommunity())),
+      get: jest
+        .fn<CommunitiesManagerService['get']>()
+        .mockResolvedValue(createManagedCommunity()),
     }
 
     handlers = new Map()
