@@ -1,27 +1,14 @@
 cd ~/qss
 
-sudo su
-
-echo "Installing git"
-yum install git -y
-git version
-
-# install node 22
-echo "Installing node 22.14.0"
-yum install -y curl
-curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
-yum install -y nodejs
-node -v
-
 # install pnpm 10
-echo "Installing pnpm 10.6.0"
-npm install -g pnpm@10.6.0
-pnpm setup
-source ~/.bashrc
+# echo "Installing pnpm 10.6.0"
+# npm install -g pnpm@10.6.0
+# pnpm setup
+# source ~/.bashrc
 
 # install pm2
-echo "Installing pm2"
-pnpm add pm2@latest -g
+# echo "Installing pm2"
+# pnpm add pm2@latest -g
 
 # stop the existing QSS process gracefully
 QSS_EXISTS=$(pm2 list | grep QSS)
@@ -36,11 +23,11 @@ fi
 # rm -rf /home/ec2-user/qss
 
 # install fluentd
-root soft nofile 65536
-root hard nofile 65536
-curl -fsSL https://fluentd.cdn.cncf.io/sh/install-amazon2023-fluent-package6-lts.sh | sh
-systemctl start fluentd.service
+# root soft nofile 65536
+# root hard nofile 65536
+# curl -fsSL https://fluentd.cdn.cncf.io/sh/install-amazon2023-fluent-package6-lts.sh | sh
+# systemctl start fluentd.service
 
 # install AWS CLI tools
-snap install aws-cli --classic
-aws --version
+# snap install aws-cli --classic
+# aws --version

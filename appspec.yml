@@ -2,17 +2,17 @@ version: 0.0
 os: linux
 files:
   - source: /
-    destination: /home/ec2-user/qss
+    destination: /home/qss-user/qss
 hooks:
   BeforeInstall:
     - location: aws/scripts/before-install.sh
       timeout: 300
-      runas: root
+      runas: qss-user
   AfterInstall:
     - location: aws/scripts/after-install.sh
       timeout: 300
-      runas: root
+      runas: qss-user
   ApplicationStart:
     - location: aws/scripts/application-start.sh
       timeout: 300
-      runas: root
+      runas: qss-user
