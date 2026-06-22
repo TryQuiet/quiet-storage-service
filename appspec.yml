@@ -11,7 +11,7 @@ hooks:
   AfterInstall:
     - location: aws/scripts/after-install.sh
       timeout: 300
-      runas: root
+      runas: root # this runs as root to change the ownership of the qss directory to the actual service user
   ApplicationStart:
     - location: aws/scripts/application-start.sh
       timeout: 300
