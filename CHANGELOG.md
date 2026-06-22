@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.4-alpha.14 (2026-06-22)</small>
+
+- Run AfterInstall as root to modify dir ownership ([288c51e](https://github.com/TryQuiet/quiet-storage-service/commit/288c51e))
+- Update app package CHANGELOG.md ([102c40b](https://github.com/TryQuiet/quiet-storage-service/commit/102c40b))
+
 ## <small>1.0.4-alpha.13 (2026-06-22)</small>
 
 - Pare down deploy scripts to work with new golden AMI ([314b245](https://github.com/TryQuiet/quiet-storage-service/commit/314b245))
