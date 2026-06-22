@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.4-alpha.17 (2026-06-22)</small>
+
+- Update app package CHANGELOG.md ([cffc4d3](https://github.com/TryQuiet/quiet-storage-service/commit/cffc4d3))
+- Update production RDS env config ([c56571c](https://github.com/TryQuiet/quiet-storage-service/commit/c56571c))
+
 ## <small>1.0.4-alpha.16 (2026-06-22)</small>
 
 - Cleanup and add logs to scripts ([00fe53f](https://github.com/TryQuiet/quiet-storage-service/commit/00fe53f))
