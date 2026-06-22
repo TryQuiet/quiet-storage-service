@@ -12,6 +12,7 @@ export interface RegisterDevicePayload {
   deviceToken: string
   bundleId: string
   platform: 'ios' | 'android'
+  teamId: string
 }
 
 export interface RegisterDeviceMessage

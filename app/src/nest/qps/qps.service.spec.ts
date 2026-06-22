@@ -4,15 +4,22 @@ import type { UcanService } from './ucan/ucan.service.js'
 import type { PushService } from './push/push.service.js'
 
 describe('QPSService', () => {
+  const createUcan = jest.fn<UcanService['createUcan']>()
   const validateUcan = jest.fn<UcanService['validateUcan']>()
+  const isAvailable = jest.fn<PushService['isAvailable']>()
   const send = jest.fn<PushService['send']>()
   const sendMulticast = jest.fn<PushService['sendMulticast']>()
 
-  const ucanService: Pick<UcanService, 'validateUcan'> = {
+  const ucanService: Pick<UcanService, 'createUcan' | 'validateUcan'> = {
+    createUcan,
     validateUcan,
   }
 
-  const pushService: Pick<PushService, 'send' | 'sendMulticast'> = {
+  const pushService: Pick<
+    PushService,
+    'isAvailable' | 'send' | 'sendMulticast'
+  > = {
+    isAvailable,
     send,
     sendMulticast,
   }
@@ -21,10 +28,47 @@ describe('QPSService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    isAvailable.mockReturnValue(true)
     service = new QPSService(
       ucanService as unknown as UcanService,
       pushService as unknown as PushService,
     )
+  })
+
+  it('creates registration UCANs with platform and team ID', async () => {
+    createUcan.mockResolvedValue('test-ucan')
+
+    const result = await service.registerDevice(
+      'device-token',
+      'com.test.app',
+      'android',
+      'team-1',
+    )
+
+    expect(result).toEqual({ success: true, ucan: 'test-ucan' })
+    expect(isAvailable).toHaveBeenCalledWith('android')
+    expect(createUcan).toHaveBeenCalledWith(
+      'device-token',
+      'com.test.app',
+      'android',
+      'team-1',
+    )
+  })
+
+  it('returns UCAN metadata for authorization checks', async () => {
+    validateUcan.mockResolvedValue({
+      valid: true,
+      deviceToken: 'device-token',
+      platform: 'ios',
+      teamId: 'team-1',
+    })
+
+    await expect(service.validateUcan('test-ucan')).resolves.toEqual({
+      valid: true,
+      deviceToken: 'device-token',
+      platform: 'ios',
+      teamId: 'team-1',
+    })
   })
 
   it('sends data-only pushes to Android devices', async () => {

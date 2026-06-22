@@ -5,18 +5,37 @@ import { jest } from '@jest/globals'
 import { Test, type TestingModule } from '@nestjs/testing'
 import * as ucans from '@ucans/ucans'
 import { UcanService } from './ucan.service.js'
-import { EncryptionModule } from '../../encryption/enc.module.js'
-import { UtilsModule } from '../../utils/utils.module.js'
-import { AWSModule } from '../../utils/aws/aws.module.js'
+import { AWSSecretsService } from '../../utils/aws/aws-secrets.service.js'
 
 describe('UcanService', () => {
+  const TEST_TEAM_ID = 'test-team-id'
+
   let module: TestingModule | undefined = undefined
   let ucanService: UcanService | undefined = undefined
+  let secrets: Map<string, string | Uint8Array>
+  let awsSecretsService: jest.Mocked<Pick<AWSSecretsService, 'get' | 'create'>>
 
   beforeEach(async () => {
+    secrets = new Map()
+    awsSecretsService = {
+      get: jest.fn(
+        async secretName =>
+          await Promise.resolve(secrets.get(secretName) ?? null),
+      ),
+      create: jest.fn(async (secretName, secret) => {
+        secrets.set(secretName, secret)
+        await Promise.resolve()
+      }),
+    }
+
     module = await Test.createTestingModule({
-      imports: [UtilsModule, EncryptionModule, AWSModule],
-      providers: [UcanService],
+      providers: [
+        UcanService,
+        {
+          provide: AWSSecretsService,
+          useValue: awsSecretsService,
+        },
+      ],
     }).compile()
 
     await module.init()
@@ -45,7 +64,12 @@ describe('UcanService', () => {
       const deviceToken = 'test-fcm-device-token-123'
       const bundleId = 'com.tryquiet.quiet'
 
-      const ucan = await ucanService!.createUcan(deviceToken, bundleId, 'ios')
+      const ucan = await ucanService!.createUcan(
+        deviceToken,
+        bundleId,
+        'ios',
+        TEST_TEAM_ID,
+      )
 
       expect(ucan).toBeDefined()
       expect(typeof ucan).toBe('string')
@@ -56,12 +80,19 @@ describe('UcanService', () => {
       const deviceToken = 'roundtrip-test-token'
       const bundleId = 'com.tryquiet.quiet'
 
-      const ucan = await ucanService!.createUcan(deviceToken, bundleId, 'ios')
+      const ucan = await ucanService!.createUcan(
+        deviceToken,
+        bundleId,
+        'ios',
+        TEST_TEAM_ID,
+      )
       const validation = await ucanService!.validateUcan(ucan)
 
       expect(validation.valid).toBe(true)
       expect(validation.deviceToken).toBe(deviceToken)
       expect(validation.bundleId).toBe(bundleId)
+      expect(validation.platform).toBe('ios')
+      expect(validation.teamId).toBe(TEST_TEAM_ID)
     })
 
     it('should create self-issued UCANs (issuer === audience)', async () => {
@@ -69,6 +100,7 @@ describe('UcanService', () => {
         'test-token',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
       const parsed = ucans.parse(ucan)
 
@@ -82,12 +114,19 @@ describe('UcanService', () => {
       const deviceToken = 'validation-test-token'
       const bundleId = 'com.tryquiet.quiet'
 
-      const ucan = await ucanService!.createUcan(deviceToken, bundleId, 'ios')
+      const ucan = await ucanService!.createUcan(
+        deviceToken,
+        bundleId,
+        'ios',
+        TEST_TEAM_ID,
+      )
       const validation = await ucanService!.validateUcan(ucan)
 
       expect(validation.valid).toBe(true)
       expect(validation.deviceToken).toBe(deviceToken)
       expect(validation.bundleId).toBe(bundleId)
+      expect(validation.platform).toBe('ios')
+      expect(validation.teamId).toBe(TEST_TEAM_ID)
       expect(validation.error).toBeUndefined()
     })
 
@@ -113,6 +152,7 @@ describe('UcanService', () => {
         'test-token',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
 
       const parts = ucan.split('.')
@@ -130,6 +170,7 @@ describe('UcanService', () => {
         'original-token',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
 
       const parts = ucan.split('.')
@@ -172,7 +213,12 @@ describe('UcanService', () => {
       const deviceToken = 'test-token'
       const bundleId = 'com.test.app'
 
-      const ucan = await ucanService!.createUcan(deviceToken, bundleId, 'ios')
+      const ucan = await ucanService!.createUcan(
+        deviceToken,
+        bundleId,
+        'ios',
+        TEST_TEAM_ID,
+      )
       const parts = ucan.split('.')
       const payload = JSON.parse(
         Buffer.from(parts[1], 'base64url').toString('utf8'),
@@ -245,7 +291,12 @@ describe('UcanService', () => {
       const deviceToken = 'token-with_special.chars:123'
       const bundleId = 'com.tryquiet.quiet'
 
-      const ucan = await ucanService!.createUcan(deviceToken, bundleId, 'ios')
+      const ucan = await ucanService!.createUcan(
+        deviceToken,
+        bundleId,
+        'ios',
+        TEST_TEAM_ID,
+      )
       const validation = await ucanService!.validateUcan(ucan)
 
       expect(validation.valid).toBe(true)
@@ -256,7 +307,12 @@ describe('UcanService', () => {
       const deviceToken = 'a'.repeat(1000)
       const bundleId = 'com.tryquiet.quiet'
 
-      const ucan = await ucanService!.createUcan(deviceToken, bundleId, 'ios')
+      const ucan = await ucanService!.createUcan(
+        deviceToken,
+        bundleId,
+        'ios',
+        TEST_TEAM_ID,
+      )
       const validation = await ucanService!.validateUcan(ucan)
 
       expect(validation.valid).toBe(true)
@@ -276,6 +332,7 @@ describe('UcanService', () => {
           'test-token',
           bundleId,
           'ios',
+          TEST_TEAM_ID,
         )
         const validation = await ucanService!.validateUcan(ucan)
 
@@ -292,6 +349,7 @@ describe('UcanService', () => {
         'test-token',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
 
       const validation1 = await ucanService!.validateUcan(ucan)
@@ -306,11 +364,13 @@ describe('UcanService', () => {
         'token1',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
       const ucan2 = await ucanService!.createUcan(
         'token2',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
 
       expect(ucan1).not.toBe(ucan2)
@@ -329,6 +389,7 @@ describe('UcanService', () => {
         'valid-token',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
       const parts = ucan.split('.')
       const payload = JSON.parse(
@@ -351,6 +412,7 @@ describe('UcanService', () => {
         'valid-token',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
       const parts = ucan.split('.')
       const payload = JSON.parse(
@@ -372,6 +434,7 @@ describe('UcanService', () => {
         'valid-token',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
       const parts = ucan.split('.')
       const payload = JSON.parse(
@@ -393,6 +456,7 @@ describe('UcanService', () => {
         'valid-token',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
       const parts = ucan.split('.')
       const payload = JSON.parse(

@@ -69,6 +69,9 @@ Make sure QPS has Firebase credentials configured:
 export FIREBASE_IOS_PROJECT_ID="your-project"
 export FIREBASE_IOS_CLIENT_EMAIL="firebase-adminsdk-xxx@your-project.iam.gserviceaccount.com"
 export FIREBASE_IOS_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+export FIREBASE_ANDROID_PROJECT_ID="your-android-project"
+export FIREBASE_ANDROID_CLIENT_EMAIL="firebase-adminsdk-xxx@your-android-project.iam.gserviceaccount.com"
+export FIREBASE_ANDROID_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 ```
 
 ## Usage
@@ -81,7 +84,8 @@ export FIREBASE_IOS_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIV
    - An FCM device token will be generated
 
 3. **Register with QPS**: Click "Register Device"
-   - Sends a `register-device-token` WebSocket event with your FCM token
+   - Enter the bundle ID, platform, and signed-in team ID
+   - Sends a `register-device-token` WebSocket event with your FCM token and team ID
    - You'll receive a UCAN token for authorization
 
 4. **Send Test Push**: Enter a title/body and click "Send Push Notification"
@@ -97,7 +101,7 @@ QPS uses Socket.io WebSocket events for all operations (not HTTP):
 | `register-device-token` | client → server | Register FCM device token, returns UCAN |
 | `qps-send-push` | client → server | Send push notification using UCAN |
 
-Both events use acknowledgment callbacks. The response `status` field will be `success`, `error`, or `not found` (device token expired).
+Both events use acknowledgment callbacks. The response `status` field will be `success`, `error`, `unauthorized`, or `not found` (device token expired).
 
 ## Troubleshooting
 
@@ -119,6 +123,11 @@ Both events use acknowledgment callbacks. The response `status` field will be `s
 ### "Registration failed: Push service not available"
 - QPS server needs Firebase credentials configured
 - Check that `FIREBASE_IOS_PROJECT_ID`, `FIREBASE_IOS_CLIENT_EMAIL`, and `FIREBASE_IOS_PRIVATE_KEY` are set
+- For Android registrations, also check `FIREBASE_ANDROID_PROJECT_ID`, `FIREBASE_ANDROID_CLIENT_EMAIL`, and `FIREBASE_ANDROID_PRIVATE_KEY`
+
+### "Socket is not signed into this team"
+- Register after the WebSocket client has signed into the team ID used for the UCAN
+- Check that the team ID matches the active community
 
 ### "Device token no longer valid — re-register"
 - The FCM token has expired or been revoked; click "Register Device" again after getting a fresh token
