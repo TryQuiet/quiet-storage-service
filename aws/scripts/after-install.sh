@@ -1,8 +1,14 @@
+cd /home/qss-user
+
+echo "Bootstrapping QSS"
+
+chown -R qss-user .
+
+sudo su - qss-user
+
 cd /home/qss-user/qss
 
 source ~/.bashrc
-
-echo "Bootstrapping QSS"
 
 rm -rf dist/
 rm -rf node_modules/
