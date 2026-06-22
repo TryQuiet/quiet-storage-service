@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.4-alpha.15 (2026-06-22)</small>
+
+- Move bootstrap and migration logic to app start script ([7c9c837](https://github.com/TryQuiet/quiet-storage-service/commit/7c9c837))
+- Update app package CHANGELOG.md ([e5bce0e](https://github.com/TryQuiet/quiet-storage-service/commit/e5bce0e))
+
 ## <small>1.0.4-alpha.14 (2026-06-22)</small>
 
 - Run AfterInstall as root to modify dir ownership ([288c51e](https://github.com/TryQuiet/quiet-storage-service/commit/288c51e))
