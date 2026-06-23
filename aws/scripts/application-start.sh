@@ -13,7 +13,6 @@ pnpm run bootstrap:deployed
 
 echo "Running database migrations"
 
-# ENVIRONMENT=$(TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"` && curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/tags/instance/Environment)
 ENVIRONMENT=$(cat aws-environment.txt)
 if [ $ENVIRONMENT == "production" ]
 then
@@ -28,8 +27,6 @@ else
   exit 1
 fi
 
-# ENVIRONMENT=$(TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"` && curl -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/tags/instance/Environment)
-ENVIRONMENT=$(cat aws-environment.txt)
 echo "Starting $ENVIRONMENT QSS"
 QSS_EXISTS=$(pm2 list | grep QSS)
 if [ $ENVIRONMENT == "production" ]
