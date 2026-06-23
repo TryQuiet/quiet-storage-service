@@ -262,9 +262,19 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     const clientEmail = ConfigService.getString(
       EnvVars.FIREBASE_IOS_CLIENT_EMAIL,
     )
-    const privateKey = await this.awsSecretsService.getSecretEnvVar(
-      EnvVars.FIREBASE_IOS_PRIVATE_KEY,
-    )
+    let privateKey: string | undefined
+    try {
+      privateKey = await this.awsSecretsService.getSecretEnvVar(
+        EnvVars.FIREBASE_IOS_PRIVATE_KEY,
+      )
+    } catch (error) {
+      this.logger.error(
+        `Failed to retrieve iOS FCM private key from secrets manager. iOS push notifications will be unavailable.`,
+        error,
+      )
+      this.iosAvailable = false
+      return
+    }
 
     if (projectId == null || clientEmail == null || privateKey == null) {
       this.logger.error(
@@ -311,9 +321,19 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     const clientEmail = ConfigService.getString(
       EnvVars.FIREBASE_ANDROID_CLIENT_EMAIL,
     )
-    const privateKey = await this.awsSecretsService.getSecretEnvVar(
-      EnvVars.FIREBASE_ANDROID_PRIVATE_KEY,
-    )
+    let privateKey: string | undefined
+    try {
+      privateKey = await this.awsSecretsService.getSecretEnvVar(
+        EnvVars.FIREBASE_ANDROID_PRIVATE_KEY,
+      )
+    } catch (error) {
+      this.logger.error(
+        `Failed to retrieve Android FCM private key from secrets manager. Android push notifications will be unavailable.`,
+        error,
+      )
+      this.androidAvailable = false
+      return
+    }
 
     if (projectId == null || clientEmail == null || privateKey == null) {
       this.logger.warn(

@@ -20,25 +20,11 @@ import { isUint8Array } from 'util/types'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { Environment } from '../config/types.js'
 import { RedisClient } from '../../storage/redis/redis.client.js'
+import { AwsErrorShape, CachedSecretEnvVar } from './types.js'
 
 const GET_SECRET_MAX_ATTEMPTS = 3
 const GET_SECRET_RETRY_DELAY_MS = 100
 const ENV_SECRET_CACHE_TTL_MS = 5 * 60 * 1000
-
-interface CachedSecretEnvVar {
-  value: string
-  expiresAt: number
-}
-
-interface AwsErrorShape {
-  name?: string
-  code?: string
-  message?: string
-  $metadata?: {
-    httpStatusCode?: number
-  }
-  $retryable?: unknown
-}
 
 @Injectable()
 export class AWSSecretsService {
@@ -102,6 +88,7 @@ export class AWSSecretsService {
    *
    * @param secretName Secret to retrieve
    * @returns Retrieved encrypted secret value
+   * @throws Error if secret service is unavailable
    */
   public async get(
     secretName: string,

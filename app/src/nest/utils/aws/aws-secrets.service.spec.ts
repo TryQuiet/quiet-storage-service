@@ -108,7 +108,10 @@ describe('AWSSecretsService', () => {
         .mockRejectedValueOnce(
           makeAwsError('InternalServiceError', { httpStatusCode: 500 }),
         )
-        .mockResolvedValueOnce({ SecretString: 'retrieved-secret' })
+        .mockResolvedValueOnce({
+          $metadata: {},
+          SecretString: 'retrieved-secret',
+        })
 
       await expect(service.get('eventual-secret')).resolves.toBe(
         'retrieved-secret',
@@ -152,7 +155,10 @@ describe('AWSSecretsService', () => {
       const service = createService()
       const getSecretSpy = jest
         .spyOn(getInternals(service), 'executeGetSecretValueCommandAws')
-        .mockResolvedValue({ SecretString: '{"secret":"hcaptcha-secret"}' })
+        .mockResolvedValue({
+          $metadata: {},
+          SecretString: '{"secret":"hcaptcha-secret"}',
+        })
 
       await expect(
         service.getSecretEnvVar(EnvVars.HCAPTCHA_SECRET_KEY),
@@ -168,10 +174,13 @@ describe('AWSSecretsService', () => {
       const service = createService()
       const getSecretSpy = jest
         .spyOn(getInternals(service), 'executeGetSecretValueCommandAws')
-        .mockResolvedValueOnce({ SecretString: '{"secret":"old-secret"}' })
+        .mockResolvedValueOnce({
+          $metadata: {},
+          SecretString: '{"secret":"old-secret"}',
+        })
       const createSecretSpy = jest
         .spyOn(getInternals(service), 'executeCreateSecretCommandAws')
-        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({ $metadata: {} })
 
       await expect(
         service.getSecretEnvVar(EnvVars.HCAPTCHA_SECRET_KEY),
