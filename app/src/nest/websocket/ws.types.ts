@@ -84,20 +84,7 @@ export function formatSocketPeer(socket: QuietSocket): string {
 }
 
 export function getClientIp(socket: QuietSocket): string {
-  const { handshake } = socket
-  const { address, headers } = handshake
-
-  const cfIp = headerValueToString(headers['cf-connecting-ip'])
-  if (cfIp.length > 0) return cfIp
-
-  const forwardedFor = headerValueToString(headers['x-forwarded-for'])
-  if (forwardedFor.length > 0) {
-    // x-forwarded-for may be comma-separated; leftmost entry is the originating client
-    const first = forwardedFor.split(',')[0].trim()
-    if (first.length > 0) return first
-  }
-
-  return address
+  return socket.handshake.address
 }
 
 function headerValueToString(value: string | string[] | undefined): string {
