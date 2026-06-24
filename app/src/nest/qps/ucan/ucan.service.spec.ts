@@ -5,10 +5,7 @@ import { jest } from '@jest/globals'
 import { Test, type TestingModule } from '@nestjs/testing'
 import * as ucans from '@ucans/ucans'
 import { UcanService } from './ucan.service.js'
-import { EncryptionModule } from '../../encryption/enc.module.js'
-import { UtilsModule } from '../../utils/utils.module.js'
-import { AWSModule } from '../../utils/aws/aws.module.js'
-import type { AWSSecretsService } from '../../utils/aws/aws-secrets.service.js'
+import { AWSSecretsService } from '../../utils/aws/aws-secrets.service.js'
 
 describe('UcanService', () => {
   const TEST_TEAM_ID = 'test-team-id'
@@ -23,7 +20,7 @@ describe('UcanService', () => {
     awsSecretsService = {
       get: jest.fn(
         async secretName =>
-          await Promise.resolve(secrets.get(secretName) ?? null),
+          await Promise.resolve(secrets.get(secretName) ?? undefined),
       ),
       create: jest.fn(async (secretName, secret) => {
         secrets.set(secretName, secret)
