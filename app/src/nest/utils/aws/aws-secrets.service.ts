@@ -17,8 +17,14 @@ import { EnvVars } from '../config/env_vars.js'
 import { createLogger } from '../../app/logger/logger.js'
 import { CompoundError } from '../errors.js'
 import { isUint8Array } from 'util/types'
+import { setTimeout as sleep } from 'node:timers/promises'
 import { Environment } from '../config/types.js'
 import { RedisClient } from '../../storage/redis/redis.client.js'
+import { AwsErrorShape, CachedSecretEnvVar } from './types.js'
+
+const GET_SECRET_MAX_ATTEMPTS = 3
+const GET_SECRET_RETRY_DELAY_MS = 100
+const ENV_SECRET_CACHE_TTL_MS = 5 * 60 * 1000
 
 @Injectable()
 export class AWSSecretsService {
@@ -36,6 +42,8 @@ export class AWSSecretsService {
   private readonly client: SecretsManagerClient | undefined
 
   private readonly logger = createLogger(`Utils:${AWSSecretsService.name}`)
+
+  private readonly secretEnvVarCache = new Map<string, CachedSecretEnvVar>()
 
   /**
    * @param redisClient Redis client for local instances
@@ -80,27 +88,56 @@ export class AWSSecretsService {
    *
    * @param secretName Secret to retrieve
    * @returns Retrieved encrypted secret value
+   * @throws Error if secret service is unavailable
    */
   public async get(
     secretName: string,
-  ): Promise<string | Uint8Array | undefined | null> {
-    try {
-      // if local fetch the secret from Redis and return
-      if (this.local) {
-        return await this.redisClient.get(secretName)
-      }
-
-      // generate the AWS secrets manager command and fetch
-      const commandInput: GetSecretValueCommandInput = {
-        SecretId: secretName,
-      }
-      const command = new GetSecretValueCommand(commandInput)
-      const response = await this.executeGetSecretValueCommandAws(command)
-      return response.SecretString ?? response.SecretBinary
-    } catch (e) {
-      this.logger.error('Error retrieving secret from AWS', e)
-      return undefined
+  ): Promise<string | Uint8Array | undefined> {
+    // if local fetch the secret from Redis and return
+    if (this.local) {
+      return (await this.redisClient.get(secretName)) ?? undefined
     }
+
+    // generate the AWS secrets manager command and fetch
+    const commandInput: GetSecretValueCommandInput = {
+      SecretId: secretName,
+    }
+    const command = new GetSecretValueCommand(commandInput)
+    let lastError: Error | undefined
+    for (let attempt = 1; attempt <= GET_SECRET_MAX_ATTEMPTS; attempt++) {
+      try {
+        const response = await this.executeGetSecretValueCommandAws(command)
+        const secret = response.SecretString ?? response.SecretBinary
+        if (secret == null) {
+          throw new Error(
+            `Secret ${secretName} was found but did not include a secret value`,
+          )
+        }
+        return secret
+      } catch (e) {
+        if (AWSSecretsService.isSecretNotFoundError(e)) {
+          return undefined
+        }
+
+        lastError = AWSSecretsService.normalizeError(e)
+        if (
+          attempt < GET_SECRET_MAX_ATTEMPTS &&
+          AWSSecretsService.isRetryableGetSecretError(e)
+        ) {
+          this.logger.warn(
+            `Retrying AWS secret retrieval after attempt ${attempt} failed`,
+            e,
+          )
+          await sleep(GET_SECRET_RETRY_DELAY_MS)
+          continue
+        }
+
+        this.logger.error('Error retrieving secret from AWS', e)
+        throw lastError
+      }
+    }
+
+    throw lastError ?? new Error('Error retrieving secret from AWS')
   }
 
   public async getSecretEnvVar(
@@ -114,6 +151,11 @@ export class AWSSecretsService {
     const envScopedSecretName = useEnvScopedName
       ? `${ConfigService.getString(EnvVars.ENV)?.toLowerCase() === 'development' ? 'DEV' : 'PROD'}_${secretName}`
       : secretName
+    const cachedSecret = this.getCachedSecretEnvVar(envScopedSecretName)
+    if (cachedSecret != null) {
+      return cachedSecret
+    }
+
     const secret = await this.get(envScopedSecretName)
     let secretString =
       secret == null ? undefined : AWSSecretsService.parseSecretString(secret)
@@ -127,6 +169,7 @@ export class AWSSecretsService {
       }
       secretString = localSecret
     }
+    this.setCachedSecretEnvVar(envScopedSecretName, secretString)
     return secretString
   }
 
@@ -144,6 +187,7 @@ export class AWSSecretsService {
       // if local add the secret to Redis and return
       if (this.local) {
         await this.redisClient.set(secretName, secret)
+        this.updateCachedSecretEnvVar(secretName, secret)
         return
       }
 
@@ -161,9 +205,13 @@ export class AWSSecretsService {
 
       const command = new CreateSecretCommand(commandInput)
       await this.executeCreateSecretCommandAws(command)
+      this.updateCachedSecretEnvVar(secretName, secret)
     } catch (e) {
       this.logger.error('Error putting secret:', e)
-      throw new CompoundError('Error putting secret into AWS', e as Error)
+      throw new CompoundError(
+        'Error putting secret into AWS',
+        AWSSecretsService.normalizeError(e),
+      )
     }
   }
 
@@ -201,8 +249,105 @@ export class AWSSecretsService {
       typeof value === 'object' &&
       value !== null &&
       'secret' in value &&
-      typeof (value as { secret?: unknown }).secret === 'string'
+      typeof value.secret === 'string'
     )
+  }
+
+  private static isSecretNotFoundError(error: unknown): boolean {
+    const awsError = AWSSecretsService.toAwsErrorShape(error)
+    return (
+      awsError.name === 'ResourceNotFoundException' ||
+      awsError.code === 'ResourceNotFoundException' ||
+      awsError.$metadata?.httpStatusCode === 404
+    )
+  }
+
+  private static isRetryableGetSecretError(error: unknown): boolean {
+    const awsError = AWSSecretsService.toAwsErrorShape(error)
+    const errorName = awsError.name ?? awsError.code
+    const statusCode = awsError.$metadata?.httpStatusCode
+
+    if (
+      statusCode != null &&
+      (statusCode === 408 || statusCode === 429 || statusCode >= 500)
+    ) {
+      return true
+    }
+    if (awsError.$retryable != null) {
+      return true
+    }
+    if (
+      errorName != null &&
+      [
+        'InternalServiceError',
+        'InternalServiceErrorException',
+        'ServiceUnavailableException',
+        'ThrottlingException',
+        'TooManyRequestsException',
+        'TimeoutError',
+        'TimeoutException',
+        'RequestTimeout',
+        'NetworkingError',
+        'NetworkError',
+      ].includes(errorName)
+    ) {
+      return true
+    }
+
+    const errorMessage = awsError.message?.toLowerCase()
+    return (
+      errorMessage?.includes('timeout') === true ||
+      errorMessage?.includes('network') === true ||
+      errorMessage?.includes('socket hang up') === true ||
+      errorMessage?.includes('econnreset') === true
+    )
+  }
+
+  private static toAwsErrorShape(error: unknown): AwsErrorShape {
+    if (typeof error !== 'object' || error === null) {
+      return {}
+    }
+    return error as AwsErrorShape
+  }
+
+  private static normalizeError(error: unknown): Error {
+    if (error instanceof Error) {
+      return error
+    }
+    return new Error(
+      typeof error === 'string' ? error : 'Unknown AWS secrets service error',
+    )
+  }
+
+  private getCachedSecretEnvVar(secretName: string): string | undefined {
+    const cachedSecret = this.secretEnvVarCache.get(secretName)
+    if (cachedSecret == null) {
+      return undefined
+    }
+    if (cachedSecret.expiresAt <= Date.now()) {
+      this.secretEnvVarCache.delete(secretName)
+      return undefined
+    }
+    return cachedSecret.value
+  }
+
+  private setCachedSecretEnvVar(secretName: string, secret: string): void {
+    this.secretEnvVarCache.set(secretName, {
+      value: secret,
+      expiresAt: Date.now() + ENV_SECRET_CACHE_TTL_MS,
+    })
+  }
+
+  private updateCachedSecretEnvVar(
+    secretName: string,
+    secret: string | Uint8Array,
+  ): void {
+    const secretString = AWSSecretsService.parseSecretString(secret)
+    if (secretString == null) {
+      this.secretEnvVarCache.delete(secretName)
+      return
+    }
+    this.setCachedSecretEnvVar(secretName, secretString)
   }
 
   private getAwsClient(): SecretsManagerClient {

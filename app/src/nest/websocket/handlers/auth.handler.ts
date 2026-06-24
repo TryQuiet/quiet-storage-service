@@ -143,9 +143,16 @@ export function registerCommunitiesAuthHandlers(
       // get the existing auth connection for this user and return an error if not found
       authConnection = community.authConnections?.get(userId)
       if (authConnection == null) {
-        throw new Error(
-          `No auth connection was established for this user on this community`,
+        _logger.warn(
+          `Rejecting auth-sync: no auth connection was established for the requested community/user`,
         )
+        return
+      }
+      if (authConnection.socketId !== config.socket.id) {
+        _logger.warn(
+          `Rejecting auth-sync: socket ownership mismatch for the requested community/user`,
+        )
+        return
       }
       // push the sync message onto the auth sync connection
       const decoded = uint8arrays.fromString(message.payload.message, 'base64')

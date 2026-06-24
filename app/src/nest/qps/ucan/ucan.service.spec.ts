@@ -5,7 +5,10 @@ import { jest } from '@jest/globals'
 import { Test, type TestingModule } from '@nestjs/testing'
 import * as ucans from '@ucans/ucans'
 import { UcanService } from './ucan.service.js'
-import { AWSSecretsService } from '../../utils/aws/aws-secrets.service.js'
+import { EncryptionModule } from '../../encryption/enc.module.js'
+import { UtilsModule } from '../../utils/utils.module.js'
+import { AWSModule } from '../../utils/aws/aws.module.js'
+import type { AWSSecretsService } from '../../utils/aws/aws-secrets.service.js'
 
 describe('UcanService', () => {
   const TEST_TEAM_ID = 'test-team-id'
@@ -472,5 +475,62 @@ describe('UcanService', () => {
       expect(validation.valid).toBe(false)
       expect(validation.error).toBeDefined()
     })
+  })
+})
+
+/**
+ * Regression coverage for issue #3290: a transient secrets-backend failure must
+ * not be misread as "no signing key exists", which would regenerate the QPS
+ * signing key and invalidate every previously issued UCAN. These tests drive
+ * initializeKeypair with a mocked AWSSecretsService so they stay independent of
+ * Redis/AWS.
+ */
+describe('UcanService - signing key retrieval failure handling', () => {
+  const createMockSecrets = (): {
+    get: jest.Mock<(name: string) => Promise<string | Uint8Array | undefined>>
+    create: jest.Mock<(name: string, secret: string) => Promise<void>>
+  } => ({
+    get: jest.fn<(name: string) => Promise<string | Uint8Array | undefined>>(),
+    create: jest.fn<(name: string, secret: string) => Promise<void>>(),
+  })
+
+  const makeService = (
+    mock: ReturnType<typeof createMockSecrets>,
+  ): UcanService => new UcanService(mock as unknown as AWSSecretsService)
+
+  it('does not generate a new signing key when retrieval fails transiently', async () => {
+    const mockSecrets = createMockSecrets()
+    mockSecrets.get.mockRejectedValueOnce(new Error('AWS unavailable'))
+
+    const service = makeService(mockSecrets)
+
+    await expect(service.onModuleInit()).rejects.toThrow('AWS unavailable')
+    expect(mockSecrets.create).not.toHaveBeenCalled()
+  })
+
+  it('generates and stores a new signing key only when none exists', async () => {
+    const mockSecrets = createMockSecrets()
+    mockSecrets.get.mockResolvedValueOnce(undefined)
+    mockSecrets.create.mockResolvedValueOnce(undefined)
+
+    const service = makeService(mockSecrets)
+    await service.onModuleInit()
+
+    expect(mockSecrets.create).toHaveBeenCalledTimes(1)
+    expect(service.getDid()).toMatch(/^did:key:z[a-zA-Z0-9]+$/)
+  })
+
+  it('loads the existing signing key without regenerating it', async () => {
+    const existingKeypair = await ucans.EdKeypair.create({ exportable: true })
+    const existingSecret = await existingKeypair.export('base64')
+
+    const mockSecrets = createMockSecrets()
+    mockSecrets.get.mockResolvedValueOnce(existingSecret)
+
+    const service = makeService(mockSecrets)
+    await service.onModuleInit()
+
+    expect(mockSecrets.create).not.toHaveBeenCalled()
+    expect(service.getDid()).toBe(existingKeypair.did())
   })
 })

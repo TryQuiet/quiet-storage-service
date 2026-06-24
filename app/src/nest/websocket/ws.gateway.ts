@@ -37,6 +37,7 @@ import { registerQpsHandlers } from './handlers/qps.handler.js'
 import { LogEntrySyncManager } from '../communities/sync/log-entry-sync.service.js'
 import { QPSService } from '../qps/qps.service.js'
 import { CaptchaService } from '../utils/captcha.js'
+import { pruneConnectionRates } from './ws.rate-limiter.js'
 
 const RATE_LIMIT_WINDOW_MS = 10_000
 const RATE_LIMIT_MAX_IN_WINDOW = 10
@@ -125,6 +126,7 @@ export class WebsocketGateway
     // Reject if this IP is connecting too rapidly
     const now = Date.now()
     const windowStart = now - RATE_LIMIT_WINDOW_MS
+    pruneConnectionRates(this._connectionRates, windowStart)
     const recentTimestamps = (this._connectionRates.get(ip) ?? []).filter(
       t => t >= windowStart,
     )
