@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.7-alpha.0 (2026-06-24)</small>
+
+- Add server init script and use different zip file names by environment ([5caf7d7](https://github.com/TryQuiet/quiet-storage-service/commit/5caf7d7))
+- Clear dupe and commented out lines from app start script ([1cc30ad](https://github.com/TryQuiet/quiet-storage-service/commit/1cc30ad))
+- Update app package CHANGELOG.md ([efd4052](https://github.com/TryQuiet/quiet-storage-service/commit/efd4052))
+
 ## <small>1.0.6 (2026-06-22)</small>
 
 - Update app package CHANGELOG.md ([4af26c1](https://github.com/TryQuiet/quiet-storage-service/commit/4af26c1))
