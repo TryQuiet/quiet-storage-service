@@ -40,10 +40,31 @@ interface SerializedBuffer {
 interface SanitizerState {
   depth: number
   seen: WeakSet<object>
+  options: Required<LogSanitizerOptions>
 }
 
-export function sanitizeLogValue(value: unknown): unknown {
-  return sanitizeValue(value, { depth: 0, seen: new WeakSet<object>() })
+interface SanitizedPrimitive {
+  handled: boolean
+  value?: unknown
+}
+
+export interface LogSanitizerOptions {
+  sanitizeValues?: boolean
+  summarizeBinary?: boolean
+}
+
+export function sanitizeLogValue(
+  value: unknown,
+  options: LogSanitizerOptions = {},
+): unknown {
+  return sanitizeValue(value, {
+    depth: 0,
+    seen: new WeakSet<object>(),
+    options: {
+      sanitizeValues: options.sanitizeValues ?? true,
+      summarizeBinary: options.summarizeBinary ?? true,
+    },
+  })
 }
 
 function sanitizeValue(
@@ -51,31 +72,16 @@ function sanitizeValue(
   state: SanitizerState,
   key?: string,
 ): unknown {
-  if (key != null && isSensitiveKey(key)) {
+  if (state.options.sanitizeValues && key != null && isSensitiveKey(key)) {
     return REDACTED_VALUE
   }
 
-  if (typeof value === 'string') {
-    return truncateString(value)
-  }
-  if (
-    typeof value === 'number' ||
-    typeof value === 'boolean' ||
-    value == null
-  ) {
-    return value
-  }
-  if (typeof value === 'bigint') {
-    return `${value.toString()}n`
-  }
-  if (typeof value === 'symbol') {
-    return value.toString()
-  }
-  if (typeof value === 'function') {
-    return `[Function ${value.name.length > 0 ? value.name : 'anonymous'}]`
+  const primitive = sanitizePrimitive(value, state.options)
+  if (primitive.handled) {
+    return primitive.value
   }
 
-  const binaryDescription = describeBinary(value)
+  const binaryDescription = describeBinary(value, state.options)
   if (binaryDescription != null) {
     return binaryDescription
   }
@@ -102,21 +108,58 @@ function sanitizeValue(
 
   const serializedBuffer = asSerializedBuffer(value)
   if (serializedBuffer != null) {
-    return describeSerializedBuffer(serializedBuffer)
+    return describeSerializedBuffer(serializedBuffer, state.options)
   }
 
   return sanitizeObject(value, state)
+}
+
+function sanitizePrimitive(
+  value: unknown,
+  options: Required<LogSanitizerOptions>,
+): SanitizedPrimitive {
+  if (typeof value === 'string') {
+    return {
+      handled: true,
+      value: options.sanitizeValues ? truncateString(value) : value,
+    }
+  }
+  if (
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    value == null
+  ) {
+    return { handled: true, value }
+  }
+  if (typeof value === 'bigint') {
+    return { handled: true, value: `${value.toString()}n` }
+  }
+  if (typeof value === 'symbol') {
+    return { handled: true, value: value.toString() }
+  }
+  if (typeof value === 'function') {
+    return {
+      handled: true,
+      value: `[Function ${value.name.length > 0 ? value.name : 'anonymous'}]`,
+    }
+  }
+
+  return { handled: false }
 }
 
 function sanitizeError(error: Error, state: SanitizerState): unknown {
   const output: Record<string, unknown> = {
     type: error.constructor.name,
     name: error.name,
-    message: truncateString(error.message),
+    message: state.options.sanitizeValues
+      ? truncateString(error.message)
+      : error.message,
   }
 
   if (error.stack != null) {
-    output.stack = truncateString(error.stack)
+    output.stack = state.options.sanitizeValues
+      ? truncateString(error.stack)
+      : error.stack
   }
 
   const cause = getErrorCause(error)
@@ -132,10 +175,14 @@ function sanitizeMap(
   state: SanitizerState,
 ): unknown {
   if (state.seen.has(map)) return '[Circular]'
-  if (state.depth >= MAX_DEPTH) return `[MaxDepth:Map size=${map.size}]`
+  if (state.options.sanitizeValues && state.depth >= MAX_DEPTH) {
+    return `[MaxDepth:Map size=${map.size}]`
+  }
 
   state.seen.add(map)
-  const entries = Array.from(map.entries()).slice(0, MAX_ARRAY_ITEMS)
+  const entries = state.options.sanitizeValues
+    ? Array.from(map.entries()).slice(0, MAX_ARRAY_ITEMS)
+    : Array.from(map.entries())
   const sanitizedEntries = entries.map(([entryKey, entryValue]) => [
     sanitizeValue(entryKey, nextState(state)),
     sanitizeValue(entryValue, nextState(state), String(entryKey)),
@@ -145,16 +192,22 @@ function sanitizeMap(
   return {
     type: 'Map',
     size: map.size,
-    entries: appendTruncationMarker(sanitizedEntries, map.size),
+    entries: state.options.sanitizeValues
+      ? appendTruncationMarker(sanitizedEntries, map.size)
+      : sanitizedEntries,
   }
 }
 
 function sanitizeSet(set: Set<unknown>, state: SanitizerState): unknown {
   if (state.seen.has(set)) return '[Circular]'
-  if (state.depth >= MAX_DEPTH) return `[MaxDepth:Set size=${set.size}]`
+  if (state.options.sanitizeValues && state.depth >= MAX_DEPTH) {
+    return `[MaxDepth:Set size=${set.size}]`
+  }
 
   state.seen.add(set)
-  const values = Array.from(set.values()).slice(0, MAX_ARRAY_ITEMS)
+  const values = state.options.sanitizeValues
+    ? Array.from(set.values()).slice(0, MAX_ARRAY_ITEMS)
+    : Array.from(set.values())
   const sanitizedValues = values.map(item =>
     sanitizeValue(item, nextState(state)),
   )
@@ -163,22 +216,27 @@ function sanitizeSet(set: Set<unknown>, state: SanitizerState): unknown {
   return {
     type: 'Set',
     size: set.size,
-    values: appendTruncationMarker(sanitizedValues, set.size),
+    values: state.options.sanitizeValues
+      ? appendTruncationMarker(sanitizedValues, set.size)
+      : sanitizedValues,
   }
 }
 
 function sanitizeArray(value: unknown[], state: SanitizerState): unknown[] {
   if (state.seen.has(value)) return ['[Circular]']
-  if (state.depth >= MAX_DEPTH)
+  if (state.options.sanitizeValues && state.depth >= MAX_DEPTH)
     return [`[MaxDepth:Array length=${value.length}]`]
 
   state.seen.add(value)
-  const sanitized = value
-    .slice(0, MAX_ARRAY_ITEMS)
-    .map(item => sanitizeValue(item, nextState(state)))
+  const values = state.options.sanitizeValues
+    ? value.slice(0, MAX_ARRAY_ITEMS)
+    : value
+  const sanitized = values.map(item => sanitizeValue(item, nextState(state)))
   state.seen.delete(value)
 
-  return appendTruncationMarker(sanitized, value.length)
+  return state.options.sanitizeValues
+    ? appendTruncationMarker(sanitized, value.length)
+    : sanitized
 }
 
 function sanitizeObject(
@@ -190,7 +248,9 @@ function sanitizeObject(
   const {
     constructor: { name: type },
   } = object
-  if (state.depth >= MAX_DEPTH) return `[MaxDepth:${type}]`
+  if (state.options.sanitizeValues && state.depth >= MAX_DEPTH) {
+    return `[MaxDepth:${type}]`
+  }
 
   state.seen.add(object)
   const keys = Object.keys(object)
@@ -199,7 +259,10 @@ function sanitizeObject(
     output.type = type
   }
 
-  for (const key of keys.slice(0, MAX_OBJECT_KEYS)) {
+  const visibleKeys = state.options.sanitizeValues
+    ? keys.slice(0, MAX_OBJECT_KEYS)
+    : keys
+  for (const key of visibleKeys) {
     try {
       output[key] = sanitizeValue(object[key], nextState(state), key)
     } catch (error) {
@@ -210,7 +273,7 @@ function sanitizeObject(
     }
   }
 
-  if (keys.length > MAX_OBJECT_KEYS) {
+  if (state.options.sanitizeValues && keys.length > MAX_OBJECT_KEYS) {
     output.__truncatedKeys = keys.length - MAX_OBJECT_KEYS
   }
 
@@ -232,20 +295,39 @@ function appendTruncationMarker(
   ]
 }
 
-function describeBinary(value: unknown): BinaryDescription | undefined {
+function describeBinary(
+  value: unknown,
+  options: Required<LogSanitizerOptions>,
+):
+  | BinaryDescription
+  | ArrayBuffer
+  | ArrayBufferView
+  | SerializedBuffer
+  | undefined {
   if (Buffer.isBuffer(value)) {
-    return describeBytes('Buffer', value)
+    return options.summarizeBinary ? describeBytes('Buffer', value) : value
   }
   if (value instanceof ArrayBuffer) {
-    return describeBytes('ArrayBuffer', new Uint8Array(value))
+    return options.summarizeBinary
+      ? describeBytes('ArrayBuffer', new Uint8Array(value))
+      : value
   }
   if (ArrayBuffer.isView(value)) {
-    return describeBytes(value.constructor.name, arrayBufferViewToBytes(value))
+    return options.summarizeBinary
+      ? describeBytes(value.constructor.name, arrayBufferViewToBytes(value))
+      : value
   }
   return undefined
 }
 
-function describeSerializedBuffer(value: SerializedBuffer): BinaryDescription {
+function describeSerializedBuffer(
+  value: SerializedBuffer,
+  options: Required<LogSanitizerOptions>,
+): BinaryDescription | SerializedBuffer {
+  if (!options.summarizeBinary) {
+    return value
+  }
+
   const previewBytes = value.data
     .slice(0, BINARY_PREVIEW_BYTES)
     .filter((item): item is number => typeof item === 'number')
@@ -306,6 +388,7 @@ function nextState(state: SanitizerState): SanitizerState {
   return {
     depth: state.depth + 1,
     seen: state.seen,
+    options: state.options,
   }
 }
 

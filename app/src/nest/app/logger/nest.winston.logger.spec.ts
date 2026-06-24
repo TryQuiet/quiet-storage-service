@@ -15,6 +15,8 @@ const originalEnv = {
   LOG_LEVEL: process.env.LOG_LEVEL,
   LOG_MAX_FILES: process.env.LOG_MAX_FILES,
   LOG_MAX_SIZE: process.env.LOG_MAX_SIZE,
+  LOG_SANITIZATION_ENABLED: process.env.LOG_SANITIZATION_ENABLED,
+  LOG_BINARY_SUMMARY_ENABLED: process.env.LOG_BINARY_SUMMARY_ENABLED,
 }
 
 const tempDirs: string[] = []
@@ -125,6 +127,8 @@ describe(QuietWinstonNestLogger.name, () => {
     process.env.LOG_LEVEL = 'debug'
     delete process.env.LOG_MAX_FILES
     delete process.env.LOG_MAX_SIZE
+    delete process.env.LOG_SANITIZATION_ENABLED
+    delete process.env.LOG_BINARY_SUMMARY_ENABLED
   })
 
   afterAll(async () => {
@@ -154,6 +158,18 @@ describe(QuietWinstonNestLogger.name, () => {
       delete process.env.LOG_MAX_SIZE
     } else {
       process.env.LOG_MAX_SIZE = originalEnv.LOG_MAX_SIZE
+    }
+    if (originalEnv.LOG_SANITIZATION_ENABLED == null) {
+      delete process.env.LOG_SANITIZATION_ENABLED
+    } else {
+      process.env.LOG_SANITIZATION_ENABLED =
+        originalEnv.LOG_SANITIZATION_ENABLED
+    }
+    if (originalEnv.LOG_BINARY_SUMMARY_ENABLED == null) {
+      delete process.env.LOG_BINARY_SUMMARY_ENABLED
+    } else {
+      process.env.LOG_BINARY_SUMMARY_ENABLED =
+        originalEnv.LOG_BINARY_SUMMARY_ENABLED
     }
     for (const tempDir of tempDirs) {
       fs.rmSync(tempDir, { force: true, recursive: true })
@@ -226,6 +242,67 @@ describe(QuietWinstonNestLogger.name, () => {
       previewHex: '010203',
       truncated: false,
     })
+  })
+
+  it('can disable winston metadata sanitization while preserving binary summaries', () => {
+    process.env.LOG_SANITIZATION_ENABLED = 'false'
+    const quietLogger = createWinstonLogger('Unsanitized')
+    const logger = getWinstonLogger(quietLogger)
+    const infoSpy = jest.spyOn(logger, 'info').mockImplementation(() => logger)
+
+    quietLogger.info('payload', {
+      payload: 'x'.repeat(300),
+      token: 'secret-token',
+      bytes: Buffer.from([1, 2, 3]),
+    })
+
+    const meta = getLoggedMeta(infoSpy.mock.calls as unknown[][])
+    const loggedParam = JSON.parse(meta.params[0]) as {
+      payload: string
+      token: string
+      bytes: {
+        type: string
+        byteLength: number
+        previewHex: string
+        truncated: boolean
+      }
+    }
+
+    expect(loggedParam.payload).toHaveLength(300)
+    expect(loggedParam.token).toBe('secret-token')
+    expect(loggedParam.bytes).toEqual({
+      type: 'Buffer',
+      byteLength: 3,
+      previewHex: '010203',
+      truncated: false,
+    })
+  })
+
+  it('can print binary values in full while keeping other sanitization', () => {
+    process.env.LOG_BINARY_SUMMARY_ENABLED = 'false'
+    const quietLogger = createWinstonLogger('FullBinary')
+    const logger = getWinstonLogger(quietLogger)
+    const infoSpy = jest.spyOn(logger, 'info').mockImplementation(() => logger)
+
+    quietLogger.info('payload', {
+      token: 'secret-token',
+      buffer: Buffer.from([1, 2, 3]),
+      bytes: new Uint8Array([4, 5, 6]),
+    })
+
+    const meta = getLoggedMeta(infoSpy.mock.calls as unknown[][])
+    const loggedParam = JSON.parse(meta.params[0]) as {
+      token: string
+      buffer: { type: string; data: number[] }
+      bytes: Record<string, number>
+    }
+
+    expect(loggedParam.token).toBe('[redacted]')
+    expect(loggedParam.buffer).toEqual({
+      type: 'Buffer',
+      data: [1, 2, 3],
+    })
+    expect(loggedParam.bytes).toEqual({ 0: 4, 1: 5, 2: 6 })
   })
 
   it('skips formatting when the active log level drops the message', () => {

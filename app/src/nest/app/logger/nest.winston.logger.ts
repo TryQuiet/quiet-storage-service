@@ -195,7 +195,7 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
 
   private static stringifyMeta(meta: unknown): string {
     try {
-      return JSON.stringify(sanitizeLogValue(meta))
+      return JSON.stringify(QuietWinstonNestLogger.formatLogValue(meta))
     } catch (e) {
       return '[unserializable-meta]'
     }
@@ -343,12 +343,32 @@ export class QuietWinstonNestLogger extends ConsoleLogger {
       return 'undefined'
     }
 
-    const sanitized = sanitizeLogValue(param)
     try {
-      return JSON.stringify(sanitized, null, 2)
+      return JSON.stringify(
+        QuietWinstonNestLogger.formatLogValue(param),
+        null,
+        2,
+      )
     } catch (e) {
       return '[unserializable-param]'
     }
+  }
+
+  private static formatLogValue(value: unknown): unknown {
+    return sanitizeLogValue(value, {
+      sanitizeValues: QuietWinstonNestLogger.isLogSanitizationEnabled(),
+      summarizeBinary: QuietWinstonNestLogger.isLogBinarySummaryEnabled(),
+    })
+  }
+
+  private static isLogSanitizationEnabled(): boolean {
+    return ConfigService.getBool(EnvVars.LOG_SANITIZATION_ENABLED, true) ?? true
+  }
+
+  private static isLogBinarySummaryEnabled(): boolean {
+    return (
+      ConfigService.getBool(EnvVars.LOG_BINARY_SUMMARY_ENABLED, true) ?? true
+    )
   }
 
   private _formatMessage(message: unknown): string {

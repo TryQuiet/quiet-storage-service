@@ -49,6 +49,43 @@ describe('log sanitizer', () => {
     })
   })
 
+  it('can keep full binary values when binary summaries are disabled', () => {
+    const result = sanitizeLogValue(
+      {
+        buffer: Buffer.from([1, 2, 3]),
+        bytes: new Uint8Array([4, 5, 6]),
+      },
+      { summarizeBinary: false },
+    )
+
+    expect(result).toEqual({
+      buffer: Buffer.from([1, 2, 3]),
+      bytes: new Uint8Array([4, 5, 6]),
+    })
+  })
+
+  it('can disable value sanitization while preserving binary summaries', () => {
+    const result = sanitizeLogValue(
+      {
+        token: 'secret-token',
+        payload: 'x'.repeat(300),
+        bytes: Buffer.from([1, 2, 3]),
+      },
+      { sanitizeValues: false, summarizeBinary: true },
+    )
+
+    expect(result).toEqual({
+      token: 'secret-token',
+      payload: 'x'.repeat(300),
+      bytes: {
+        type: 'Buffer',
+        byteLength: 3,
+        previewHex: '010203',
+        truncated: false,
+      },
+    })
+  })
+
   it('redacts sensitive fields and handles circular references', () => {
     const value: Record<string, unknown> = {
       accessToken: 'secret-token',
