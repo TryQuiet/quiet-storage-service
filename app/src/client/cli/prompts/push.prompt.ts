@@ -21,6 +21,7 @@ const logger = createLogger('Client:Push')
  */
 export const registerDevice = async (
   client: WebsocketClient,
+  defaultTeamId?: string,
 ): Promise<string | undefined> => {
   const deviceToken = await input({
     message: 'Enter the FCM device token:',
@@ -55,12 +56,23 @@ export const registerDevice = async (
   })
   const platform = platformRaw as 'ios' | 'android'
 
+  const teamId = await input({
+    message: 'Enter the team ID:',
+    default: defaultTeamId,
+    validate: (value: string | undefined) => {
+      if (value == null || value === '') {
+        return 'Team ID is required'
+      }
+      return true
+    },
+  })
+
   const result = await promiseWithSpinner(
     async () => {
       const message: RegisterDeviceMessage = {
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.SENDING,
-        payload: { deviceToken, bundleId, platform },
+        payload: { deviceToken, bundleId, platform, teamId },
       }
 
       const response = await client.sendMessage<RegisterDeviceResponse>(

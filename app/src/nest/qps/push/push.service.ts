@@ -15,6 +15,7 @@ import {
   PushErrorCode,
 } from './push.types.js'
 import { ConfigService } from '../../utils/config/config.service.js'
+import { QpsErrorReason } from '../qps.types.js'
 
 @Injectable()
 export class PushService implements OnModuleInit, OnModuleDestroy {
@@ -67,7 +68,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     if (!this.isAvailable(platform)) {
       return {
         success: false,
-        error: `Push service not available for platform: ${platform}`,
+        error: QpsErrorReason.PushNotificationServiceNotAvailable,
         errorCode: PushErrorCode.SERVICE_UNAVAILABLE,
       }
     }
@@ -196,7 +197,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     if (messaging == null) {
       return {
         success: false,
-        error: `FCM service not configured for platform: ${platform}`,
+        error: QpsErrorReason.PushNotificationServiceNotAvailable,
         errorCode: PushErrorCode.SERVICE_UNAVAILABLE,
       }
     }

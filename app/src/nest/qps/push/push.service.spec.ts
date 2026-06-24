@@ -5,6 +5,7 @@ import { jest } from '@jest/globals'
 import { Test, type TestingModule } from '@nestjs/testing'
 import { PushService } from './push.service.js'
 import { PushErrorCode } from './push.types.js'
+import { QpsErrorReason } from '../qps.types.js'
 import { AWSSecretsService } from '../../utils/aws/aws-secrets.service.js'
 
 // Mock firebase-admin
@@ -103,6 +104,9 @@ describe('PushService', () => {
       const result = await pushService!.send('test-token', { title: 'Test' })
 
       expect(result.success).toBe(false)
+      expect(result.error).toBe(
+        QpsErrorReason.PushNotificationServiceNotAvailable,
+      )
       expect(result.errorCode).toBe(PushErrorCode.SERVICE_UNAVAILABLE)
     })
 

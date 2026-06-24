@@ -205,6 +205,7 @@ export class WebsocketGateway
       const qpsConfig: QPSHandlerConfig = {
         ...baseConfig,
         qpsService: this.qpsService,
+        communitiesManager: this.communitiesManager,
       }
       registerQpsHandlers(qpsConfig)
     }

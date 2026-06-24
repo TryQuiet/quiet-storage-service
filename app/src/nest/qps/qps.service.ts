@@ -12,6 +12,8 @@ import {
   type MulticastPushResult,
   type PushPayload,
 } from './push/push.types.js'
+import type { UcanValidationResult } from './ucan/ucan.types.js'
+import { QPS_MAX_BATCH_UCANS, QpsErrorReason } from './qps.types.js'
 
 /**
  * Result of a device registration
@@ -54,12 +56,14 @@ export class QPSService {
    *
    * @param deviceToken The FCM device token
    * @param bundleId The app bundle identifier
+   * @param teamId The team this UCAN authorizes push delivery for
    * @returns Registration result with UCAN token
    */
   async registerDevice(
     deviceToken: string,
     bundleId: string,
     platform: 'ios' | 'android',
+    teamId: string,
   ): Promise<RegistrationResult> {
     try {
       if (!this.pushService.isAvailable(platform)) {
@@ -68,7 +72,7 @@ export class QPSService {
         )
         return {
           success: false,
-          error: 'Push notification service not available',
+          error: QpsErrorReason.PushNotificationServiceNotAvailable,
         }
       }
 
@@ -76,6 +80,7 @@ export class QPSService {
         deviceToken,
         bundleId,
         platform,
+        teamId,
       )
 
       this.logger.log(`Device registered successfully`)
@@ -90,9 +95,16 @@ export class QPSService {
         error:
           error instanceof Error
             ? error.message
-            : 'Unknown error during registration',
+            : QpsErrorReason.UnknownRegistrationError,
       }
     }
+  }
+
+  /**
+   * Validate a UCAN and return its embedded metadata for authorization checks.
+   */
+  async validateUcan(ucanToken: string): Promise<UcanValidationResult> {
+    return await this.ucanService.validateUcan(ucanToken)
   }
 
   /**
@@ -119,7 +131,7 @@ export class QPSService {
       )
       return {
         success: false,
-        error: validation.error ?? 'Invalid UCAN token',
+        error: validation.error ?? QpsErrorReason.InvalidUcanToken,
       }
     }
 
@@ -159,13 +171,13 @@ export class QPSService {
   ): Promise<SendBatchPushResult> {
     if (ucans.length === 0) {
       return { success: true }
-    } else if (ucans.length > 500) {
+    } else if (ucans.length > QPS_MAX_BATCH_UCANS) {
       this.logger.debug(
-        `Batch push failed: ${ucans.length} UCANs exceeds firebase limit of 500`,
+        `Batch push failed: ${ucans.length} UCANs exceeds firebase limit of ${QPS_MAX_BATCH_UCANS}`,
       )
       return {
         success: false,
-        error: 'Batch size exceeds limit of 500',
+        error: QpsErrorReason.BatchSizeExceedsLimit,
       }
     }
 
@@ -190,7 +202,7 @@ export class QPSService {
     const totalValid = iosTokens.length + androidTokens.length
     if (totalValid === 0) {
       this.logger.warn(`Batch push failed: no valid UCANs`)
-      return { success: false, error: 'No valid device tokens' }
+      return { success: false, error: QpsErrorReason.NoValidDeviceTokens }
     }
 
     const iosPayload = this.makePayload('ios', title, body, data)
@@ -227,7 +239,7 @@ export class QPSService {
       )
       return {
         success: false,
-        error: 'All push notifications failed',
+        error: QpsErrorReason.AllPushNotificationsFailed,
         invalidTokens,
       }
     }

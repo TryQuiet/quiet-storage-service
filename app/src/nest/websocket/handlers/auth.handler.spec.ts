@@ -3,7 +3,7 @@ import { WebsocketEvents } from '../ws.types.js'
 import { CommunityOperationStatus } from './types/common.types.js'
 import type { AuthConnection } from '../../communities/auth/auth.connection.js'
 import type { CommunitiesManagerService } from '../../communities/communities-manager.service.js'
-import type { Community } from '../../communities/types.js'
+import type { ManagedCommunity } from '../../communities/types.js'
 import type { Server } from 'socket.io'
 import type { CommunitiesHandlerConfig } from './types/common.types.js'
 import type { QuietSocket } from '../ws.types.js'
@@ -88,10 +88,10 @@ describe('Communities auth WebSocket handlers', () => {
     return { authConnection, deliver, emit }
   }
 
-  function buildCommunity(authConnection: AuthConnection): Community {
+  function buildCommunity(authConnection: AuthConnection): ManagedCommunity {
     return {
       authConnections: new Map([[userId, authConnection]]),
-    } as unknown as Community
+    } as unknown as ManagedCommunity
   }
 
   async function callAuthSyncHandler(): Promise<void> {
