@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.7-alpha.1 (2026-06-24)</small>
+
+- Rename setup script ([a071f45](https://github.com/TryQuiet/quiet-storage-service/commit/a071f45))
+- Update app package CHANGELOG.md ([a89961c](https://github.com/TryQuiet/quiet-storage-service/commit/a89961c))
+- Write setup script to S3 during deploys ([ea78ea1](https://github.com/TryQuiet/quiet-storage-service/commit/ea78ea1))
+
 ## <small>1.0.7-alpha.0 (2026-06-24)</small>
 
 - Add server init script and use different zip file names by environment ([5caf7d7](https://github.com/TryQuiet/quiet-storage-service/commit/5caf7d7))
