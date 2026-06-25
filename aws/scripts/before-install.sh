@@ -1,4 +1,5 @@
-cd ~/qss
+echo "Running BeforeInstall"
+echo $(whoami)
 
 # stop the existing QSS process gracefully
 echo "Checking for existing QSS service"

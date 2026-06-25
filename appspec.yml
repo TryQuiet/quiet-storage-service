@@ -3,15 +3,21 @@ os: linux
 files:
   - source: /
     destination: /home/qss-user/qss
+permissions:
+  - object: /home/qss-user/qss
+    owner: qss-user
+    mode: 644
+    type:
+      - directory
 hooks:
   BeforeInstall:
     - location: aws/scripts/before-install.sh
       timeout: 300
       runas: qss-user
-  AfterInstall:
-    - location: aws/scripts/after-install.sh
-      timeout: 300
-      runas: root # this runs as root to change the ownership of the qss directory to the actual service user
+  # AfterInstall:
+  #   - location: aws/scripts/after-install.sh
+  #     timeout: 300
+  #     runas: root # this runs as root to change the ownership of the qss directory to the actual service user
   ApplicationStart:
     - location: aws/scripts/application-start.sh
       timeout: 300
