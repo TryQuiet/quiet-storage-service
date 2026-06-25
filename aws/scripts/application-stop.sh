@@ -1,5 +1,3 @@
-set -e
-
 source ~/.bashrc
 
 # stop the existing QSS process gracefully (if it exists)

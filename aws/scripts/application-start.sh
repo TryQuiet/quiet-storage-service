@@ -1,5 +1,3 @@
-set -e
-
 cd /home/qss-user/qss
 
 source ~/.bashrc
