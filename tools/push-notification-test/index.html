@@ -25,7 +25,7 @@
     }
     .card h2 { margin-top: 0; font-size: 14px; color: #888; text-transform: uppercase; }
     label { display: block; margin-bottom: 8px; font-size: 14px; color: #aaa; }
-    input, textarea {
+    input, select, textarea {
       width: 100%;
       padding: 10px;
       border: 1px solid #333;
@@ -141,6 +141,13 @@
     <h2>3. Register with QPS</h2>
     <label>Bundle ID</label>
     <input type="text" id="bundle-id" value="com.tryquiet.quiet">
+    <label>Platform</label>
+    <select id="platform">
+      <option value="ios">iOS</option>
+      <option value="android">Android</option>
+    </select>
+    <label>Team ID</label>
+    <input type="text" id="team-id" placeholder="Enter signed-in team ID">
     <button onclick="registerDevice()">Register Device</button>
     <div id="ucan-display" class="hidden">
       <label>UCAN Token:</label>
@@ -358,13 +365,18 @@
         }
 
         const bundleId = document.getElementById('bundle-id').value;
+        const platform = document.getElementById('platform').value;
+        const teamId = document.getElementById('team-id').value;
+        if (!teamId) {
+          throw new Error('Team ID is required');
+        }
 
         log(`Registering device with QPS...`);
 
         const message = {
           ts: Date.now(),
           status: 'sending',
-          payload: { deviceToken: fcmToken, bundleId },
+          payload: { deviceToken: fcmToken, bundleId, platform, teamId },
         };
 
         const response = await socket.emitWithAck('register-device-token', message);

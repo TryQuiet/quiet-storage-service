@@ -93,7 +93,7 @@ const mainLoop = async (
             break
           }
           case 'registerDevice': {
-            const ucan = await registerDevice(client)
+            const ucan = await registerDevice(client, community?.teamId)
             if (ucan != null) {
               lastUcan = ucan
             }

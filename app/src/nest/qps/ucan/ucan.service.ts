@@ -59,6 +59,7 @@ export class UcanService implements OnModuleInit {
     deviceToken: string,
     bundleId: string,
     platform: 'ios' | 'android',
+    teamId: string,
   ): Promise<string> {
     if (this.keypair == null || this.qpsDid == null) {
       throw new UcanError(
@@ -77,7 +78,7 @@ export class UcanService implements OnModuleInit {
           can: { namespace: 'push', segments: ['send'] },
         },
       ],
-      facts: [{ bundleId, platform }],
+      facts: [{ bundleId, platform, teamId }],
     })
 
     return ucans.encode(ucan)
@@ -158,15 +159,18 @@ export class UcanService implements OnModuleInit {
       const facts = parsed.payload.fct as Array<{
         bundleId?: string
         platform?: 'ios' | 'android'
+        teamId?: string
       }>
       const bundleId = facts?.[0]?.bundleId
       const platform = facts?.[0]?.platform
+      const teamId = facts?.[0]?.teamId
 
       return {
         valid: true,
         deviceToken,
         bundleId,
         platform,
+        teamId,
       }
     } catch (error) {
       this.logger.error(`Error validating UCAN`, error)

@@ -15,6 +15,7 @@ import {
   PushErrorCode,
 } from './push.types.js'
 import { ConfigService } from '../../utils/config/config.service.js'
+import { QpsErrorReason } from '../qps.types.js'
 
 @Injectable()
 export class PushService implements OnModuleInit, OnModuleDestroy {
@@ -67,7 +68,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     if (!this.isAvailable(platform)) {
       return {
         success: false,
-        error: `Push service not available for platform: ${platform}`,
+        error: QpsErrorReason.PushNotificationServiceNotAvailable,
         errorCode: PushErrorCode.SERVICE_UNAVAILABLE,
       }
     }
@@ -196,7 +197,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     if (messaging == null) {
       return {
         success: false,
-        error: `FCM service not configured for platform: ${platform}`,
+        error: QpsErrorReason.PushNotificationServiceNotAvailable,
         errorCode: PushErrorCode.SERVICE_UNAVAILABLE,
       }
     }
@@ -262,9 +263,19 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     const clientEmail = ConfigService.getString(
       EnvVars.FIREBASE_IOS_CLIENT_EMAIL,
     )
-    const privateKey = await this.awsSecretsService.getSecretEnvVar(
-      EnvVars.FIREBASE_IOS_PRIVATE_KEY,
-    )
+    let privateKey: string | undefined
+    try {
+      privateKey = await this.awsSecretsService.getSecretEnvVar(
+        EnvVars.FIREBASE_IOS_PRIVATE_KEY,
+      )
+    } catch (error) {
+      this.logger.error(
+        `Failed to retrieve iOS FCM private key from secrets manager. iOS push notifications will be unavailable.`,
+        error,
+      )
+      this.iosAvailable = false
+      return
+    }
 
     if (projectId == null || clientEmail == null || privateKey == null) {
       this.logger.error(
@@ -311,9 +322,19 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     const clientEmail = ConfigService.getString(
       EnvVars.FIREBASE_ANDROID_CLIENT_EMAIL,
     )
-    const privateKey = await this.awsSecretsService.getSecretEnvVar(
-      EnvVars.FIREBASE_ANDROID_PRIVATE_KEY,
-    )
+    let privateKey: string | undefined
+    try {
+      privateKey = await this.awsSecretsService.getSecretEnvVar(
+        EnvVars.FIREBASE_ANDROID_PRIVATE_KEY,
+      )
+    } catch (error) {
+      this.logger.error(
+        `Failed to retrieve Android FCM private key from secrets manager. Android push notifications will be unavailable.`,
+        error,
+      )
+      this.androidAvailable = false
+      return
+    }
 
     if (projectId == null || clientEmail == null || privateKey == null) {
       this.logger.warn(

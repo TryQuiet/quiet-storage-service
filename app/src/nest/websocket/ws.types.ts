@@ -67,7 +67,7 @@ export function formatSocketAttribution(socket: QuietSocket): string {
   ].join(' ')
 }
 
-export function formatSocketPeer(socket: QuietSocket): string {
+export function formatSocketPeerForSecurityLog(socket: QuietSocket): string {
   const { handshake } = socket
   const { address, headers } = handshake
 

@@ -1,4 +1,8 @@
-import { formatSocketPeer, getClientIp, type QuietSocket } from './ws.types.js'
+import {
+  formatSocketPeerForSecurityLog,
+  getClientIp,
+  type QuietSocket,
+} from './ws.types.js'
 
 describe('websocket socket identity', () => {
   it('uses the socket peer address instead of spoofable proxy headers', () => {
@@ -17,7 +21,7 @@ describe('websocket socket identity', () => {
   })
 
   it('keeps proxy headers in peer logs for attribution context', () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- minimal socket shape used by formatSocketPeer
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- minimal socket shape used by formatSocketPeerForSecurityLog
     const socket = {
       handshake: {
         address: '203.0.113.10',
@@ -29,8 +33,14 @@ describe('websocket socket identity', () => {
       },
     } as unknown as QuietSocket
 
-    expect(formatSocketPeer(socket)).toContain('remoteAddress="203.0.113.10"')
-    expect(formatSocketPeer(socket)).toContain('forwardedFor="198.51.100.30"')
-    expect(formatSocketPeer(socket)).toContain('cfConnectingIp="198.51.100.20"')
+    expect(formatSocketPeerForSecurityLog(socket)).toContain(
+      'remoteAddress="203.0.113.10"',
+    )
+    expect(formatSocketPeerForSecurityLog(socket)).toContain(
+      'forwardedFor="198.51.100.30"',
+    )
+    expect(formatSocketPeerForSecurityLog(socket)).toContain(
+      'cfConnectingIp="198.51.100.20"',
+    )
   })
 })

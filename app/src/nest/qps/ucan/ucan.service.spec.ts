@@ -5,18 +5,37 @@ import { jest } from '@jest/globals'
 import { Test, type TestingModule } from '@nestjs/testing'
 import * as ucans from '@ucans/ucans'
 import { UcanService } from './ucan.service.js'
-import { EncryptionModule } from '../../encryption/enc.module.js'
-import { UtilsModule } from '../../utils/utils.module.js'
-import { AWSModule } from '../../utils/aws/aws.module.js'
+import { AWSSecretsService } from '../../utils/aws/aws-secrets.service.js'
 
 describe('UcanService', () => {
+  const TEST_TEAM_ID = 'test-team-id'
+
   let module: TestingModule | undefined = undefined
   let ucanService: UcanService | undefined = undefined
+  let secrets: Map<string, string | Uint8Array>
+  let awsSecretsService: jest.Mocked<Pick<AWSSecretsService, 'get' | 'create'>>
 
   beforeEach(async () => {
+    secrets = new Map()
+    awsSecretsService = {
+      get: jest.fn(
+        async secretName =>
+          await Promise.resolve(secrets.get(secretName) ?? undefined),
+      ),
+      create: jest.fn(async (secretName, secret) => {
+        secrets.set(secretName, secret)
+        await Promise.resolve()
+      }),
+    }
+
     module = await Test.createTestingModule({
-      imports: [UtilsModule, EncryptionModule, AWSModule],
-      providers: [UcanService],
+      providers: [
+        UcanService,
+        {
+          provide: AWSSecretsService,
+          useValue: awsSecretsService,
+        },
+      ],
     }).compile()
 
     await module.init()
@@ -45,7 +64,12 @@ describe('UcanService', () => {
       const deviceToken = 'test-fcm-device-token-123'
       const bundleId = 'com.tryquiet.quiet'
 
-      const ucan = await ucanService!.createUcan(deviceToken, bundleId, 'ios')
+      const ucan = await ucanService!.createUcan(
+        deviceToken,
+        bundleId,
+        'ios',
+        TEST_TEAM_ID,
+      )
 
       expect(ucan).toBeDefined()
       expect(typeof ucan).toBe('string')
@@ -56,12 +80,19 @@ describe('UcanService', () => {
       const deviceToken = 'roundtrip-test-token'
       const bundleId = 'com.tryquiet.quiet'
 
-      const ucan = await ucanService!.createUcan(deviceToken, bundleId, 'ios')
+      const ucan = await ucanService!.createUcan(
+        deviceToken,
+        bundleId,
+        'ios',
+        TEST_TEAM_ID,
+      )
       const validation = await ucanService!.validateUcan(ucan)
 
       expect(validation.valid).toBe(true)
       expect(validation.deviceToken).toBe(deviceToken)
       expect(validation.bundleId).toBe(bundleId)
+      expect(validation.platform).toBe('ios')
+      expect(validation.teamId).toBe(TEST_TEAM_ID)
     })
 
     it('should create self-issued UCANs (issuer === audience)', async () => {
@@ -69,6 +100,7 @@ describe('UcanService', () => {
         'test-token',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
       const parsed = ucans.parse(ucan)
 
@@ -82,12 +114,19 @@ describe('UcanService', () => {
       const deviceToken = 'validation-test-token'
       const bundleId = 'com.tryquiet.quiet'
 
-      const ucan = await ucanService!.createUcan(deviceToken, bundleId, 'ios')
+      const ucan = await ucanService!.createUcan(
+        deviceToken,
+        bundleId,
+        'ios',
+        TEST_TEAM_ID,
+      )
       const validation = await ucanService!.validateUcan(ucan)
 
       expect(validation.valid).toBe(true)
       expect(validation.deviceToken).toBe(deviceToken)
       expect(validation.bundleId).toBe(bundleId)
+      expect(validation.platform).toBe('ios')
+      expect(validation.teamId).toBe(TEST_TEAM_ID)
       expect(validation.error).toBeUndefined()
     })
 
@@ -113,6 +152,7 @@ describe('UcanService', () => {
         'test-token',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
 
       const parts = ucan.split('.')
@@ -130,6 +170,7 @@ describe('UcanService', () => {
         'original-token',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
 
       const parts = ucan.split('.')
@@ -172,7 +213,12 @@ describe('UcanService', () => {
       const deviceToken = 'test-token'
       const bundleId = 'com.test.app'
 
-      const ucan = await ucanService!.createUcan(deviceToken, bundleId, 'ios')
+      const ucan = await ucanService!.createUcan(
+        deviceToken,
+        bundleId,
+        'ios',
+        TEST_TEAM_ID,
+      )
       const parts = ucan.split('.')
       const payload = JSON.parse(
         Buffer.from(parts[1], 'base64url').toString('utf8'),
@@ -245,7 +291,12 @@ describe('UcanService', () => {
       const deviceToken = 'token-with_special.chars:123'
       const bundleId = 'com.tryquiet.quiet'
 
-      const ucan = await ucanService!.createUcan(deviceToken, bundleId, 'ios')
+      const ucan = await ucanService!.createUcan(
+        deviceToken,
+        bundleId,
+        'ios',
+        TEST_TEAM_ID,
+      )
       const validation = await ucanService!.validateUcan(ucan)
 
       expect(validation.valid).toBe(true)
@@ -256,7 +307,12 @@ describe('UcanService', () => {
       const deviceToken = 'a'.repeat(1000)
       const bundleId = 'com.tryquiet.quiet'
 
-      const ucan = await ucanService!.createUcan(deviceToken, bundleId, 'ios')
+      const ucan = await ucanService!.createUcan(
+        deviceToken,
+        bundleId,
+        'ios',
+        TEST_TEAM_ID,
+      )
       const validation = await ucanService!.validateUcan(ucan)
 
       expect(validation.valid).toBe(true)
@@ -276,6 +332,7 @@ describe('UcanService', () => {
           'test-token',
           bundleId,
           'ios',
+          TEST_TEAM_ID,
         )
         const validation = await ucanService!.validateUcan(ucan)
 
@@ -292,6 +349,7 @@ describe('UcanService', () => {
         'test-token',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
 
       const validation1 = await ucanService!.validateUcan(ucan)
@@ -306,11 +364,13 @@ describe('UcanService', () => {
         'token1',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
       const ucan2 = await ucanService!.createUcan(
         'token2',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
 
       expect(ucan1).not.toBe(ucan2)
@@ -329,6 +389,7 @@ describe('UcanService', () => {
         'valid-token',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
       const parts = ucan.split('.')
       const payload = JSON.parse(
@@ -351,6 +412,7 @@ describe('UcanService', () => {
         'valid-token',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
       const parts = ucan.split('.')
       const payload = JSON.parse(
@@ -372,6 +434,7 @@ describe('UcanService', () => {
         'valid-token',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
       const parts = ucan.split('.')
       const payload = JSON.parse(
@@ -393,6 +456,7 @@ describe('UcanService', () => {
         'valid-token',
         'com.test.app',
         'ios',
+        TEST_TEAM_ID,
       )
       const parts = ucan.split('.')
       const payload = JSON.parse(
@@ -408,5 +472,62 @@ describe('UcanService', () => {
       expect(validation.valid).toBe(false)
       expect(validation.error).toBeDefined()
     })
+  })
+})
+
+/**
+ * Regression coverage for issue #3290: a transient secrets-backend failure must
+ * not be misread as "no signing key exists", which would regenerate the QPS
+ * signing key and invalidate every previously issued UCAN. These tests drive
+ * initializeKeypair with a mocked AWSSecretsService so they stay independent of
+ * Redis/AWS.
+ */
+describe('UcanService - signing key retrieval failure handling', () => {
+  const createMockSecrets = (): {
+    get: jest.Mock<(name: string) => Promise<string | Uint8Array | undefined>>
+    create: jest.Mock<(name: string, secret: string) => Promise<void>>
+  } => ({
+    get: jest.fn<(name: string) => Promise<string | Uint8Array | undefined>>(),
+    create: jest.fn<(name: string, secret: string) => Promise<void>>(),
+  })
+
+  const makeService = (
+    mock: ReturnType<typeof createMockSecrets>,
+  ): UcanService => new UcanService(mock as unknown as AWSSecretsService)
+
+  it('does not generate a new signing key when retrieval fails transiently', async () => {
+    const mockSecrets = createMockSecrets()
+    mockSecrets.get.mockRejectedValueOnce(new Error('AWS unavailable'))
+
+    const service = makeService(mockSecrets)
+
+    await expect(service.onModuleInit()).rejects.toThrow('AWS unavailable')
+    expect(mockSecrets.create).not.toHaveBeenCalled()
+  })
+
+  it('generates and stores a new signing key only when none exists', async () => {
+    const mockSecrets = createMockSecrets()
+    mockSecrets.get.mockResolvedValueOnce(undefined)
+    mockSecrets.create.mockResolvedValueOnce(undefined)
+
+    const service = makeService(mockSecrets)
+    await service.onModuleInit()
+
+    expect(mockSecrets.create).toHaveBeenCalledTimes(1)
+    expect(service.getDid()).toMatch(/^did:key:z[a-zA-Z0-9]+$/)
+  })
+
+  it('loads the existing signing key without regenerating it', async () => {
+    const existingKeypair = await ucans.EdKeypair.create({ exportable: true })
+    const existingSecret = await existingKeypair.export('base64')
+
+    const mockSecrets = createMockSecrets()
+    mockSecrets.get.mockResolvedValueOnce(existingSecret)
+
+    const service = makeService(mockSecrets)
+    await service.onModuleInit()
+
+    expect(mockSecrets.create).not.toHaveBeenCalled()
+    expect(service.getDid()).toBe(existingKeypair.did())
   })
 })

@@ -14,7 +14,7 @@ import { Inject, OnModuleDestroy, Optional } from '@nestjs/common'
 
 import {
   formatSocketAttribution,
-  formatSocketPeer,
+  formatSocketPeerForSecurityLog,
   getClientIp,
   type BaseHandlerConfig,
   type QuietSocket,
@@ -139,7 +139,7 @@ export class WebsocketGateway
     )
     if (concurrentCount >= this._rateLimitConfig.maxConcurrentPerIp) {
       _logger.warn(
-        `Max concurrent connections (${this._rateLimitConfig.maxConcurrentPerIp}) exceeded for ${formatSocketPeer(client)}, disconnecting`,
+        `Max concurrent connections (${this._rateLimitConfig.maxConcurrentPerIp}) exceeded for ${formatSocketPeerForSecurityLog(client)}, disconnecting`,
       )
       client.disconnect(true)
       return
@@ -154,7 +154,7 @@ export class WebsocketGateway
     )
     if (attemptsInWindow > this._rateLimitConfig.maxAttemptsInWindow) {
       _logger.warn(
-        `Rate limit exceeded (${attemptsInWindow} connections in ${this._rateLimitConfig.windowMs}ms) for ${formatSocketPeer(client)}, disconnecting`,
+        `Rate limit exceeded (${attemptsInWindow} connections in ${this._rateLimitConfig.windowMs}ms) for ${formatSocketPeerForSecurityLog(client)}, disconnecting`,
       )
       client.disconnect(true)
       return
@@ -163,7 +163,7 @@ export class WebsocketGateway
     this._socketIps.set(id, ip)
 
     _logger.debug(
-      `Client connected: ${formatSocketAttribution(client)} ${formatSocketPeer(client)} rooms=${JSON.stringify([...rooms])} connectedClients=${sockets.size}`,
+      `Client connected: ${formatSocketAttribution(client)} roomsCount=${rooms.size} connectedClients=${sockets.size}`,
     )
     _logger.debug(`Current connected clients: ${sockets.size}`)
 
@@ -186,7 +186,7 @@ export class WebsocketGateway
     this._socketIps.delete(id)
 
     _logger.debug(
-      `Client disconnected: ${formatSocketAttribution(client)} ${formatSocketPeer(client)} connectedClients=${sockets.size}`,
+      `Client disconnected: ${formatSocketAttribution(client)} connectedClients=${sockets.size}`,
     )
   }
 
@@ -225,6 +225,7 @@ export class WebsocketGateway
       const qpsConfig: QPSHandlerConfig = {
         ...baseConfig,
         qpsService: this.qpsService,
+        communitiesManager: this.communitiesManager,
       }
       registerQpsHandlers(qpsConfig)
     }

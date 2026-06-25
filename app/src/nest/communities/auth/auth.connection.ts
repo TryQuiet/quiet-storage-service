@@ -17,7 +17,7 @@ import { createLogger } from '../../app/logger/logger.js'
 import { DateTime } from 'luxon'
 import * as uint8arrays from 'uint8arrays'
 import { ConfigService } from '../../utils/config/config.service.js'
-import { Environment } from '../../utils/config/types.js'
+import { EnvVars } from '../../utils/config/env_vars.js'
 import {
   type AuthSyncMessage,
   CommunityOperationStatus,
@@ -105,7 +105,10 @@ export class AuthConnection extends EventEmitter {
         }
         this.config.socket.emit(WebsocketEvents.AuthSync, socketMessage)
       },
-      ...(ConfigService.getEnv() !== Environment.Production && {
+      ...(ConfigService.getBool(
+        EnvVars.LOCALFIRST_DEBUG_LOGGING_ENABLED,
+        false,
+      ) === true && {
         createLogger: this.createLfaLogger,
       }),
     })
@@ -147,8 +150,8 @@ export class AuthConnection extends EventEmitter {
     })
 
     // handle disconnects
-    this.lfaConnection.on('disconnected', event => {
-      this.logger.log(`LFA Disconnected!`, event)
+    this.lfaConnection.on('disconnected', () => {
+      this.logger.debug(`LFA disconnected`)
       this._status = AuthStatus.REJECTED_OR_CLOSED
       const payload: AuthDisconnectedPayload = {
         userId: this.userId,

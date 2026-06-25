@@ -2,11 +2,7 @@
  * Auth websocket event handlers
  */
 
-import {
-  formatSocketAttribution,
-  setSocketAttribution,
-  WebsocketEvents,
-} from '../ws.types.js'
+import { WebsocketEvents } from '../ws.types.js'
 import { DateTime } from 'luxon'
 import { createLogger } from '../../app/logger/logger.js'
 import {
@@ -54,16 +50,6 @@ export function registerCommunitiesAuthHandlers(
       }
       const { payload } = message
       const { teamId } = payload
-      if (
-        setSocketAttribution(config.socket, {
-          teamId,
-          source: WebsocketEvents.GeneratePublicKeys,
-        })
-      ) {
-        _logger.info(
-          `Socket attribution updated: ${formatSocketAttribution(config.socket)}`,
-        )
-      }
 
       if (config.socket.data.verifiedCaptcha !== true) {
         _logger.warn(
@@ -122,17 +108,6 @@ export function registerCommunitiesAuthHandlers(
     try {
       const { payload } = message
       const { teamId, userId } = payload
-      if (
-        setSocketAttribution(config.socket, {
-          teamId,
-          userId,
-          source: WebsocketEvents.AuthSync,
-        })
-      ) {
-        _logger.debug(
-          `Socket attribution updated: ${formatSocketAttribution(config.socket)}`,
-        )
-      }
 
       // get the managed community by ID and return an error if not found
       const community = await config.communitiesManager.get(teamId)
@@ -143,9 +118,16 @@ export function registerCommunitiesAuthHandlers(
       // get the existing auth connection for this user and return an error if not found
       authConnection = community.authConnections?.get(userId)
       if (authConnection == null) {
-        throw new Error(
-          `No auth connection was established for this user on this community`,
+        _logger.warn(
+          `Rejecting auth-sync: no auth connection was established for the requested community/user`,
         )
+        return
+      }
+      if (authConnection.socketId !== config.socket.id) {
+        _logger.warn(
+          `Rejecting auth-sync: socket ownership mismatch for the requested community/user`,
+        )
+        return
       }
       // push the sync message onto the auth sync connection
       const decoded = uint8arrays.fromString(message.payload.message, 'base64')
