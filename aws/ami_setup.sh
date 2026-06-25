@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 ###### This script is run as part of the AMI build process
 
 echo -e "Starting server init\n"

@@ -1,3 +1,5 @@
+set -e
+
 echo "Running BeforeInstall"
 echo $(whoami)
 
