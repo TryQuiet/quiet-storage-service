@@ -54,7 +54,7 @@ runs:
     - name: Push setup script to S3
       shell: bash
       run: |
-        aws s3 cp ./aws/ami_setup.sh s3://qss-ami-setup
+        aws s3 cp ./aws/ami_setup.sh s3://qss-ami-setup/ami_setup_${{ inputs.version }}_${{ github.sha }}_${{ inputs.environment }}.sh
 
     - name: Bundle code and push to S3
       shell: bash
