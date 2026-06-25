@@ -37,11 +37,12 @@ import { registerQpsHandlers } from './handlers/qps.handler.js'
 import { LogEntrySyncManager } from '../communities/sync/log-entry-sync.service.js'
 import { QPSService } from '../qps/qps.service.js'
 import { CaptchaService } from '../utils/captcha.js'
-import { pruneConnectionRates } from './ws.rate-limiter.js'
-
-const RATE_LIMIT_WINDOW_MS = 10_000
-const RATE_LIMIT_MAX_IN_WINDOW = 10
-const MAX_CONCURRENT_PER_IP = 5
+import { getWebsocketRateLimitConfig } from './ws-rate-limit.config.js'
+import {
+  countConcurrentConnections,
+  pruneConnectionRates,
+  recordConnectionAttempt,
+} from './ws-rate-limit.js'
 
 /**
  * Websocket gateway configuration
@@ -74,6 +75,10 @@ export class WebsocketGateway
   // Active socket ID → client IP, used to count concurrent connections per IP
   private readonly _socketIps = new Map<string, string>()
 
+  private readonly _rateLimitConfig = getWebsocketRateLimitConfig()
+
+  private _connectionRateCleanupTimer: NodeJS.Timeout | undefined = undefined
+
   // eslint-disable-next-line @typescript-eslint/max-params -- NestJS requires constructor injection
   constructor(
     private readonly communityStorageService: CommunitiesStorageService,
@@ -85,13 +90,23 @@ export class WebsocketGateway
   ) {}
 
   afterInit(): void {
-    // do nothing for now
+    this._connectionRateCleanupTimer = setInterval(() => {
+      pruneConnectionRates(
+        this._connectionRates,
+        Date.now(),
+        this._rateLimitConfig.windowMs,
+      )
+    }, this._rateLimitConfig.cleanupIntervalMs)
+    this._connectionRateCleanupTimer.unref()
   }
 
   /**
    * Close the websocket server when shutting down the server
    */
   public async onModuleDestroy(): Promise<void> {
+    if (this._connectionRateCleanupTimer != null) {
+      clearInterval(this._connectionRateCleanupTimer)
+    }
     await this.io.close()
   }
 
@@ -109,32 +124,37 @@ export class WebsocketGateway
     const { sockets } = namespace
 
     const ip = getClientIp(client)
+    const now = Date.now()
+
+    pruneConnectionRates(
+      this._connectionRates,
+      now,
+      this._rateLimitConfig.windowMs,
+    )
 
     // Reject if this IP already has too many concurrent connections
-    let concurrentCount = 0
-    for (const storedIp of this._socketIps.values()) {
-      if (storedIp === ip) concurrentCount++
-    }
-    if (concurrentCount >= MAX_CONCURRENT_PER_IP) {
+    const concurrentCount = countConcurrentConnections(
+      this._socketIps.values(),
+      ip,
+    )
+    if (concurrentCount >= this._rateLimitConfig.maxConcurrentPerIp) {
       _logger.warn(
-        `Max concurrent connections (${MAX_CONCURRENT_PER_IP}) exceeded for ${formatSocketPeerForSecurityLog(client)}, disconnecting`,
+        `Max concurrent connections (${this._rateLimitConfig.maxConcurrentPerIp}) exceeded for ${formatSocketPeerForSecurityLog(client)}, disconnecting`,
       )
       client.disconnect(true)
       return
     }
 
     // Reject if this IP is connecting too rapidly
-    const now = Date.now()
-    const windowStart = now - RATE_LIMIT_WINDOW_MS
-    pruneConnectionRates(this._connectionRates, windowStart)
-    const recentTimestamps = (this._connectionRates.get(ip) ?? []).filter(
-      t => t >= windowStart,
+    const attemptsInWindow = recordConnectionAttempt(
+      this._connectionRates,
+      ip,
+      now,
+      this._rateLimitConfig.windowMs,
     )
-    recentTimestamps.push(now)
-    this._connectionRates.set(ip, recentTimestamps)
-    if (recentTimestamps.length > RATE_LIMIT_MAX_IN_WINDOW) {
+    if (attemptsInWindow > this._rateLimitConfig.maxAttemptsInWindow) {
       _logger.warn(
-        `Rate limit exceeded (${recentTimestamps.length} connections in ${RATE_LIMIT_WINDOW_MS}ms) for ${formatSocketPeerForSecurityLog(client)}, disconnecting`,
+        `Rate limit exceeded (${attemptsInWindow} connections in ${this._rateLimitConfig.windowMs}ms) for ${formatSocketPeerForSecurityLog(client)}, disconnecting`,
       )
       client.disconnect(true)
       return
