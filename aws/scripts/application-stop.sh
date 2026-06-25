@@ -1,6 +1,6 @@
 set -e
 
-source /home/qss-user/.bashrc
+source ~/.bashrc
 
 # stop the existing QSS process gracefully (if it exists)
 echo "Checking for existing QSS service"
