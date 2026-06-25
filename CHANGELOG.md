@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.7-alpha.8 (2026-06-25)</small>
+
+- Set prod hostname ([af734b4](https://github.com/TryQuiet/quiet-storage-service/commit/af734b4))
+- Try waiting for deploy to succeed ([851f2a2](https://github.com/TryQuiet/quiet-storage-service/commit/851f2a2))
+- Update app package CHANGELOG.md ([de4ee5c](https://github.com/TryQuiet/quiet-storage-service/commit/de4ee5c))
+
 ## <small>1.0.7-alpha.7 (2026-06-25)</small>
 
 - Remove permissions code ([1c1343a](https://github.com/TryQuiet/quiet-storage-service/commit/1c1343a))
