@@ -6,9 +6,11 @@ files:
 permissions:
   - object: /home/qss-user/qss
     owner: qss-user
+    pattern: "**"
     mode: 644
     type:
       - directory
+      - file
 hooks:
   BeforeInstall:
     - location: aws/scripts/before-install.sh
