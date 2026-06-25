@@ -5,7 +5,7 @@
 ###
 
 name: 'Release Notifier'
-
+description: 'Publish notifications to slack for deploys'
 inputs:
   version:
     description: 'Semantic version string for this release (e.g. 4.0.0-alpha.0)'

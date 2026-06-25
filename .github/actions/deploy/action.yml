@@ -72,4 +72,10 @@ runs:
           --application-name ${{ inputs.code_deploy_application }} \
           --deployment-group-name ${{ inputs.code_deploy_group }} \
           --s3-location bucket=${{ inputs.s3_bucket }},bundleType=zip,key=$ZIP_FILE_NAME \
-          --color on
+          --color on \
+        | grep -i -E -o 'd-[[:alnum:]]+' | { read depId; echo "DEPLOYMENT_ID=$depId"; } >> $GITHUB_ENV
+    
+    - name: Wait for CodeDeploy To Succeed
+      shell: bash
+      run: |
+        aws deploy wait deployment-successful --deployment-id $DEPLOYMENT_ID
