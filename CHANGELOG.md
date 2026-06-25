@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.7-alpha.11 (2026-06-25)</small>
+
+- Run on ApplicationStop ([a532214](https://github.com/TryQuiet/quiet-storage-service/commit/a532214))
+- Update app package CHANGELOG.md ([7994380](https://github.com/TryQuiet/quiet-storage-service/commit/7994380))
+
 ## <small>1.0.7-alpha.10 (2026-06-25)</small>
 
 - Try to fix error with pm2 on before install ([b3a73c4](https://github.com/TryQuiet/quiet-storage-service/commit/b3a73c4))
