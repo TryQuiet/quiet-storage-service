@@ -22,6 +22,8 @@ import { CommunityOperationStatus } from '../nest/websocket/handlers/types/commo
 import { WebsocketEvents } from '../nest/websocket/ws.types.js'
 import { ClientEvents } from './ws.client.events.js'
 import { QuietLogger } from '../nest/app/logger/types.js'
+import { ConfigService } from '../nest/utils/config/config.service.js'
+import { EnvVars } from '../nest/utils/config/env_vars.js'
 
 @Injectable()
 export class QSSClientAuthConnection extends EventEmitter {
@@ -53,11 +55,11 @@ export class QSSClientAuthConnection extends EventEmitter {
     super()
     this._id = randomUUID()
     this.logger = createLogger(
-      `qss:auth:conn:client:${this.context.user.userName}`,
+      `qss:auth:conn:client:${this.context.user.userId}`,
     )
     this.createLfaLogger = (packageName: string) =>
       createLogger(
-        `localfirst:qss:client:${this.context.user.userName}:${packageName}`,
+        `localfirst:qss:client:${this.context.user.userId}:${packageName}`,
       )
   }
 
@@ -117,7 +119,12 @@ export class QSSClientAuthConnection extends EventEmitter {
             false,
           )
         },
-        createLogger: this.createLfaLogger,
+        ...(ConfigService.getBool(
+          EnvVars.LOCALFIRST_DEBUG_LOGGING_ENABLED,
+          false,
+        ) === true && {
+          createLogger: this.createLfaLogger,
+        }),
       })
     }
 

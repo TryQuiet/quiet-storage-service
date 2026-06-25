@@ -252,6 +252,9 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         return
       }
       // Stale connection: belongs to a previous socket or is dead. Stop it before creating a new one.
+      this.logger.log(
+        `Replacing stale auth connection; previousStatus=${existingConn.status}`,
+      )
       this.logger.debug(
         `Replacing stale auth connection for user ${userId} (oldSocket=${existingConn.socketId}, newSocket=${config.socket.id}, status=${existingConn.status})`,
       )

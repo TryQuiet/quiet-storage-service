@@ -16,6 +16,7 @@ import colors from 'ansi-colors'
 import { ConfigService } from '../../utils/config/config.service.js'
 import { EnvVars } from '../../utils/config/env_vars.js'
 import { DEFAULT_LOG_LEVEL } from './const.js'
+import { sanitizeLogValue } from './log-sanitizer.js'
 
 export const createDefaultLogger = (context?: string): QuietNestLogger => {
   const logger = new QuietNestLogger(context, {
@@ -47,31 +48,41 @@ export class QuietNestLogger extends ConsoleLogger {
   public log(message: unknown, context?: string): void
   public log(message: unknown, ...rest: [...any, string?]): void
   public log(message: unknown, ...rest: unknown[]): void {
-    super.log(message, ...this._parseParams(rest))
+    if (!this.isLevelEnabled('log')) return
+
+    super.log(this._sanitizeMessage(message), ...this._parseParams(rest))
   }
 
   public info(message: unknown, context?: string): void
   public info(message: unknown, ...rest: [...any, string?]): void
   public info(message: unknown, ...rest: unknown[]): void {
-    super.log(message, ...this._parseParams(rest))
+    if (!this.isLevelEnabled('log')) return
+
+    super.log(this._sanitizeMessage(message), ...this._parseParams(rest))
   }
 
   public warn(message: unknown, context?: string): void
   public warn(message: unknown, ...rest: [...any, string?]): void
   public warn(message: unknown, ...rest: unknown[]): void {
-    super.warn(message, ...this._parseParams(rest))
+    if (!this.isLevelEnabled('warn')) return
+
+    super.warn(this._sanitizeMessage(message), ...this._parseParams(rest))
   }
 
   public debug(message: unknown, context?: string): void
   public debug(message: unknown, ...rest: [...any, string?]): void
   public debug(message: unknown, ...rest: unknown[]): void {
-    super.debug(message, ...this._parseParams(rest))
+    if (!this.isLevelEnabled('debug')) return
+
+    super.debug(this._sanitizeMessage(message), ...this._parseParams(rest))
   }
 
   public verbose(message: unknown, context?: string): void
   public verbose(message: unknown, ...rest: [...any, string?]): void
   public verbose(message: unknown, ...rest: unknown[]): void {
-    super.verbose(message, ...this._parseParams(rest))
+    if (!this.isLevelEnabled('verbose')) return
+
+    super.verbose(this._sanitizeMessage(message), ...this._parseParams(rest))
   }
 
   public error(message: unknown, stack?: string, context?: string): void
@@ -82,6 +93,8 @@ export class QuietNestLogger extends ConsoleLogger {
     ...rest: unknown[]
   ): void
   public error(message: unknown, ...rest: [...any, string?, string?]): void {
+    if (!this.isLevelEnabled('error')) return
+
     if (message instanceof Error) {
       message = this._formatError(message, 'error')
     }
@@ -93,21 +106,39 @@ export class QuietNestLogger extends ConsoleLogger {
       return param
     })
 
-    super.error(message, ...this._parseParams(rest))
+    super.error(this._sanitizeMessage(message), ...this._parseParams(rest))
   }
 
   public fatal(message: unknown, context?: string): void
   public fatal(message: unknown, ...rest: [...any, string?]): void
   public fatal(message: unknown, ...rest: unknown[]): void {
+    if (!this.isLevelEnabled('fatal')) return
+
     if (message instanceof Error) {
       message = this._formatError(message, 'fatal')
     }
 
-    super.fatal(message, ...this._parseParams(rest))
+    super.fatal(this._sanitizeMessage(message), ...this._parseParams(rest))
   }
 
   private _parseParams(rest: unknown[] = []): unknown[] {
-    return this.context != null ? rest.concat(this.context) : rest
+    const sanitized = rest.map(param => {
+      if (param instanceof Error) {
+        return this._formatError(param, 'error')
+      }
+      return this._sanitizeMessage(param)
+    })
+    return this.context != null ? sanitized.concat(this.context) : sanitized
+  }
+
+  private _sanitizeMessage(message: unknown): unknown {
+    if (
+      ['string', 'number', 'boolean', 'bigint'].includes(typeof message) ||
+      message == null
+    ) {
+      return message
+    }
+    return sanitizeLogValue(message)
   }
 
   private _formatError(e: Error, level: 'error' | 'fatal'): string {
