@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.7-alpha.6 (2026-06-25)</small>
+
+- Add back AfterInstall ([a5e644d](https://github.com/TryQuiet/quiet-storage-service/commit/a5e644d))
+- Update app package CHANGELOG.md ([544d010](https://github.com/TryQuiet/quiet-storage-service/commit/544d010))
+
 ## <small>1.0.7-alpha.5 (2026-06-25)</small>
 
 - Update app package CHANGELOG.md ([376cd71](https://github.com/TryQuiet/quiet-storage-service/commit/376cd71))
