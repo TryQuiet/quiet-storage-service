@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.7-alpha.2 (2026-06-25)</small>
+
+- Update app package CHANGELOG.md ([25ef66a](https://github.com/TryQuiet/quiet-storage-service/commit/25ef66a))
+- Update BeforeInstall, apply dir ownership in appspec, skip AfterInstall script ([c8b4191](https://github.com/TryQuiet/quiet-storage-service/commit/c8b4191))
+
 ## <small>1.0.7-alpha.1 (2026-06-24)</small>
 
 - Rename setup script ([a071f45](https://github.com/TryQuiet/quiet-storage-service/commit/a071f45))
