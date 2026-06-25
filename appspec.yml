@@ -3,12 +3,6 @@ os: linux
 files:
   - source: /
     destination: /home/qss-user/qss
-permissions:
-  - object: /home/qss-user/qss
-    owner: qss-user
-    mode: 644
-    type:
-      - directory
 hooks:
   BeforeInstall:
     - location: aws/scripts/before-install.sh
