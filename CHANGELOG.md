@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.7-alpha.9 (2026-06-25)</small>
+
+- Add 'set -e' to deploy/AMI init scripts ([66b28bd](https://github.com/TryQuiet/quiet-storage-service/commit/66b28bd))
+- Update app package CHANGELOG.md ([336d51a](https://github.com/TryQuiet/quiet-storage-service/commit/336d51a))
+- Write versioned AMI setup scripts to S3 ([15b1438](https://github.com/TryQuiet/quiet-storage-service/commit/15b1438))
+
 ## <small>1.0.7-alpha.8 (2026-06-25)</small>
 
 - Set prod hostname ([af734b4](https://github.com/TryQuiet/quiet-storage-service/commit/af734b4))
