@@ -5,7 +5,7 @@ files:
     destination: /home/qss-user/qss
 hooks:
   BeforeInstall:
-    - location: aws/scripts/before-install.sh
+    - location: aws/scripts/application-stop.sh
       timeout: 300
       runas: qss-user
   AfterInstall:

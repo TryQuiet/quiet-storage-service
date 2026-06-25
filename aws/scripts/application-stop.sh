@@ -1,9 +1,8 @@
 set -e
 
-echo "Running BeforeInstall"
-echo $(whoami)
+source /home/qss-user/.bashrc
 
-# stop the existing QSS process gracefully
+# stop the existing QSS process gracefully (if it exists)
 echo "Checking for existing QSS service"
 QSS_EXISTS=$(pm2 list | grep QSS)
 if [ -n "$QSS_EXISTS" ]
