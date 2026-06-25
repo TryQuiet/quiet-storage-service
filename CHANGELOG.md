@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.7-alpha.10 (2026-06-25)</small>
+
+- Try to fix error with pm2 on before install ([b3a73c4](https://github.com/TryQuiet/quiet-storage-service/commit/b3a73c4))
+- Update action.yml ([3de3794](https://github.com/TryQuiet/quiet-storage-service/commit/3de3794))
+- Update app package CHANGELOG.md ([8f8c7bf](https://github.com/TryQuiet/quiet-storage-service/commit/8f8c7bf))
+
 ## <small>1.0.7-alpha.9 (2026-06-25)</small>
 
 - Add 'set -e' to deploy/AMI init scripts ([66b28bd](https://github.com/TryQuiet/quiet-storage-service/commit/66b28bd))
