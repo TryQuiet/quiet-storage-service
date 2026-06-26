@@ -1,12 +1,3 @@
-sudo su -- qss-user
+cd /home/qss-user/qss
 
-source ~/.bashrc
-
-# stop the existing QSS process gracefully (if it exists)
-echo "Checking for existing QSS service"
-QSS_EXISTS=$(pm2 list | grep QSS)
-if [ -n "$QSS_EXISTS" ]
-then
-  echo "Gracefully stopping existing QSS service"
-  pm2 stop QSS
-fi
+runuser -l qss-user -c 'sh aws/scripts/user-level-scripts/run_on_app_stop.sh'
