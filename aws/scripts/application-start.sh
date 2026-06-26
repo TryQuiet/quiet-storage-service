@@ -1,3 +1,5 @@
+sudo su -- qss-user
+
 cd /home/qss-user/qss
 
 source ~/.bashrc

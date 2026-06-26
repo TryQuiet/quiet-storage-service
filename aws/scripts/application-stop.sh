@@ -1,3 +1,5 @@
+sudo su -- qss-user
+
 source ~/.bashrc
 
 # stop the existing QSS process gracefully (if it exists)

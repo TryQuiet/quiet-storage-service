@@ -7,7 +7,7 @@ hooks:
   ApplicationStop:
     - location: aws/scripts/application-stop.sh
       timeout: 300
-      runas: qss-user
+      runas: root
   AfterInstall:
     - location: aws/scripts/after-install.sh
       timeout: 300
@@ -15,4 +15,4 @@ hooks:
   ApplicationStart:
     - location: aws/scripts/application-start.sh
       timeout: 300
-      runas: qss-user
+      runas: root
