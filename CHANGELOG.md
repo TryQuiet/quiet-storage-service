@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.8-alpha.3 (2026-06-26)</small>
+
+- Run user-level logic in separate script ([e9a10ee](https://github.com/TryQuiet/quiet-storage-service/commit/e9a10ee))
+- Update app package CHANGELOG.md ([df6681d](https://github.com/TryQuiet/quiet-storage-service/commit/df6681d))
+
 ## <small>1.0.8-alpha.2 (2026-06-26)</small>
 
 - Run scripts as root ([0c24d99](https://github.com/TryQuiet/quiet-storage-service/commit/0c24d99))
