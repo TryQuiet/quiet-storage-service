@@ -5,7 +5,7 @@
 ###
 
 name: 'Release Notifier'
-
+description: 'Publish notifications to slack for deploys'
 inputs:
   version:
     description: 'Semantic version string for this release (e.g. 4.0.0-alpha.0)'
@@ -32,7 +32,7 @@ runs:
         color: white
         verbose: false
         message: |
-          QSS ${{ inputs.environment }} Release CI Started - `${{ inputs.version }}`
+          QSS ${{ inputs.environment }} Release Started - `${{ inputs.version }}`
         channel: releases
 
     - name: 'Success Notification'
@@ -44,7 +44,7 @@ runs:
         color: green
         verbose: true
         message: |
-          QSS ${{ inputs.environment }} Release CI Success - `${{ inputs.version }}`
+          QSS ${{ inputs.environment }} Release Success - `${{ inputs.version }}`
         channel: releases
         
     - name: 'Failure Notification'
@@ -56,7 +56,7 @@ runs:
         color: red
         verbose: true
         message: |
-          QSS ${{ inputs.environment }} Release CI Failed - `${{ inputs.version }}`
+          QSS ${{ inputs.environment }} Release Failed - `${{ inputs.version }}`
         channel: releases
 
     - name: 'Cancelled Notification'
@@ -68,5 +68,5 @@ runs:
         color: yellow
         verbose: true
         message: |
-          QSS ${{ inputs.environment }} Release CI Cancelled - `${{ inputs.version }}`
+          QSS ${{ inputs.environment }} Release Cancelled - `${{ inputs.version }}`
         channel: releases

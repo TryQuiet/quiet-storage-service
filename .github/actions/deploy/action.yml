@@ -1,5 +1,5 @@
 name: AWS Deploy
-
+description: Deploy code to AWS CodeDeploy
 inputs:
   version:
     description: 'Semantic version string for this release (e.g. 4.0.0-alpha.0)'
@@ -22,6 +22,9 @@ inputs:
   s3_bucket:
     description: 'S3 bucket that code is pushed to'
     required: true
+  environment:
+    description: 'Environment being deployed (e.g. development, production)'
+    required: true
 
 runs:
   using: composite
@@ -29,13 +32,17 @@ runs:
     - name: Build QSS
       uses: ./.github/actions/setup-env
 
+    - name: Write aws environment
+      shell: bash
+      run: echo "${{ inputs.environment }}" >> aws-environment.txt
+
     - name: Remove 3rd-party directory
       shell: bash
       run: rm -rf ./3rd-party/
 
     - name: Generate release archive name
       shell: bash
-      run: echo "ZIP_FILE_NAME=${{ inputs.code_deploy_application }}_${{ inputs.version }}_${{ github.sha }}.zip" >> $GITHUB_ENV
+      run: echo "ZIP_FILE_NAME=${{ inputs.code_deploy_application }}_${{ inputs.version }}_${{ github.sha }}_${{ inputs.environment }}.zip" >> $GITHUB_ENV
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
@@ -43,6 +50,11 @@ runs:
         aws-access-key-id: ${{ inputs.aws_access_key_id }}
         aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
         aws-region: ${{ inputs.aws_region }}
+
+    - name: Push setup script to S3
+      shell: bash
+      run: |
+        aws s3 cp ./aws/ami_setup.sh s3://qss-ami-setup/ami_setup_${{ inputs.version }}_${{ github.sha }}_${{ inputs.environment }}.sh
 
     - name: Bundle code and push to S3
       shell: bash
@@ -60,4 +72,10 @@ runs:
           --application-name ${{ inputs.code_deploy_application }} \
           --deployment-group-name ${{ inputs.code_deploy_group }} \
           --s3-location bucket=${{ inputs.s3_bucket }},bundleType=zip,key=$ZIP_FILE_NAME \
-          --color on
+          --color on \
+        | grep -i -E -o 'd-[[:alnum:]]+' | { read depId; echo "DEPLOYMENT_ID=$depId"; } >> $GITHUB_ENV
+    
+    - name: Wait for CodeDeploy To Succeed
+      shell: bash
+      run: |
+        aws deploy wait deployment-successful --deployment-id $DEPLOYMENT_ID

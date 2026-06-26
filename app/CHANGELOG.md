@@ -3,6 +3,197 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.0.7 (2026-06-25)</small>
+
+- Update app package CHANGELOG.md ([f087685](https://github.com/TryQuiet/quiet-storage-service/commit/f087685))
+
+## <small>1.0.7-alpha.12 (2026-06-25)</small>
+
+- Remove set -e because its throwing on grep not finding strings ([79dbf78](https://github.com/TryQuiet/quiet-storage-service/commit/79dbf78))
+- Update app package CHANGELOG.md ([6b0dafd](https://github.com/TryQuiet/quiet-storage-service/commit/6b0dafd))
+
+## <small>1.0.7-alpha.11 (2026-06-25)</small>
+
+- Run on ApplicationStop ([a532214](https://github.com/TryQuiet/quiet-storage-service/commit/a532214))
+- Update app package CHANGELOG.md ([7994380](https://github.com/TryQuiet/quiet-storage-service/commit/7994380))
+
+## <small>1.0.7-alpha.10 (2026-06-25)</small>
+
+- Try to fix error with pm2 on before install ([b3a73c4](https://github.com/TryQuiet/quiet-storage-service/commit/b3a73c4))
+- Update action.yml ([3de3794](https://github.com/TryQuiet/quiet-storage-service/commit/3de3794))
+- Update app package CHANGELOG.md ([8f8c7bf](https://github.com/TryQuiet/quiet-storage-service/commit/8f8c7bf))
+
+## <small>1.0.7-alpha.9 (2026-06-25)</small>
+
+- Add 'set -e' to deploy/AMI init scripts ([66b28bd](https://github.com/TryQuiet/quiet-storage-service/commit/66b28bd))
+- Update app package CHANGELOG.md ([336d51a](https://github.com/TryQuiet/quiet-storage-service/commit/336d51a))
+- Write versioned AMI setup scripts to S3 ([15b1438](https://github.com/TryQuiet/quiet-storage-service/commit/15b1438))
+
+## <small>1.0.7-alpha.8 (2026-06-25)</small>
+
+- Set prod hostname ([af734b4](https://github.com/TryQuiet/quiet-storage-service/commit/af734b4))
+- Try waiting for deploy to succeed ([851f2a2](https://github.com/TryQuiet/quiet-storage-service/commit/851f2a2))
+- Update app package CHANGELOG.md ([de4ee5c](https://github.com/TryQuiet/quiet-storage-service/commit/de4ee5c))
+
+## <small>1.0.7-alpha.7 (2026-06-25)</small>
+
+- Remove permissions code ([1c1343a](https://github.com/TryQuiet/quiet-storage-service/commit/1c1343a))
+- Update app package CHANGELOG.md ([7326642](https://github.com/TryQuiet/quiet-storage-service/commit/7326642))
+
+## <small>1.0.7-alpha.6 (2026-06-25)</small>
+
+- Add back AfterInstall ([a5e644d](https://github.com/TryQuiet/quiet-storage-service/commit/a5e644d))
+- Update app package CHANGELOG.md ([544d010](https://github.com/TryQuiet/quiet-storage-service/commit/544d010))
+
+## <small>1.0.7-alpha.5 (2026-06-25)</small>
+
+- Update app package CHANGELOG.md ([376cd71](https://github.com/TryQuiet/quiet-storage-service/commit/376cd71))
+
+## <small>1.0.7-alpha.4 (2026-06-25)</small>
+
+- Fix permissions ([eed959e](https://github.com/TryQuiet/quiet-storage-service/commit/eed959e))
+- Update app package CHANGELOG.md ([8e9dfc0](https://github.com/TryQuiet/quiet-storage-service/commit/8e9dfc0))
+
+## <small>1.0.7-alpha.3 (2026-06-25)</small>
+
+- Cleanup ([a00e819](https://github.com/TryQuiet/quiet-storage-service/commit/a00e819))
+- Update app package CHANGELOG.md ([d60c91b](https://github.com/TryQuiet/quiet-storage-service/commit/d60c91b))
+
+## <small>1.0.7-alpha.2 (2026-06-25)</small>
+
+- Update app package CHANGELOG.md ([25ef66a](https://github.com/TryQuiet/quiet-storage-service/commit/25ef66a))
+- Update BeforeInstall, apply dir ownership in appspec, skip AfterInstall script ([c8b4191](https://github.com/TryQuiet/quiet-storage-service/commit/c8b4191))
+
+## <small>1.0.7-alpha.1 (2026-06-24)</small>
+
+- Rename setup script ([a071f45](https://github.com/TryQuiet/quiet-storage-service/commit/a071f45))
+- Update app package CHANGELOG.md ([a89961c](https://github.com/TryQuiet/quiet-storage-service/commit/a89961c))
+- Write setup script to S3 during deploys ([ea78ea1](https://github.com/TryQuiet/quiet-storage-service/commit/ea78ea1))
+
+## <small>1.0.7-alpha.0 (2026-06-24)</small>
+
+- Add server init script and use different zip file names by environment ([5caf7d7](https://github.com/TryQuiet/quiet-storage-service/commit/5caf7d7))
+- Clear dupe and commented out lines from app start script ([1cc30ad](https://github.com/TryQuiet/quiet-storage-service/commit/1cc30ad))
+- Update app package CHANGELOG.md ([efd4052](https://github.com/TryQuiet/quiet-storage-service/commit/efd4052))
+
+## <small>1.0.6 (2026-06-22)</small>
+
+- Update app package CHANGELOG.md ([4af26c1](https://github.com/TryQuiet/quiet-storage-service/commit/4af26c1))
+- Update prod RDS secret name ([b8c4f8f](https://github.com/TryQuiet/quiet-storage-service/commit/b8c4f8f))
+
+## <small>1.0.5 (2026-06-22)</small>
+
+- Fix prod release notification ([e05170d](https://github.com/TryQuiet/quiet-storage-service/commit/e05170d))
+- Update app package CHANGELOG.md ([619f297](https://github.com/TryQuiet/quiet-storage-service/commit/619f297))
+
+## <small>1.0.4 (2026-06-22)</small>
+
+- Update app package CHANGELOG.md ([32fcf2c](https://github.com/TryQuiet/quiet-storage-service/commit/32fcf2c))
+
+## <small>1.0.4-alpha.17 (2026-06-22)</small>
+
+- Update app package CHANGELOG.md ([cffc4d3](https://github.com/TryQuiet/quiet-storage-service/commit/cffc4d3))
+- Update production RDS env config ([c56571c](https://github.com/TryQuiet/quiet-storage-service/commit/c56571c))
+
+## <small>1.0.4-alpha.16 (2026-06-22)</small>
+
+- Cleanup and add logs to scripts ([00fe53f](https://github.com/TryQuiet/quiet-storage-service/commit/00fe53f))
+- Update app package CHANGELOG.md ([d87fac9](https://github.com/TryQuiet/quiet-storage-service/commit/d87fac9))
+
+## <small>1.0.4-alpha.15 (2026-06-22)</small>
+
+- Move bootstrap and migration logic to app start script ([7c9c837](https://github.com/TryQuiet/quiet-storage-service/commit/7c9c837))
+- Update app package CHANGELOG.md ([e5bce0e](https://github.com/TryQuiet/quiet-storage-service/commit/e5bce0e))
+
+## <small>1.0.4-alpha.14 (2026-06-22)</small>
+
+- Run AfterInstall as root to modify dir ownership ([288c51e](https://github.com/TryQuiet/quiet-storage-service/commit/288c51e))
+- Update app package CHANGELOG.md ([102c40b](https://github.com/TryQuiet/quiet-storage-service/commit/102c40b))
+
+## <small>1.0.4-alpha.13 (2026-06-22)</small>
+
+- Pare down deploy scripts to work with new golden AMI ([314b245](https://github.com/TryQuiet/quiet-storage-service/commit/314b245))
+- Update app package CHANGELOG.md ([f257a57](https://github.com/TryQuiet/quiet-storage-service/commit/f257a57))
+
+## <small>1.0.4-alpha.12 (2026-06-19)</small>
+
+- Gracefully stop the QSS process before install ([402a053](https://github.com/TryQuiet/quiet-storage-service/commit/402a053))
+- Update app package CHANGELOG.md ([6e56f52](https://github.com/TryQuiet/quiet-storage-service/commit/6e56f52))
+
+## <small>1.0.4-alpha.11 (2026-06-19)</small>
+
+- Update app package CHANGELOG.md ([3f2ed66](https://github.com/TryQuiet/quiet-storage-service/commit/3f2ed66))
+
+## <small>1.0.4-alpha.10 (2026-06-19)</small>
+
+- Fix restart check of QSS service ([8923bfb](https://github.com/TryQuiet/quiet-storage-service/commit/8923bfb))
+- Update app package CHANGELOG.md ([2753a85](https://github.com/TryQuiet/quiet-storage-service/commit/2753a85))
+
+## <small>1.0.4-alpha.9 (2026-06-19)</small>
+
+- Source correct bashrc ([4e22c4b](https://github.com/TryQuiet/quiet-storage-service/commit/4e22c4b))
+- Update app package CHANGELOG.md ([9439913](https://github.com/TryQuiet/quiet-storage-service/commit/9439913))
+
+## <small>1.0.4-alpha.8 (2026-06-19)</small>
+
+- Add logs ([cca6cca](https://github.com/TryQuiet/quiet-storage-service/commit/cca6cca))
+- Update app package CHANGELOG.md ([9d145d5](https://github.com/TryQuiet/quiet-storage-service/commit/9d145d5))
+- Update application-start.sh ([64ee294](https://github.com/TryQuiet/quiet-storage-service/commit/64ee294))
+
+## <small>1.0.4-alpha.7 (2026-06-18)</small>
+
+- Fix pm2 check ([28f1735](https://github.com/TryQuiet/quiet-storage-service/commit/28f1735))
+- Update app package CHANGELOG.md ([1455813](https://github.com/TryQuiet/quiet-storage-service/commit/1455813))
+
+## <small>1.0.4-alpha.6 (2026-06-18)</small>
+
+- Update app package CHANGELOG.md ([1877880](https://github.com/TryQuiet/quiet-storage-service/commit/1877880))
+- Update auth to latest and sudo su ([e41f345](https://github.com/TryQuiet/quiet-storage-service/commit/e41f345))
+
+## <small>1.0.4-alpha.5 (2026-06-18)</small>
+
+- Fix scripts again ([6e2eeb5](https://github.com/TryQuiet/quiet-storage-service/commit/6e2eeb5))
+- Update app package CHANGELOG.md ([2cea47e](https://github.com/TryQuiet/quiet-storage-service/commit/2cea47e))
+
+## <small>1.0.4-alpha.4 (2026-06-18)</small>
+
+- Ensure AWS CLI tools are installed ([abdc6ea](https://github.com/TryQuiet/quiet-storage-service/commit/abdc6ea))
+- Skip using aws cli for environment name ([64f40f2](https://github.com/TryQuiet/quiet-storage-service/commit/64f40f2))
+- Update app package CHANGELOG.md ([4557c28](https://github.com/TryQuiet/quiet-storage-service/commit/4557c28))
+
+## <small>1.0.4-alpha.3 (2026-06-18)</small>
+
+- More tweaks for amazon linux ([b4cef16](https://github.com/TryQuiet/quiet-storage-service/commit/b4cef16))
+- Update app package CHANGELOG.md ([414dca5](https://github.com/TryQuiet/quiet-storage-service/commit/414dca5))
+
+## <small>1.0.4-alpha.2 (2026-06-17)</small>
+
+- More script updates ([d7acaa2](https://github.com/TryQuiet/quiet-storage-service/commit/d7acaa2))
+- Update app package CHANGELOG.md ([8c62a89](https://github.com/TryQuiet/quiet-storage-service/commit/8c62a89))
+
+## <small>1.0.4-alpha.1 (2026-06-17)</small>
+
+- Update app package CHANGELOG.md ([43feb4d](https://github.com/TryQuiet/quiet-storage-service/commit/43feb4d))
+- Update install scripts to work with amazon linux ([58dceac](https://github.com/TryQuiet/quiet-storage-service/commit/58dceac))
+
+## <small>1.0.4-alpha.0 (2026-06-17)</small>
+
+- release: 1.0.3 (#39) ([4295a31](https://github.com/TryQuiet/quiet-storage-service/commit/4295a31)), closes [#39](https://github.com/TryQuiet/quiet-storage-service/issues/39) [#36](https://github.com/TryQuiet/quiet-storage-service/issues/36)
+- 1.0.2 (#33) ([87c5922](https://github.com/TryQuiet/quiet-storage-service/commit/87c5922)), closes [#33](https://github.com/TryQuiet/quiet-storage-service/issues/33) [#34](https://github.com/TryQuiet/quiet-storage-service/issues/34)
+- add a default title and body so that message is not treated as silent ([391802a](https://github.com/TryQuiet/quiet-storage-service/commit/391802a))
+- Add index to log entry table for community ID + hashedDbId + receivedAt (#26) ([0b5402d](https://github.com/TryQuiet/quiet-storage-service/commit/0b5402d)), closes [#26](https://github.com/TryQuiet/quiet-storage-service/issues/26)
+- Android Firebase Configuration (#31) ([49e0e3e](https://github.com/TryQuiet/quiet-storage-service/commit/49e0e3e)), closes [#31](https://github.com/TryQuiet/quiet-storage-service/issues/31)
+- Batch push notifications (#23) ([a337f38](https://github.com/TryQuiet/quiet-storage-service/commit/a337f38)), closes [#23](https://github.com/TryQuiet/quiet-storage-service/issues/23)
+- NSE Sync Protocol (#30) ([aadb8b5](https://github.com/TryQuiet/quiet-storage-service/commit/aadb8b5)), closes [#30](https://github.com/TryQuiet/quiet-storage-service/issues/30)
+- Secrets Management for Firebase (#32) ([74e1853](https://github.com/TryQuiet/quiet-storage-service/commit/74e1853)), closes [#32](https://github.com/TryQuiet/quiet-storage-service/issues/32)
+- Test change: forgot to set the ruleset to active (#28) ([c026e9f](https://github.com/TryQuiet/quiet-storage-service/commit/c026e9f)), closes [#28](https://github.com/TryQuiet/quiet-storage-service/issues/28)
+- Test commit: should be blocked by branch rules ([faa2b67](https://github.com/TryQuiet/quiet-storage-service/commit/faa2b67))
+- Update app package CHANGELOG.md ([2e43e19](https://github.com/TryQuiet/quiet-storage-service/commit/2e43e19))
+- Update auth (#37) ([63b00eb](https://github.com/TryQuiet/quiet-storage-service/commit/63b00eb)), closes [#37](https://github.com/TryQuiet/quiet-storage-service/issues/37)
+- feat(3155): Update auth module to be compatible with private channels (#35) ([a5692b0](https://github.com/TryQuiet/quiet-storage-service/commit/a5692b0)), closes [#35](https://github.com/TryQuiet/quiet-storage-service/issues/35)
+- fix: Allow more fuzziness in team link timestamp validations and use updated logging (#27) ([2e41cc4](https://github.com/TryQuiet/quiet-storage-service/commit/2e41cc4)), closes [#27](https://github.com/TryQuiet/quiet-storage-service/issues/27)
+- fix: Handle auth errors on QSS (#25) ([b10f52a](https://github.com/TryQuiet/quiet-storage-service/commit/b10f52a)), closes [#25](https://github.com/TryQuiet/quiet-storage-service/issues/25)
+
 ## <small>1.0.3 (2026-06-17)</small>
 
 - Update app package CHANGELOG.md ([a6c75a8](https://github.com/TryQuiet/quiet-storage-service/commit/a6c75a8))
