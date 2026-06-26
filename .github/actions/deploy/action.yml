@@ -25,10 +25,30 @@ inputs:
   environment:
     description: 'Environment being deployed (e.g. development, production)'
     required: true
+  test:
+    description: 'Is this a test build'
+    required: false
+    default: 'false'
 
 runs:
   using: composite
   steps:
+    - name: Verify test release
+      if: 
+      shell: bash
+      run: |
+        if [ ${{ inputs.test }} == 'true' ]
+        then
+          if [ ${{ inputs.environment }} == 'production' ]
+          then
+            exit 1
+          else
+            echo "ENV_TAG=test" >> $GITHUB_ENV
+          fi
+        else
+          echo "ENV_TAG=${{ inputs.environment }}" >> $GITHUB_ENV
+        fi
+      
     - name: Build QSS
       uses: ./.github/actions/setup-env
 
@@ -42,7 +62,7 @@ runs:
 
     - name: Generate release archive name
       shell: bash
-      run: echo "ZIP_FILE_NAME=${{ inputs.code_deploy_application }}_${{ inputs.version }}_${{ github.sha }}_${{ inputs.environment }}.zip" >> $GITHUB_ENV
+      run: echo "ZIP_FILE_NAME=${{ inputs.code_deploy_application }}_${{ inputs.version }}_${{ github.sha }}_$ENV_TAG.zip" >> $GITHUB_ENV
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
@@ -54,7 +74,7 @@ runs:
     - name: Push setup script to S3
       shell: bash
       run: |
-        aws s3 cp ./aws/ami_setup.sh s3://qss-ami-setup/ami_setup_${{ inputs.version }}_${{ github.sha }}_${{ inputs.environment }}.sh
+        aws s3 cp ./aws/ami_setup.sh s3://qss-ami-setup/ami_setup_${{ inputs.version }}_${{ github.sha }}_$ENV_TAG.sh
 
     - name: Bundle code and push to S3
       shell: bash
