@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.1.1 (2026-06-27)</small>
+
+- enable qps ([4e2338c](https://github.com/TryQuiet/quiet-storage-service/commit/4e2338c))
+- Update app package CHANGELOG.md ([1af760d](https://github.com/TryQuiet/quiet-storage-service/commit/1af760d))
+
 ## 1.1.0 (2026-06-27)
 
 - Update app package CHANGELOG.md ([16c04a8](https://github.com/TryQuiet/quiet-storage-service/commit/16c04a8))
