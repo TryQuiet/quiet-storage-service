@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>1.1.2-alpha.1 (2026-07-24)</small>
+
+- fix: Ensure sigchain updates are propagated to postgres (#50) ([3aba1bf](https://github.com/TryQuiet/quiet-storage-service/commit/3aba1bf)), closes [#50](https://github.com/TryQuiet/quiet-storage-service/issues/50)
+- Update app package CHANGELOG.md ([207065e](https://github.com/TryQuiet/quiet-storage-service/commit/207065e))
+
 ## <small>1.1.2-alpha.0 (2026-07-24)</small>
 
 - release: 1.0.3 (#39) ([4295a31](https://github.com/TryQuiet/quiet-storage-service/commit/4295a31)), closes [#39](https://github.com/TryQuiet/quiet-storage-service/issues/39) [#36](https://github.com/TryQuiet/quiet-storage-service/issues/36)
