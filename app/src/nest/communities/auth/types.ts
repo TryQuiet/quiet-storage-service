@@ -12,3 +12,23 @@ export enum AuthStatus {
   JOINED = 'JOINED',
   REJECTED_OR_CLOSED = 'REJECTED_OR_CLOSED',
 }
+
+/**
+ * Native LFA Events
+ */
+export enum LFAEvents {
+  UPDATED = 'updated',
+  CONNECTED = 'connected',
+  DISCONNECTED = 'disconnected',
+  JOINED = 'joined',
+  CHANGE = 'change',
+  LOCAL_ERROR = 'localError',
+  REMOTE_ERROR = 'remoteError',
+}
+
+/**
+ * Events emitted by Sigchains
+ */
+export enum SigchainEvents {
+  UPDATED = 'sigchainUpdated',
+}
