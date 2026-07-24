@@ -154,7 +154,7 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       const invalidTokens: string[] = []
       response.responses.forEach((resp, idx) => {
         if (!resp.success) {
-          const error = resp.error
+          const { error } = resp
           const errorCode = error?.code
 
           if (
