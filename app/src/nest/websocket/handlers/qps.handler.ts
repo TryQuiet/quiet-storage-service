@@ -115,7 +115,7 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
         return
       }
 
-      const teamId = ucanInfo.teamId
+      const { teamId } = ucanInfo
       if (teamId == null || !(await isAuthorizedForTeam(teamId))) {
         const response: SendPushResponse = {
           ts: DateTime.utc().toMillis(),
@@ -199,7 +199,7 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
       const authorizedUcans: string[] = []
       for (const ucan of ucans) {
         const ucanInfo = await config.qpsService.validateUcan(ucan)
-        const teamId = ucanInfo.teamId
+        const { teamId } = ucanInfo
 
         if (
           ucanInfo.valid &&

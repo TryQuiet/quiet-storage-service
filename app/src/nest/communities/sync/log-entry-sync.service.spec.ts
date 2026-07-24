@@ -176,6 +176,7 @@ describe('LogEntrySyncManager', () => {
         teamId,
         sigChain: sigChain.sigchain,
         authConnections,
+        chainEventHandler: jest.fn<() => Promise<void>>(),
       }
     }
   }
@@ -270,6 +271,7 @@ describe('LogEntrySyncManager', () => {
           teamId,
           sigChain: sigChain.sigchain,
           authConnections,
+          chainEventHandler: jest.fn<() => Promise<void>>(),
         }
         return managedCommunity
       }
@@ -361,6 +363,7 @@ describe('LogEntrySyncManager', () => {
           teamId,
           sigChain: sigChain.sigchain,
           authConnections,
+          chainEventHandler: jest.fn<() => Promise<void>>(),
         }
         return managedCommunity
       }
@@ -428,6 +431,7 @@ describe('LogEntrySyncManager', () => {
           teamId,
           sigChain: sigChain.sigchain,
           authConnections,
+          chainEventHandler: jest.fn<() => Promise<void>>(),
         }
         return managedCommunity
       }
@@ -495,6 +499,7 @@ describe('LogEntrySyncManager', () => {
           teamId,
           sigChain: sigChain.sigchain,
           authConnections,
+          chainEventHandler: jest.fn<() => Promise<void>>(),
         }
         return managedCommunity
       }
@@ -602,6 +607,7 @@ describe('LogEntrySyncManager', () => {
           teamId,
           sigChain: sigChain.sigchain,
           authConnections,
+          chainEventHandler: jest.fn<() => Promise<void>>(),
         }
         return managedCommunity
       }

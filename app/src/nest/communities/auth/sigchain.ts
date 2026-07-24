@@ -7,6 +7,7 @@ import { Injectable } from '@nestjs/common'
 import { createLogger } from '../../app/logger/logger.js'
 import * as uint8arrays from 'uint8arrays'
 import EventEmitter from 'events'
+import { LFAEvents, SigchainEvents } from './types.js'
 
 const logger = createLogger('Auth:SigChain')
 const lfaLogger = createLogger('Localfirst')
@@ -18,6 +19,7 @@ export class SigChain extends EventEmitter {
     public context: auth.LocalServerContext,
   ) {
     super()
+    this.team.on(LFAEvents.UPDATED, this._handleTeamUpdate)
   }
 
   public static create(
@@ -45,6 +47,16 @@ export class SigChain extends EventEmitter {
     }
 
     return uint8arrays.toString(bytes, 'hex')
+  }
+
+  public clearListeners(): void {
+    this.team.removeListener(LFAEvents.UPDATED, this._handleTeamUpdate)
+  }
+
+  private readonly _handleTeamUpdate = (payload: {
+    head: auth.Hash[]
+  }): void => {
+    this.emit(SigchainEvents.UPDATED, payload)
   }
 
   static get lfa(): typeof auth {

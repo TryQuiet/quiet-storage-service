@@ -36,7 +36,11 @@ import { HOSTNAME, SERIALIZER } from '../app/const.js'
 import { SigChain } from './auth/sigchain.js'
 import { AuthConnection } from './auth/auth.connection.js'
 import { NativeServerWebsocketEvents } from '../websocket/ws.types.js'
-import { AuthConnectionConfig, AuthStatus } from './auth/types.js'
+import {
+  AuthConnectionConfig,
+  AuthStatus,
+  SigchainEvents,
+} from './auth/types.js'
 import { Socket } from 'socket.io'
 import { AuthDisconnectedPayload, AuthEvents } from './auth/auth.events.js'
 import { DateTime } from 'luxon'
@@ -155,6 +159,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         localServerContext,
         deserializedTeamKeyring,
       )
+      const chainEventHandler = this.addSigchainListener(sigChain)
 
       const userCount = sigChain.team.members().length
       if (userCount > 1) {
@@ -178,6 +183,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       this.communities.set(community.teamId, {
         teamId: community.teamId,
         sigChain,
+        chainEventHandler,
       })
 
       // start the LFA sync connection over the existing websocket
@@ -428,11 +434,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       teamKeys,
     )
 
-    sigChain.on('update', async () => {
-      await this.update(sigChain.team.id, {
-        sigChain: sigChain.serialize(true),
-      })
-    })
+    const chainEventHandler = this.addSigchainListener(sigChain)
 
     // if we already have a managed community for this team merge it with the new data
     const existingManagedCommunity = this.communities.get(teamId)
@@ -440,6 +442,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       ...(existingManagedCommunity ?? {}),
       teamId: community.teamId,
       sigChain,
+      chainEventHandler,
     }
     // put the new managed community into memory
     this.communities.set(community.teamId, managedCommunity)
@@ -472,8 +475,38 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         community.expiryMs <= DateTime.utc().toMillis()
       ) {
         this.logger.verbose('Removing stale community', community.teamId)
+        this.clearSigchainListeners(
+          community.sigChain,
+          community.chainEventHandler,
+        )
         this.communities.delete(community.teamId)
       }
     }
   }
+
+  private readonly addSigchainListener = (
+    sigChain: SigChain,
+  ): (() => Promise<void>) => {
+    this.logger.debug('Attaching chain update listener(s)', sigChain.team.id)
+    const handler = this._updateDbOnChainUpdate(sigChain)
+    sigChain.on(SigchainEvents.UPDATED, handler)
+    return handler
+  }
+
+  private readonly clearSigchainListeners = (
+    sigChain: SigChain,
+    handler: () => Promise<void>,
+  ): void => {
+    this.logger.debug('Clearing chain update listeners', sigChain.team.id)
+    sigChain.clearListeners()
+    sigChain.removeListener(SigchainEvents.UPDATED, handler)
+  }
+
+  private readonly _updateDbOnChainUpdate =
+    (sigChain: SigChain): (() => Promise<void>) =>
+    async (): Promise<void> => {
+      await this.update(sigChain.team.id, {
+        sigChain: sigChain.serialize(true),
+      })
+    }
 }

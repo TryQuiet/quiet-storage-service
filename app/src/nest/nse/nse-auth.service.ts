@@ -257,7 +257,7 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
       throw new UnauthorizedException('Unknown team')
     }
 
-    const team = community.sigChain.team
+    const { team } = community.sigChain
     if (team.deviceWasRemoved(deviceId)) {
       logger.warn(
         `Removed device ${deviceId} attempted NSE auth for team ${teamId}`,
