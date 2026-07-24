@@ -36,7 +36,11 @@ import { HOSTNAME, SERIALIZER } from '../app/const.js'
 import { SigChain } from './auth/sigchain.js'
 import { AuthConnection } from './auth/auth.connection.js'
 import { NativeServerWebsocketEvents } from '../websocket/ws.types.js'
-import { AuthConnectionConfig, AuthStatus } from './auth/types.js'
+import {
+  AuthConnectionConfig,
+  AuthStatus,
+  SigchainEvents,
+} from './auth/types.js'
 import { Socket } from 'socket.io'
 import { AuthDisconnectedPayload, AuthEvents } from './auth/auth.events.js'
 import { DateTime } from 'luxon'
@@ -428,7 +432,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       teamKeys,
     )
 
-    sigChain.on('update', async () => {
+    sigChain.on(SigchainEvents.UPDATED, async () => {
       await this.update(sigChain.team.id, {
         sigChain: sigChain.serialize(true),
       })
@@ -472,6 +476,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         community.expiryMs <= DateTime.utc().toMillis()
       ) {
         this.logger.verbose('Removing stale community', community.teamId)
+        community.sigChain.clearListeners()
         this.communities.delete(community.teamId)
       }
     }

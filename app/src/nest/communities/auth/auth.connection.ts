@@ -23,7 +23,7 @@ import {
   CommunityOperationStatus,
 } from '../../websocket/handlers/types/index.js'
 import type { QuietLogger } from '../../app/logger/types.js'
-import { type AuthConnectionConfig, AuthStatus } from './types.js'
+import { type AuthConnectionConfig, AuthStatus, LFAEvents } from './types.js'
 import EventEmitter from 'events'
 import { type AuthDisconnectedPayload, AuthEvents } from './auth.events.js'
 
@@ -127,7 +127,7 @@ export class AuthConnection extends EventEmitter {
    */
   public start(): void {
     // Set up auth connection event handlers.
-    this.lfaConnection.on('connected', async () => {
+    this.lfaConnection.on(LFAEvents.CONNECTED, async () => {
       try {
         this.logger.debug(
           `Sending sync message because our chain is initialized`,
@@ -150,7 +150,7 @@ export class AuthConnection extends EventEmitter {
     })
 
     // handle disconnects
-    this.lfaConnection.on('disconnected', () => {
+    this.lfaConnection.on(LFAEvents.DISCONNECTED, () => {
       this.logger.debug(`LFA disconnected`)
       this._status = AuthStatus.REJECTED_OR_CLOSED
       const payload: AuthDisconnectedPayload = {
@@ -161,10 +161,9 @@ export class AuthConnection extends EventEmitter {
     })
 
     // handle chain updates
-    this.lfaConnection.on('updated', head => {
+    this.lfaConnection.on(LFAEvents.UPDATED, head => {
       try {
         this.logger.debug('Received sync message, team graph updated', head)
-        this.sigChain.emit('update')
       } catch (e) {
         this.logger.error(
           'Error while processing received auth sync message',
@@ -174,10 +173,10 @@ export class AuthConnection extends EventEmitter {
     })
 
     // Handle errors from local or remote sources.
-    this.lfaConnection.on('localError', error => {
+    this.lfaConnection.on(LFAEvents.LOCAL_ERROR, error => {
       this.logger.error(`Local LFA error`, error)
     })
-    this.lfaConnection.on('remoteError', error => {
+    this.lfaConnection.on(LFAEvents.REMOTE_ERROR, error => {
       this.logger.error(`Remote LFA error`, error)
     })
 
