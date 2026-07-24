@@ -159,6 +159,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         localServerContext,
         deserializedTeamKeyring,
       )
+      this.addSigchainListeners(sigChain)
 
       const userCount = sigChain.team.members().length
       if (userCount > 1) {
@@ -432,11 +433,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       teamKeys,
     )
 
-    sigChain.on(SigchainEvents.UPDATED, async () => {
-      await this.update(sigChain.team.id, {
-        sigChain: sigChain.serialize(true),
-      })
-    })
+    this.addSigchainListeners(sigChain)
 
     // if we already have a managed community for this team merge it with the new data
     const existingManagedCommunity = this.communities.get(teamId)
@@ -477,8 +474,28 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       ) {
         this.logger.verbose('Removing stale community', community.teamId)
         community.sigChain.clearListeners()
+        this.clearSigchainListeners(community.sigChain)
         this.communities.delete(community.teamId)
       }
     }
   }
+
+  private readonly addSigchainListeners = (sigChain: SigChain): void => {
+    sigChain.on(SigchainEvents.UPDATED, this._updateDbOnChainUpdate(sigChain))
+  }
+
+  private readonly clearSigchainListeners = (sigChain: SigChain): void => {
+    sigChain.removeListener(
+      SigchainEvents.UPDATED,
+      this._updateDbOnChainUpdate(sigChain),
+    )
+  }
+
+  private readonly _updateDbOnChainUpdate =
+    (sigChain: SigChain): (() => Promise<void>) =>
+    async (): Promise<void> => {
+      await this.update(sigChain.team.id, {
+        sigChain: sigChain.serialize(true),
+      })
+    }
 }
