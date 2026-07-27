@@ -33,7 +33,8 @@ export type EncryptedCommunityUpdate = Omit<
   'teamId'
 >
 
-export type AuthConnectionMap = Map<string, AuthConnection>
+export type DeviceId = string
+export type AuthConnectionMap = Map<DeviceId, AuthConnection>
 
 export interface ManagedCommunity {
   teamId: string

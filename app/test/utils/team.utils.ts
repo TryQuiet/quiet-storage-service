@@ -11,6 +11,9 @@ import {
   LocalUserContext,
   KeysetWithSecrets,
   generateProof,
+  MemberInvitationClaim,
+  redactDevice,
+  Base58,
 } from '@localfirst/auth'
 import { createLogger } from '../../src/nest/app/logger/logger.js'
 import { ServerKeyManagerService } from '../../src/nest/encryption/server-key-manager.service.js'
@@ -92,10 +95,24 @@ export class TeamTestUtils {
     })
     const testUserContext: LocalUserContext = { user, device }
     const invitation = testTeam.team.inviteMember()
-    testTeam.team.admitMember(
-      generateProof(invitation.seed),
-      user.keys,
+    const claim: MemberInvitationClaim = {
+      invitationKind: 'member',
       userName,
+      userKeys: redactKeys(user.keys),
+      device: redactDevice(device),
+    }
+    const acceptorNonce = randomUUID().replaceAll('-', '') as Base58
+    testTeam.team.admitMember(
+      generateProof({
+        seed: invitation.seed,
+        claim,
+        acceptorNonce,
+        inviteeNonce: randomUUID().replaceAll('-', '') as Base58,
+      }),
+      claim.userKeys,
+      claim.userName,
+      claim.device,
+      acceptorNonce,
     )
     testTeam.otherUsers.push(testUserContext)
     return testTeam

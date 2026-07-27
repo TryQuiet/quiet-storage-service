@@ -23,7 +23,11 @@ import type { CompoundError } from '../utils/errors.js'
 import { RedisClient } from '../storage/redis/redis.client.js'
 import { LogEntrySyncStorageService } from './storage/log-entry-sync.storage.service.js'
 import { UtilsModule } from '../utils/utils.module.js'
-import type { QuietSocket } from '../websocket/ws.types.js'
+import {
+  NativeServerWebsocketEvents,
+  type QuietSocket,
+} from '../websocket/ws.types.js'
+import { getDeviceId } from './auth/device-id.js'
 
 describe('CommunitiesManagerService', () => {
   let module: TestingModule | undefined = undefined
@@ -114,11 +118,81 @@ describe('CommunitiesManagerService', () => {
       const b64Keyring = uint8arrays.toString(serializedTeamKeyring, 'base64')
       const createdCommunity = await manager!.create(
         testTeam.testUserContext.user.userId,
+        getDeviceId(testTeam.testUserContext.device),
         community,
         b64Keyring,
         wsConfig!.socket,
       )
       expect(_.isEqual(createdCommunity.community, community)).toBe(true)
+    })
+
+    it('keeps separate auth connections for devices sharing a user ID', async () => {
+      const testTeam = await testTeamUtils!.createTestTeam()
+      const serializedTeamKeyring = uint8arrays.fromString(
+        JSON.stringify(testTeam.team.teamKeyring()),
+        'utf8',
+      )
+      const serializedServerKeyring = uint8arrays.fromString(
+        JSON.stringify(testTeam.serverKeys),
+        'utf8',
+      )
+      await serverKeyManager!.storeKeyring(
+        testTeam.team.id,
+        serializedServerKeyring,
+        StoredKeyRingType.SERVER_KEYRING,
+      )
+      const community: Community = {
+        teamId: testTeam.team.id,
+        sigChain: uint8arrays.toString(testTeam.team.save(), 'hex'),
+      }
+      const firstDeviceId = getDeviceId(testTeam.testUserContext.device)
+      const secondDeviceId = 'second-device-id'
+      const secondSocket = {
+        id: 'second-test-socket',
+        data: {},
+        on: jest.fn().mockReturnThis(),
+        emit: jest.fn(),
+        join: jest.fn(async () => {
+          /* empty */
+        }),
+      } as unknown as QuietSocket
+
+      await manager!.create(
+        testTeam.testUserContext.user.userId,
+        firstDeviceId,
+        community,
+        uint8arrays.toString(serializedTeamKeyring, 'base64'),
+        wsConfig!.socket,
+      )
+      manager!.startAuthSyncConnection(
+        testTeam.testUserContext.user.userId,
+        secondDeviceId,
+        testTeam.team.id,
+        {
+          communitiesManager: manager!,
+          socket: secondSocket,
+        },
+      )
+
+      const managedCommunity = await manager!.get(testTeam.team.id)
+      expect(managedCommunity!.authConnections?.size).toBe(2)
+      expect(
+        managedCommunity!.authConnections?.get(firstDeviceId)?.socketId,
+      ).toBe(mockedSocket!.id)
+      expect(
+        managedCommunity!.authConnections?.get(secondDeviceId)?.socketId,
+      ).toBe(secondSocket.id)
+
+      const disconnectHandler = (
+        mockedSocket!.on as unknown as jest.Mock
+      ).mock.calls.find(
+        ([event]) => event === NativeServerWebsocketEvents.Disconnect,
+      )?.[1] as (() => void) | undefined
+      expect(disconnectHandler).toBeDefined()
+      disconnectHandler!()
+
+      expect(managedCommunity!.authConnections?.has(firstDeviceId)).toBe(false)
+      expect(managedCommunity!.authConnections?.has(secondDeviceId)).toBe(true)
     })
 
     it('should fail to create a new managed community when server keys are not stored', async () => {
@@ -137,6 +211,7 @@ describe('CommunitiesManagerService', () => {
       try {
         createdCommunity = await manager!.create(
           testTeam.testUserContext.user.userId,
+          getDeviceId(testTeam.testUserContext.device),
           community,
           b64Keyring,
           wsConfig!.socket,
@@ -181,6 +256,7 @@ describe('CommunitiesManagerService', () => {
       try {
         createdCommunity = await manager!.create(
           testTeam.testUserContext.user.userId,
+          getDeviceId(testTeam.testUserContext.device),
           community,
           b64Keyring,
           wsConfig!.socket,
@@ -221,6 +297,7 @@ describe('CommunitiesManagerService', () => {
       try {
         createdCommunity = await manager!.create(
           testTeam.testUserContext.user.userId,
+          getDeviceId(testTeam.testUserContext.device),
           community,
           invalidKeyring,
           wsConfig!.socket,
@@ -265,6 +342,7 @@ describe('CommunitiesManagerService', () => {
       try {
         createdCommunity = await manager!.create(
           testTeam.testUserContext.user.userId,
+          getDeviceId(testTeam.testUserContext.device),
           community,
           b64Keyring,
           wsConfig!.socket,

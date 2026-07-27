@@ -1,4 +1,3 @@
-import { SigChain } from './sigchain.js'
 import { ServerKeyManagerService } from '../../encryption/server-key-manager.service.js'
 import { Test, type TestingModule } from '@nestjs/testing'
 import { EncryptionModule } from '../../encryption/enc.module.js'
@@ -40,11 +39,8 @@ describe('SigChain', () => {
     }
 
     const testTeam: TestTeam = await testTeamUtils.createTestTeam()
-    const sigchain = SigChain.create(
-      testTeam.team.save(),
-      { server: testTeam.server },
-      testTeam.team.teamKeyring(),
-    )
+    const { sigchain } =
+      await testTeamUtils.createSigchainFromTestTeam(testTeam)
     expect(sigchain.serialize()).toEqual(testTeam.team.save())
   })
 
@@ -54,11 +50,8 @@ describe('SigChain', () => {
     }
 
     const testTeam: TestTeam = await testTeamUtils.createTestTeam()
-    const sigchain = SigChain.create(
-      testTeam.team.save(),
-      { server: testTeam.server },
-      testTeam.team.teamKeyring(),
-    )
+    const { sigchain } =
+      await testTeamUtils.createSigchainFromTestTeam(testTeam)
     const hexChain = sigchain.serialize(true)
     const hexBaseChain = uint8arrays.toString(testTeam.team.save(), 'hex')
     expect(hexChain).toEqual(hexBaseChain)

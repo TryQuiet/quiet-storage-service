@@ -221,6 +221,7 @@ describe('Communities', () => {
         ts: DateTime.utc().toMillis(),
         payload: {
           userId: testTeam.testUserContext.user.userId,
+          deviceId: testTeam.testUserContext.device.deviceId,
           community,
           teamKeyring: uint8arrays.toString(
             uint8arrays.fromString(
@@ -254,7 +255,7 @@ describe('Communities', () => {
       expect(managedCommunity!.authConnections).toBeDefined()
       expect(
         managedCommunity!.authConnections?.get(
-          testTeam.testUserContext.user.userId,
+          testTeam.testUserContext.device.deviceId,
         ),
       ).toBeDefined()
       expect(managedCommunity!.teamId).toBe(testTeam.team.id)
@@ -305,6 +306,7 @@ describe('Communities', () => {
         status: CommunityOperationStatus.SENDING,
         payload: {
           userId: secondClientContext.user.userId,
+          deviceId: secondClientContext.device.deviceId,
           teamId: testTeam.team.id,
         },
       }
@@ -337,7 +339,9 @@ describe('Communities', () => {
       expect(managedCommunity!.authConnections).toBeDefined()
       expect(managedCommunity!.authConnections!.size).toBe(2)
       expect(
-        managedCommunity!.authConnections!.get(secondClientContext.user.userId),
+        managedCommunity!.authConnections!.get(
+          secondClientContext.device.deviceId,
+        ),
       ).toBeDefined()
       expect(managedCommunity!.teamId).toBe(testTeam.team.id)
       expect(managedCommunity!.expiryMs).toBeUndefined()
@@ -572,6 +576,7 @@ describe('Communities', () => {
         status: CommunityOperationStatus.SENDING,
         payload: {
           userId: invalidClientContext.user.userId,
+          deviceId: invalidClientContext.device.deviceId,
           teamId: testTeam.team.id,
         },
       }
@@ -600,7 +605,7 @@ describe('Communities', () => {
       expect(managedCommunity!.authConnections!.size).toBe(3)
       expect(
         managedCommunity!.authConnections!.get(
-          invalidClientContext.user.userId,
+          invalidClientContext.device.deviceId,
         ),
       ).toBeDefined()
       expect(managedCommunity!.teamId).toBe(testTeam.team.id)
@@ -644,7 +649,7 @@ describe('Communities', () => {
           expect(managedCommunity!.authConnections!.size).toBe(2)
           expect(
             managedCommunity!.authConnections!.has(
-              invalidClientContext.user.userId,
+              invalidClientContext.device.deviceId,
             ),
           ).toBe(false)
         },

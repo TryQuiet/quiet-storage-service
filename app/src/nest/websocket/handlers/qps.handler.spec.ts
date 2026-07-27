@@ -20,6 +20,7 @@ describe('QPS WebSocket Handlers', () => {
   const teamId = 'test-team-id'
   const otherTeamId = 'other-team-id'
   const userId = 'test-user-id'
+  const deviceId = 'test-device-id'
 
   let mockQpsService: jest.Mocked<QPSService>
   let mockCommunitiesManager: jest.Mocked<
@@ -39,7 +40,7 @@ describe('QPS WebSocket Handlers', () => {
     }
 
     return {
-      authConnections: new Map([[userId, authConnection]]),
+      authConnections: new Map([[deviceId, authConnection]]),
     } as unknown as ManagedCommunity
   }
 
@@ -64,6 +65,7 @@ describe('QPS WebSocket Handlers', () => {
       data: {
         teamId,
         userId,
+        deviceId,
       },
       on: jest.fn((event: string, handler: (...args: unknown[]) => unknown) => {
         handlers.set(event, handler)

@@ -27,6 +27,7 @@ describe('Communities auth WebSocket handlers', () => {
 
   const teamId = 'team-1'
   const userId = 'user-1'
+  const deviceId = 'device-1'
   const encodedMessage = 'base64-auth-sync-payload'
 
   beforeEach(() => {
@@ -79,6 +80,8 @@ describe('Communities auth WebSocket handlers', () => {
     const emit = jest.fn()
     const authConnection = {
       socketId,
+      userId,
+      deviceId,
       lfaConnection: {
         deliver,
         emit,
@@ -90,7 +93,7 @@ describe('Communities auth WebSocket handlers', () => {
 
   function buildCommunity(authConnection: AuthConnection): ManagedCommunity {
     return {
-      authConnections: new Map([[userId, authConnection]]),
+      authConnections: new Map([[deviceId, authConnection]]),
     } as unknown as ManagedCommunity
   }
 
@@ -102,6 +105,7 @@ describe('Communities auth WebSocket handlers', () => {
       payload: {
         teamId,
         userId,
+        deviceId,
         message: encodedMessage,
       },
     })

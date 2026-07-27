@@ -1,8 +1,8 @@
-import type { Socket } from 'socket.io'
 import type { CommunitiesManagerService } from '../communities-manager.service.js'
+import type { QuietSocket } from '../../websocket/ws.types.js'
 
 export interface AuthConnectionConfig {
-  socket: Socket
+  socket: QuietSocket
   communitiesManager: CommunitiesManagerService
 }
 

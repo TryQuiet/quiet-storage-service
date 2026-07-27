@@ -15,7 +15,6 @@ import {
 
 import type { LogEntrySyncHandlerConfig } from '../../websocket/handlers/types/common.types.js'
 import { CommunitiesStorageService } from '../storage/communities.storage.service.js'
-import type { Socket } from 'socket.io'
 import { RedisClient } from '../../storage/redis/redis.client.js'
 import { LogEntrySyncStorageService } from '../storage/log-entry-sync.storage.service.js'
 import type { LogEntrySyncPayload } from '../../websocket/handlers/types/log-entry-sync.types.js'
@@ -30,6 +29,7 @@ import { SERIALIZER } from '../../app/const.js'
 import type { QuietSocket } from '../../websocket/ws.types.js'
 import { createLogger } from '../../app/logger/logger.js'
 import { LogEntrySyncManager } from './log-entry-sync.service.js'
+import { getDeviceId } from '../auth/device-id.js'
 
 const logger = createLogger('Test:LogEntrySyncManager')
 describe('LogEntrySyncManager', () => {
@@ -106,6 +106,9 @@ describe('LogEntrySyncManager', () => {
       contents?: Uint8Array
     },
   ): LogEntrySyncPayload => {
+    wsConfig!.socket.data.deviceId = getDeviceId(
+      testTeam.testUserContext.device,
+    )
     const rawMessage = 'this is a message'
     const encryptedMessage = testTeam.team.encrypt(rawMessage, 'member')
     const signature = testTeam.team.sign(rawMessage)
@@ -150,13 +153,17 @@ describe('LogEntrySyncManager', () => {
     testTeam: TestTeam,
     status: AuthStatus,
   ): Promise<void> => {
+    wsConfig!.socket.data.deviceId = getDeviceId(
+      testTeam.testUserContext.device,
+    )
     const sigChain = await testTeamUtils!.createSigchainFromTestTeam(testTeam)
     const authConnection = new AuthConnection(
       testTeam.testUserContext.user.userId,
+      getDeviceId(testTeam.testUserContext.device),
       sigChain.sigchain,
       {
         communitiesManager: communitiesManager!,
-        socket: wsConfig!.socket as Socket,
+        socket: wsConfig!.socket,
       },
     )
 
@@ -171,7 +178,10 @@ describe('LogEntrySyncManager', () => {
       // eslint-disable-next-line @typescript-eslint/require-await -- just matching the real function
     ): Promise<ManagedCommunity> => {
       const authConnections = new Map<string, AuthConnection>()
-      authConnections.set(testTeam.testUserContext.user.userId, authConnection)
+      authConnections.set(
+        getDeviceId(testTeam.testUserContext.device),
+        authConnection,
+      )
       return {
         teamId,
         sigChain: sigChain.sigchain,
@@ -244,11 +254,12 @@ describe('LogEntrySyncManager', () => {
 
       const authConnection = new AuthConnection(
         testTeam.testUserContext.user.userId,
+        getDeviceId(testTeam.testUserContext.device),
         sigChain.sigchain,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is ok
         {
           communitiesManager: communitiesManager!,
-          socket: wsConfig!.socket as Socket,
+          socket: wsConfig!.socket,
         } satisfies AuthConnectionConfig,
       )
 
@@ -264,7 +275,7 @@ describe('LogEntrySyncManager', () => {
       ): Promise<ManagedCommunity> => {
         const authConnections = new Map<string, AuthConnection>()
         authConnections.set(
-          testTeam.testUserContext.user.userId,
+          getDeviceId(testTeam.testUserContext.device),
           authConnection,
         )
         const managedCommunity: ManagedCommunity = {
@@ -336,11 +347,12 @@ describe('LogEntrySyncManager', () => {
 
       const authConnection = new AuthConnection(
         testTeam.testUserContext.user.userId,
+        getDeviceId(testTeam.testUserContext.device),
         sigChain.sigchain,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is ok
         {
           communitiesManager: communitiesManager!,
-          socket: wsConfig!.socket as Socket,
+          socket: wsConfig!.socket,
         },
       )
 
@@ -356,7 +368,7 @@ describe('LogEntrySyncManager', () => {
       ): Promise<ManagedCommunity> => {
         const authConnections = new Map<string, AuthConnection>()
         authConnections.set(
-          testTeam.testUserContext.user.userId,
+          getDeviceId(testTeam.testUserContext.device),
           authConnection,
         )
         const managedCommunity: ManagedCommunity = {
@@ -404,11 +416,12 @@ describe('LogEntrySyncManager', () => {
 
       const authConnection = new AuthConnection(
         testTeam.testUserContext.user.userId,
+        getDeviceId(testTeam.testUserContext.device),
         sigChain.sigchain,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is ok
         {
           communitiesManager: communitiesManager!,
-          socket: wsConfig!.socket as Socket,
+          socket: wsConfig!.socket,
         },
       )
 
@@ -424,7 +437,7 @@ describe('LogEntrySyncManager', () => {
       ): Promise<ManagedCommunity> => {
         const authConnections = new Map<string, AuthConnection>()
         authConnections.set(
-          testTeam.testUserContext.user.userId,
+          getDeviceId(testTeam.testUserContext.device),
           authConnection,
         )
         const managedCommunity: ManagedCommunity = {
@@ -472,11 +485,12 @@ describe('LogEntrySyncManager', () => {
 
       const authConnection = new AuthConnection(
         testTeam.testUserContext.user.userId,
+        getDeviceId(testTeam.testUserContext.device),
         sigChain.sigchain,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is ok
         {
           communitiesManager: communitiesManager!,
-          socket: wsConfig!.socket as Socket,
+          socket: wsConfig!.socket,
         },
       )
 
@@ -492,7 +506,7 @@ describe('LogEntrySyncManager', () => {
       ): Promise<ManagedCommunity> => {
         const authConnections = new Map<string, AuthConnection>()
         authConnections.set(
-          testTeam.testUserContext.user.userId,
+          getDeviceId(testTeam.testUserContext.device),
           authConnection,
         )
         const managedCommunity: ManagedCommunity = {
@@ -580,11 +594,12 @@ describe('LogEntrySyncManager', () => {
 
       const authConnection = new AuthConnection(
         testTeam.testUserContext.user.userId,
+        getDeviceId(testTeam.testUserContext.device),
         sigChain.sigchain,
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- this is ok
         {
           communitiesManager: communitiesManager!,
-          socket: wsConfig!.socket as Socket,
+          socket: wsConfig!.socket,
         },
       )
 
@@ -600,7 +615,7 @@ describe('LogEntrySyncManager', () => {
       ): Promise<ManagedCommunity> => {
         const authConnections = new Map<string, AuthConnection>()
         authConnections.set(
-          testTeam.testUserContext.user.userId,
+          getDeviceId(testTeam.testUserContext.device),
           authConnection,
         )
         const managedCommunity: ManagedCommunity = {
@@ -662,7 +677,7 @@ describe('LogEntrySyncManager', () => {
 
       const firstPage = await logEntrySyncManager!.getPaginatedLogEntries(
         basePayload,
-        wsConfig!.socket as Socket,
+        wsConfig!.socket,
       )
       expect(firstPage.entries).toHaveLength(1)
       expect(firstPage.entries[0]).toEqual(entries[0].entry)
@@ -673,7 +688,7 @@ describe('LogEntrySyncManager', () => {
 
       const secondPage = await logEntrySyncManager!.getPaginatedLogEntries(
         { ...basePayload, cursor: firstPage.cursor },
-        wsConfig!.socket as Socket,
+        wsConfig!.socket,
       )
       expect(secondPage.entries).toHaveLength(1)
       expect(secondPage.entries[0]).toEqual(entries[1].entry)
@@ -683,7 +698,7 @@ describe('LogEntrySyncManager', () => {
 
       const thirdPage = await logEntrySyncManager!.getPaginatedLogEntries(
         { ...basePayload, cursor: secondPage.cursor },
-        wsConfig!.socket as Socket,
+        wsConfig!.socket,
       )
       expect(thirdPage.entries).toHaveLength(1)
       expect(thirdPage.entries[0]).toEqual(entries[2].entry)
@@ -710,7 +725,7 @@ describe('LogEntrySyncManager', () => {
           startTs: startMs + 500,
           endTs: startMs + 1500,
         },
-        wsConfig!.socket as Socket,
+        wsConfig!.socket,
       )
 
       expect(result.entries).toHaveLength(1)
@@ -741,7 +756,7 @@ describe('LogEntrySyncManager', () => {
 
       const firstPage = await logEntrySyncManager!.getPaginatedLogEntries(
         basePayload,
-        wsConfig!.socket as Socket,
+        wsConfig!.socket,
       )
       expect(firstPage.entries).toHaveLength(1)
       expect(firstPage.entries[0]).toEqual(entries[0].entry)
@@ -751,7 +766,7 @@ describe('LogEntrySyncManager', () => {
 
       const secondPage = await logEntrySyncManager!.getPaginatedLogEntries(
         { ...basePayload, startSeq: firstPage.highestSyncSeq! },
-        wsConfig!.socket as Socket,
+        wsConfig!.socket,
       )
       expect(secondPage.entries).toHaveLength(1)
       expect(secondPage.entries[0]).toEqual(entries[1].entry)
@@ -760,7 +775,7 @@ describe('LogEntrySyncManager', () => {
 
       const thirdPage = await logEntrySyncManager!.getPaginatedLogEntries(
         { ...basePayload, startSeq: secondPage.highestSyncSeq! },
-        wsConfig!.socket as Socket,
+        wsConfig!.socket,
       )
       expect(thirdPage.entries).toHaveLength(1)
       expect(thirdPage.entries[0]).toEqual(entries[2].entry)
@@ -787,7 +802,7 @@ describe('LogEntrySyncManager', () => {
           startSeq: entries[0].syncSeq,
           endSeq: entries[1].syncSeq,
         },
-        wsConfig!.socket as Socket,
+        wsConfig!.socket,
       )
 
       expect(result.entries).toHaveLength(1)
@@ -822,7 +837,7 @@ describe('LogEntrySyncManager', () => {
           startSeq: 0,
           hashedDbId: 'hashed-db-a',
         },
-        wsConfig!.socket as Socket,
+        wsConfig!.socket,
       )
 
       expect(result.entries).toHaveLength(2)
@@ -850,7 +865,7 @@ describe('LogEntrySyncManager', () => {
           startSeq: 0,
           hash: entries[1].cid,
         },
-        wsConfig!.socket as Socket,
+        wsConfig!.socket,
       )
 
       expect(result.entries).toHaveLength(1)
@@ -878,7 +893,7 @@ describe('LogEntrySyncManager', () => {
           startSeq: 0,
           limit: 2,
         },
-        wsConfig!.socket as Socket,
+        wsConfig!.socket,
       )
 
       expect(result.entries).toHaveLength(2)
@@ -907,7 +922,7 @@ describe('LogEntrySyncManager', () => {
           userId: testTeam.testUserContext.user.userId,
           startSeq: entries[0].syncSeq,
         },
-        wsConfig!.socket as Socket,
+        wsConfig!.socket,
       )
       expect(result.entries.length).toBeLessThan(entries.length - 1)
       expect(result.hasNextPage).toBe(true)

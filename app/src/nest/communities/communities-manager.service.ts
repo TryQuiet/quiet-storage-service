@@ -35,13 +35,15 @@ import {
 import { HOSTNAME, SERIALIZER } from '../app/const.js'
 import { SigChain } from './auth/sigchain.js'
 import { AuthConnection } from './auth/auth.connection.js'
-import { NativeServerWebsocketEvents } from '../websocket/ws.types.js'
+import {
+  NativeServerWebsocketEvents,
+  type QuietSocket,
+} from '../websocket/ws.types.js'
 import {
   AuthConnectionConfig,
   AuthStatus,
   SigchainEvents,
 } from './auth/types.js'
-import { Socket } from 'socket.io'
 import { AuthDisconnectedPayload, AuthEvents } from './auth/auth.events.js'
 import { DateTime } from 'luxon'
 import { LogEntrySyncStorageService } from './storage/log-entry-sync.storage.service.js'
@@ -119,16 +121,19 @@ export class CommunitiesManagerService implements OnModuleDestroy {
    * with the user over the websocket
    *
    * @param userId ID of the user creating the community
+   * @param deviceId ID of the device creating the community
    * @param community Community metadata
    * @param teamKeyring LFA key ring
    * @param socket Socket connection with the user creating the community
    * @returns New community
    */
+  // eslint-disable-next-line @typescript-eslint/max-params -- connection identity requires both user and device IDs
   public async create(
     userId: string,
+    deviceId: string,
     community: Community,
     teamKeyring: string,
-    socket: Socket,
+    socket: QuietSocket,
   ): Promise<CreatedCommunity> {
     this.logger.log(`Adding new community for ID ${community.teamId}`)
     try {
@@ -187,7 +192,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       })
 
       // start the LFA sync connection over the existing websocket
-      this.startAuthSyncConnection(userId, community.teamId, {
+      this.startAuthSyncConnection(userId, deviceId, community.teamId, {
         socket,
         communitiesManager: this,
       })
@@ -228,12 +233,14 @@ export class CommunitiesManagerService implements OnModuleDestroy {
    * Start an LFA auth sync connection over an existing websocket connection with a user
    *
    * @param userId ID of the user we are connecting with
+   * @param deviceId ID of the device we are connecting with
    * @param teamId Team ID of the community we are syncing
    * @param config Related metadata/config for this auth sync connection
    * @returns void
    */
   public startAuthSyncConnection(
     userId: string,
+    deviceId: string,
     teamId: string,
     config: AuthConnectionConfig,
   ): void {
@@ -246,58 +253,85 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     // return an existing auth connection, if found and still valid for this socket
     const authConnections: AuthConnectionMap =
       managedCommunity.authConnections ?? (new Map() as AuthConnectionMap)
-    const existingConn = authConnections.get(userId)
+    const connectionContext = `teamId=${teamId} userId=${userId} deviceId=${deviceId} socketId=${config.socket.id}`
+    this.logger.debug(
+      `Starting auth connection request: ${connectionContext} mappedConnections=${authConnections.size}`,
+    )
+
+    const existingConn = authConnections.get(deviceId)
     if (existingConn != null) {
       if (
         existingConn.socketId === config.socket.id &&
         existingConn.status !== AuthStatus.REJECTED_OR_CLOSED
       ) {
         this.logger.debug(
-          'Already had an active auth connection for this user on the same socket, reusing...',
+          `Reusing mapped auth connection: ${connectionContext} status=${existingConn.status} mappedConnections=${authConnections.size}`,
         )
         return
       }
       // Stale connection: belongs to a previous socket or is dead. Stop it before creating a new one.
-      this.logger.log(
-        `Replacing stale auth connection; previousStatus=${existingConn.status}`,
-      )
       this.logger.debug(
-        `Replacing stale auth connection for user ${userId} (oldSocket=${existingConn.socketId}, newSocket=${config.socket.id}, status=${existingConn.status})`,
+        `Replacing mapped auth connection: teamId=${teamId} deviceId=${deviceId} requestedUserId=${userId} existingUserId=${existingConn.userId} oldSocketId=${existingConn.socketId} newSocketId=${config.socket.id} previousStatus=${existingConn.status} mappedConnections=${authConnections.size}`,
       )
       existingConn.stop()
-      authConnections.delete(userId)
+      authConnections.delete(deviceId)
+      this.logger.debug(
+        `Removed previous auth connection mapping: ${connectionContext} remainingConnections=${authConnections.size}`,
+      )
     }
 
     // create and start a new LFA auth sync connection with this user
     const authConnection = new AuthConnection(
       userId,
+      deviceId,
       managedCommunity.sigChain,
       config,
     )
-    authConnections.set(userId, authConnection)
+    authConnections.set(deviceId, authConnection)
     this.communities.set(teamId, {
       ...managedCommunity,
       authConnections,
     })
+    this.logger.debug(
+      `Mapped new auth connection: ${connectionContext} status=${authConnection.status} mappedConnections=${authConnections.size}`,
+    )
 
     // handle auth disconnection events (emitted when the LFA connection dies or the socket connection dies)
     // and remove auth connection from map/set expiry on community data in memory if no open connections left
     authConnection.on(
       AuthEvents.AuthDisconnected,
       (payload: AuthDisconnectedPayload) => {
-        this.logger.verbose(`Got an ${AuthEvents.AuthDisconnected} event`)
+        const disconnectedContext = `teamId=${payload.teamId} userId=${payload.userId} deviceId=${payload.deviceId} socketId=${authConnection.socketId}`
+        this.logger.debug(
+          `Received auth disconnect: ${disconnectedContext} status=${authConnection.status}`,
+        )
         const managedCommunity = this.communities.get(payload.teamId)
         if (managedCommunity == null) {
+          this.logger.debug(
+            `Ignoring auth disconnect because community is no longer mapped: ${disconnectedContext}`,
+          )
           return
         }
 
-        managedCommunity.authConnections?.delete(payload.userId)
-        if ((managedCommunity.authConnections?.size ?? 0) === 0) {
+        const storedConnection = managedCommunity.authConnections?.get(
+          payload.deviceId,
+        )
+        if (storedConnection !== authConnection) {
+          this.logger.debug(
+            `Ignoring stale auth disconnect for replaced mapping: ${disconnectedContext} mappedSocketId=${storedConnection?.socketId ?? 'none'} mappedStatus=${storedConnection?.status ?? 'none'}`,
+          )
+          return
+        }
+        managedCommunity.authConnections?.delete(payload.deviceId)
+        const remainingConnections = managedCommunity.authConnections?.size ?? 0
+        this.logger.debug(
+          `Unmapped auth connection after disconnect: ${disconnectedContext} remainingConnections=${remainingConnections}`,
+        )
+        if (remainingConnections === 0) {
           const communityExpiryMs =
             DateTime.utc().toMillis() + MANAGED_COMMUNITY_TTL_MS
-          this.logger.verbose(
-            'Community has no open auth connections, setting expiry',
-            communityExpiryMs,
+          this.logger.debug(
+            `Community has no mapped auth connections; setting expiry: teamId=${payload.teamId} expiryMs=${communityExpiryMs}`,
           )
           managedCommunity.expiryMs = communityExpiryMs
         }
@@ -306,10 +340,19 @@ export class CommunitiesManagerService implements OnModuleDestroy {
 
     // handle websocket disconnects and stop the auth sync connection
     config.socket.on(NativeServerWebsocketEvents.Disconnect, () => {
+      this.logger.debug(
+        `Socket disconnected; stopping auth connection: ${connectionContext} status=${authConnection.status}`,
+      )
       authConnection.stop()
     })
 
+    this.logger.debug(
+      `Starting mapped auth connection: ${connectionContext} status=${authConnection.status}`,
+    )
     authConnection.start()
+    this.logger.debug(
+      `Auth connection start invoked: ${connectionContext} status=${authConnection.status}`,
+    )
 
     // ensure we remove the expiry if it was set now that we have an open connection
     if (this.communities.has(teamId)) {
@@ -317,6 +360,9 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         ...this.communities.get(teamId)!,
         expiryMs: undefined,
       })
+      this.logger.debug(
+        `Cleared community expiry for mapped auth connection: ${connectionContext}`,
+      )
     }
   }
 
