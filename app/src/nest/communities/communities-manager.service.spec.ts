@@ -28,6 +28,7 @@ import {
   type QuietSocket,
 } from '../websocket/ws.types.js'
 import { getDeviceId } from './auth/device-id.js'
+import { AuthStatus } from './auth/types.js'
 
 describe('CommunitiesManagerService', () => {
   let module: TestingModule | undefined = undefined
@@ -164,7 +165,7 @@ describe('CommunitiesManagerService', () => {
         uint8arrays.toString(serializedTeamKeyring, 'base64'),
         wsConfig!.socket,
       )
-      manager!.startAuthSyncConnection(
+      manager!.prepareAuthSyncConnection(
         testTeam.testUserContext.user.userId,
         secondDeviceId,
         testTeam.team.id,
@@ -182,6 +183,12 @@ describe('CommunitiesManagerService', () => {
       expect(
         managedCommunity!.authConnections?.get(secondDeviceId)?.socketId,
       ).toBe(secondSocket.id)
+      expect(
+        managedCommunity!.authConnections?.get(firstDeviceId)?.status,
+      ).toBe(AuthStatus.PENDING)
+      expect(
+        managedCommunity!.authConnections?.get(secondDeviceId)?.status,
+      ).toBe(AuthStatus.PENDING)
 
       const disconnectHandler = (
         mockedSocket!.on as unknown as jest.Mock

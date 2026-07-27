@@ -13,6 +13,7 @@ import {
 } from './types/index.js'
 import * as uint8arrays from 'uint8arrays'
 import type { AuthConnection } from '../../communities/auth/auth.connection.js'
+import { AuthStatus } from '../../communities/auth/types.js'
 import { type Keyset, redactKeys } from '@localfirst/crdx'
 import { AllowedServerKeyState } from '../../communities/types.js'
 import { CaptchaErrorMessages } from './types/captcha.types.js'
@@ -144,6 +145,12 @@ export function registerCommunitiesAuthHandlers(
         _logger.warn(
           `Inbound auth-sync message is large: ${decoded.byteLength} bytes (user=${userId}, device=${deviceId}, team=${teamId})`,
         )
+      }
+      if (authConnection.status === AuthStatus.PENDING) {
+        _logger.debug(
+          `Starting pending auth connection from first validated client frame: teamId=${teamId} userId=${userId} deviceId=${deviceId} socketId=${config.socket.id}`,
+        )
+        authConnection.start()
       }
       authConnection.lfaConnection.deliver(decoded)
     } catch (e) {

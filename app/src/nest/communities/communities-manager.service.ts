@@ -191,8 +191,10 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         chainEventHandler,
       })
 
-      // start the LFA sync connection over the existing websocket
-      this.startAuthSyncConnection(userId, deviceId, community.teamId, {
+      // Prepare the server-side LFA connection before returning the create
+      // response. The first validated client auth-sync frame starts it after
+      // the client has received the response and initialized its connection.
+      this.prepareAuthSyncConnection(userId, deviceId, community.teamId, {
         socket,
         communitiesManager: this,
       })
@@ -230,7 +232,9 @@ export class CommunitiesManagerService implements OnModuleDestroy {
   }
 
   /**
-   * Start an LFA auth sync connection over an existing websocket connection with a user
+   * Prepare an LFA auth sync connection over an existing websocket connection
+   * with a user. The first validated client auth-sync frame starts the
+   * connection.
    *
    * @param userId ID of the user we are connecting with
    * @param deviceId ID of the device we are connecting with
@@ -238,7 +242,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
    * @param config Related metadata/config for this auth sync connection
    * @returns void
    */
-  public startAuthSyncConnection(
+  public prepareAuthSyncConnection(
     userId: string,
     deviceId: string,
     teamId: string,
@@ -255,7 +259,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       managedCommunity.authConnections ?? (new Map() as AuthConnectionMap)
     const connectionContext = `teamId=${teamId} userId=${userId} deviceId=${deviceId} socketId=${config.socket.id}`
     this.logger.debug(
-      `Starting auth connection request: ${connectionContext} mappedConnections=${authConnections.size}`,
+      `Preparing auth connection request: ${connectionContext} mappedConnections=${authConnections.size}`,
     )
 
     const existingConn = authConnections.get(deviceId)
@@ -280,7 +284,9 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       )
     }
 
-    // create and start a new LFA auth sync connection with this user
+    // Create and map a new LFA auth sync connection. Starting it here can emit
+    // an auth-sync frame before the create/sign-in acknowledgement reaches the
+    // client, so handleAuthSync starts it when the first client frame arrives.
     const authConnection = new AuthConnection(
       userId,
       deviceId,
@@ -345,14 +351,6 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       )
       authConnection.stop()
     })
-
-    this.logger.debug(
-      `Starting mapped auth connection: ${connectionContext} status=${authConnection.status}`,
-    )
-    authConnection.start()
-    this.logger.debug(
-      `Auth connection start invoked: ${connectionContext} status=${authConnection.status}`,
-    )
 
     // ensure we remove the expiry if it was set now that we have an open connection
     if (this.communities.has(teamId)) {

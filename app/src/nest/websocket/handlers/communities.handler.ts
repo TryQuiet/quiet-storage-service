@@ -151,11 +151,13 @@ export function registerCommunitiesHandlers(
         return
       }
 
-      // start the auth sync connection and return a success response
+      // Map the auth sync connection before returning success. Its first
+      // validated client frame starts the server side after the client has
+      // initialized its own auth connection.
       _logger.debug(
         `Found community for ID ${teamId}, initializing sync connection`,
       )
-      config.communitiesManager.startAuthSyncConnection(
+      config.communitiesManager.prepareAuthSyncConnection(
         userId,
         deviceId,
         teamId,
