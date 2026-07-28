@@ -10,6 +10,9 @@ import {
   CreateSecretCommandInput,
   CreateSecretCommand,
   CreateSecretCommandOutput,
+  PutSecretValueCommand,
+  PutSecretValueCommandInput,
+  PutSecretValueCommandOutput,
 } from '@aws-sdk/client-secrets-manager'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '../config/config.service.js'
@@ -216,6 +219,56 @@ export class AWSSecretsService {
   }
 
   /**
+   * Add a new value version to an existing secret.
+   *
+   * This is intentionally separate from create so a missing secret remains an
+   * error instead of silently changing a create operation into an upsert.
+   *
+   * @param secretName Existing secret name we are updating
+   * @param secret Encrypted secret value to store
+   * @param clientRequestToken Stable idempotency token for this secret value
+   */
+  public async update(
+    secretName: string,
+    secret: string | Uint8Array,
+    clientRequestToken: string,
+  ): Promise<void> {
+    try {
+      if (this.local) {
+        const existingSecret = await this.redisClient.get(secretName)
+        if (existingSecret == null) {
+          throw new Error(`Cannot update missing secret ${secretName}`)
+        }
+        await this.redisClient.set(secretName, secret)
+        this.updateCachedSecretEnvVar(secretName, secret)
+        return
+      }
+
+      const commandInput: PutSecretValueCommandInput = {
+        SecretId: secretName,
+        ClientRequestToken: clientRequestToken,
+      }
+      if (typeof secret === 'string') {
+        commandInput.SecretString = secret
+      } else if (isUint8Array(secret)) {
+        commandInput.SecretBinary = secret
+      } else {
+        throw new Error(`Secret must be a string or Uint8Array!`)
+      }
+
+      const command = new PutSecretValueCommand(commandInput)
+      await this.executePutSecretValueCommandAws(command)
+      this.updateCachedSecretEnvVar(secretName, secret)
+    } catch (e) {
+      this.logger.error('Error updating secret:', e)
+      throw new CompoundError(
+        'Error updating secret in AWS',
+        AWSSecretsService.normalizeError(e),
+      )
+    }
+  }
+
+  /**
    * Close the Redis client, if applicable
    */
   public async close(): Promise<void> {
@@ -366,6 +419,12 @@ export class AWSSecretsService {
   private async executeCreateSecretCommandAws(
     command: CreateSecretCommand,
   ): Promise<CreateSecretCommandOutput> {
+    return await this.getAwsClient().send(command)
+  }
+
+  private async executePutSecretValueCommandAws(
+    command: PutSecretValueCommand,
+  ): Promise<PutSecretValueCommandOutput> {
     return await this.getAwsClient().send(command)
   }
 }

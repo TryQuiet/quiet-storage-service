@@ -7,7 +7,11 @@ import { Injectable } from '@nestjs/common'
 import { createLogger } from '../../app/logger/logger.js'
 import * as uint8arrays from 'uint8arrays'
 import EventEmitter from 'events'
-import { LFAEvents, SigchainEvents } from './types.js'
+import {
+  LFAEvents,
+  SigchainEvents,
+  type SigChainPersistenceSnapshot,
+} from './types.js'
 
 const logger = createLogger('Auth:SigChain')
 const lfaLogger = createLogger('Localfirst')
@@ -47,6 +51,22 @@ export class SigChain extends EventEmitter {
     }
 
     return uint8arrays.toString(bytes, 'hex')
+  }
+
+  /**
+   * Capture the graph and keyring from the same synchronous team state.
+   */
+  public serializeForPersistence(): SigChainPersistenceSnapshot {
+    const sigChain = this.serialize(true)
+    const teamKeyring = uint8arrays.fromString(
+      JSON.stringify(this.team.teamKeyring()),
+      'utf8',
+    )
+    return {
+      teamId: this.team.id,
+      sigChain,
+      teamKeyring,
+    }
   }
 
   public clearListeners(): void {

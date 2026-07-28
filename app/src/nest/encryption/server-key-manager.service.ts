@@ -6,10 +6,16 @@ import { createLogger } from '../app/logger/logger.js'
 import { AWSSecretsService } from '../utils/aws/aws-secrets.service.js'
 import { AWSSecretNames } from '../utils/aws/const.js'
 import { CompoundError } from '../utils/errors.js'
-import { EncryptedPayload, StoredKeyring, StoredKeyRingType } from './types.js'
+import {
+  EncryptedPayload,
+  PendingKeyringUpdate,
+  StoredKeyring,
+  StoredKeyRingType,
+} from './types.js'
 import { ConfigService } from '../utils/config/config.service.js'
 import { SodiumHelper } from './sodium.helper.js'
 import { EnvironmentShort } from '../utils/config/types.js'
+import { createHash } from 'node:crypto'
 
 @Injectable()
 export class ServerKeyManagerService implements OnModuleDestroy {
@@ -17,6 +23,14 @@ export class ServerKeyManagerService implements OnModuleDestroy {
    * Key used by this environment to encrypt stored keys in the AWS secrets manager
    */
   private serverEncKey: Uint8Array | undefined = undefined
+
+  /**
+   * An ambiguous AWS response must retry the exact ciphertext and version ID.
+   */
+  private readonly pendingKeyringUpdates = new Map<
+    string,
+    Promise<PendingKeyringUpdate>
+  >()
 
   private readonly logger = createLogger(ServerKeyManagerService.name)
 
@@ -57,6 +71,53 @@ export class ServerKeyManagerService implements OnModuleDestroy {
     } catch (e) {
       throw new CompoundError(
         `Error while encrypting and storing keyring in AWS!`,
+        e as Error,
+      )
+    }
+  }
+
+  /**
+   * Update an existing keyring/keyset in the AWS secrets manager.
+   *
+   * @param id ID of the team this keyring belongs to
+   * @param keyring Bytes for this keyring
+   * @param type Type string for storing this keyring
+   * @returns Stored secret JSON
+   */
+  public async updateKeyring(
+    id: string,
+    keyring: Uint8Array,
+    type: StoredKeyRingType,
+  ): Promise<StoredKeyring> {
+    await this._initOrRetrieveServerEncKey()
+
+    try {
+      const secretName = this._generateSecretName(id, type)
+      this.logger.log(`Updating keyring`, secretName)
+      const pendingUpdateKey = this._generatePendingUpdateKey(
+        secretName,
+        keyring,
+      )
+      const pendingUpdate = this._getOrCreatePendingKeyringUpdate(
+        pendingUpdateKey,
+        secretName,
+        keyring,
+        type,
+      )
+      const { clientRequestToken, secret, serializedSecret } =
+        await pendingUpdate
+      await this.awsSecretsService.update(
+        secretName,
+        serializedSecret,
+        clientRequestToken,
+      )
+      if (this.pendingKeyringUpdates.get(pendingUpdateKey) === pendingUpdate) {
+        this.pendingKeyringUpdates.delete(pendingUpdateKey)
+      }
+      return secret
+    } catch (e) {
+      throw new CompoundError(
+        `Error while encrypting and updating keyring in AWS!`,
         e as Error,
       )
     }
@@ -186,7 +247,11 @@ export class ServerKeyManagerService implements OnModuleDestroy {
   }
 
   public async onModuleDestroy(): Promise<void> {
-    await this.close()
+    try {
+      await this.close()
+    } finally {
+      this.pendingKeyringUpdates.clear()
+    }
   }
 
   /**
@@ -248,6 +313,71 @@ export class ServerKeyManagerService implements OnModuleDestroy {
    */
   private _generateSecretName(id: string, type: StoredKeyRingType): string {
     return `qss/${ConfigService.getEnvShort()}-te-${type}-${this.sodiumHelper.sodium.crypto_hash_sha512(`${id}-${type}`, 'base64')}`
+  }
+
+  private _generatePendingUpdateKey(
+    secretName: string,
+    keyring: Uint8Array,
+  ): string {
+    return createHash('sha256')
+      .update(secretName)
+      .update('\0')
+      .update(keyring)
+      .digest('hex')
+  }
+
+  private _generateUpdateRequestToken(
+    secretName: string,
+    serializedSecret: string,
+  ): string {
+    return createHash('sha256')
+      .update(secretName)
+      .update('\0')
+      .update(serializedSecret)
+      .digest('hex')
+  }
+
+  // eslint-disable-next-line @typescript-eslint/promise-function-async -- callers must share the exact cached promise identity
+  private _getOrCreatePendingKeyringUpdate(
+    pendingUpdateKey: string,
+    secretName: string,
+    keyring: Uint8Array,
+    type: StoredKeyRingType,
+  ): Promise<PendingKeyringUpdate> {
+    const existingUpdate = this.pendingKeyringUpdates.get(pendingUpdateKey)
+    if (existingUpdate != null) {
+      return existingUpdate
+    }
+
+    const pendingUpdate = this._prepareKeyringUpdate(secretName, keyring, type)
+    this.pendingKeyringUpdates.set(pendingUpdateKey, pendingUpdate)
+    void pendingUpdate.catch(() => {
+      if (this.pendingKeyringUpdates.get(pendingUpdateKey) === pendingUpdate) {
+        this.pendingKeyringUpdates.delete(pendingUpdateKey)
+      }
+    })
+    return pendingUpdate
+  }
+
+  private async _prepareKeyringUpdate(
+    secretName: string,
+    keyring: Uint8Array,
+    type: StoredKeyRingType,
+  ): Promise<PendingKeyringUpdate> {
+    const encPayload = await this.encrypt(keyring)
+    const secret: StoredKeyring = {
+      ...encPayload,
+      type,
+    }
+    const serializedSecret = JSON.stringify(secret)
+    return {
+      clientRequestToken: this._generateUpdateRequestToken(
+        secretName,
+        serializedSecret,
+      ),
+      secret,
+      serializedSecret,
+    }
   }
 
   /**

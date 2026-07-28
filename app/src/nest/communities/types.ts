@@ -39,7 +39,7 @@ export type AuthConnectionMap = Map<DeviceId, AuthConnection>
 export interface ManagedCommunity {
   teamId: string
   sigChain: SigChain
-  chainEventHandler: () => Promise<void>
+  chainEventHandler: () => void
   authConnections?: AuthConnectionMap
   expiryMs?: number
 }

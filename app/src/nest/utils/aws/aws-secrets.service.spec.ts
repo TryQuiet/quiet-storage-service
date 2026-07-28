@@ -7,7 +7,9 @@ import type {
   CreateSecretCommandOutput,
   GetSecretValueCommand,
   GetSecretValueCommandOutput,
+  PutSecretValueCommandOutput,
 } from '@aws-sdk/client-secrets-manager'
+import { PutSecretValueCommand } from '@aws-sdk/client-secrets-manager'
 import { AWSSecretsService } from './aws-secrets.service.js'
 import { EnvVars } from '../config/env_vars.js'
 import type { RedisClient } from '../../storage/redis/redis.client.js'
@@ -19,6 +21,9 @@ interface AWSSecretsServiceInternals {
   executeCreateSecretCommandAws: (
     command: CreateSecretCommand,
   ) => Promise<CreateSecretCommandOutput>
+  executePutSecretValueCommandAws: (
+    command: PutSecretValueCommand,
+  ) => Promise<PutSecretValueCommandOutput>
 }
 
 interface AwsTestError extends Error {
@@ -193,6 +198,36 @@ describe('AWSSecretsService', () => {
       ).resolves.toBe('new-secret')
       expect(getSecretSpy).toHaveBeenCalledTimes(1)
       expect(createSecretSpy).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('update', () => {
+    it('adds a value version to an existing AWS secret', async () => {
+      const service = createService()
+      const putSecretSpy = jest
+        .spyOn(getInternals(service), 'executePutSecretValueCommandAws')
+        .mockResolvedValueOnce({ $metadata: {} })
+      const createSecretSpy = jest.spyOn(
+        getInternals(service),
+        'executeCreateSecretCommandAws',
+      )
+
+      const clientRequestToken = 'a'.repeat(64)
+      await service.update(
+        'existing-secret',
+        'updated-value',
+        clientRequestToken,
+      )
+
+      expect(putSecretSpy).toHaveBeenCalledTimes(1)
+      const command = putSecretSpy.mock.calls[0][0]
+      expect(command).toBeInstanceOf(PutSecretValueCommand)
+      expect(command.input).toEqual({
+        SecretId: 'existing-secret',
+        SecretString: 'updated-value',
+        ClientRequestToken: clientRequestToken,
+      })
+      expect(createSecretSpy).not.toHaveBeenCalled()
     })
   })
 })

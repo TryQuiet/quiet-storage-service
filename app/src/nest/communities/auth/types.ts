@@ -32,3 +32,9 @@ export enum LFAEvents {
 export enum SigchainEvents {
   UPDATED = 'sigchainUpdated',
 }
+
+export interface SigChainPersistenceSnapshot {
+  teamId: string
+  sigChain: string
+  teamKeyring: Uint8Array
+}

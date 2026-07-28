@@ -42,12 +42,18 @@ import {
 import {
   AuthConnectionConfig,
   AuthStatus,
+  type SigChainPersistenceSnapshot,
   SigchainEvents,
 } from './auth/types.js'
 import { AuthDisconnectedPayload, AuthEvents } from './auth/auth.events.js'
 import { DateTime } from 'luxon'
 import { LogEntrySyncStorageService } from './storage/log-entry-sync.storage.service.js'
 import { Serializer } from '../utils/serialization/serializer.service.js'
+import { createHash } from 'node:crypto'
+import { setTimeout as sleep } from 'node:timers/promises'
+
+const PERSISTENCE_RETRY_BASE_DELAY_MS = 100
+const PERSISTENCE_RETRY_MAX_DELAY_MS = 5_000
 
 @Injectable()
 export class CommunitiesManagerService implements OnModuleDestroy {
@@ -55,6 +61,31 @@ export class CommunitiesManagerService implements OnModuleDestroy {
    * Map of team IDs to sigchains and associated LFA auth sync connections
    */
   private readonly communities = new Map<string, ManagedCommunity>()
+
+  /**
+   * Per-team promise tails serialize graph/keyring persistence.
+   */
+  private readonly persistenceQueues = new Map<string, Promise<void>>()
+
+  /**
+   * Serialized keyrings already committed to secrets storage, by team ID.
+   */
+  private readonly lastPersistedKeyrings = new Map<string, string>()
+
+  /**
+   * Coalesced storage loads prevent multiple live SigChains for one cache miss.
+   */
+  private readonly communityLoads = new Map<
+    string,
+    Promise<ManagedCommunity | undefined>
+  >()
+
+  /**
+   * Creates accepted before shutdown are allowed to finish before teardown.
+   */
+  private readonly communityCreates = new Set<Promise<CreatedCommunity>>()
+
+  private shuttingDown = false
 
   /**
    * Interval for checking for clearable locally stored communities
@@ -86,10 +117,23 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     }, 60_000)
   }
 
-  public onModuleDestroy(): void {
+  public async onModuleDestroy(): Promise<void> {
     this.logger.info('Clearing CommunitesManagerService')
+    this.shuttingDown = true
     clearTimeout(this._communityExpiryHandler)
+    this._clearAllSigchainListeners()
+    await Promise.allSettled([
+      ...this.communityLoads.values(),
+      ...this.communityCreates,
+    ])
+    // A load already in progress can attach a listener after the first pass.
+    this._clearAllSigchainListeners()
+    await Promise.allSettled(this.persistenceQueues.values())
     this.communities.clear()
+    this.communityLoads.clear()
+    this.communityCreates.clear()
+    this.persistenceQueues.clear()
+    this.lastPersistedKeyrings.clear()
   }
 
   /**
@@ -103,17 +147,37 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     teamId: string,
     forceFetchFromStorage = false,
   ): Promise<ManagedCommunity | undefined> {
-    if (this.communities.has(teamId) && !forceFetchFromStorage) {
-      return this.communities.get(teamId)
+    if (this.shuttingDown) {
+      throw new Error(`Cannot load community ${teamId} during shutdown`)
     }
 
-    const community = await this.storage.getCommunity(teamId)
-    if (community == null) {
-      this.logger.warn('Community not found in local cache or storage', teamId)
-      return undefined
+    const cachedCommunity = this.communities.get(teamId)
+    if (cachedCommunity != null) {
+      const activeConnectionCount = cachedCommunity.authConnections?.size ?? 0
+      if (!forceFetchFromStorage || activeConnectionCount > 0) {
+        if (forceFetchFromStorage && activeConnectionCount > 0) {
+          this.logger.warn(
+            `Skipping forced reload for ${teamId}; ${activeConnectionCount} auth connection(s) still use its sigchain`,
+          )
+        }
+        return cachedCommunity
+      }
     }
 
-    return await this._processCommunityToManagedCommunity(teamId, community)
+    const existingLoad = this.communityLoads.get(teamId)
+    if (existingLoad != null) {
+      return await existingLoad
+    }
+
+    const load = this._loadCommunity(teamId)
+    this.communityLoads.set(teamId, load)
+    try {
+      return await load
+    } finally {
+      if (this.communityLoads.get(teamId) === load) {
+        this.communityLoads.delete(teamId)
+      }
+    }
   }
 
   /**
@@ -129,6 +193,35 @@ export class CommunitiesManagerService implements OnModuleDestroy {
    */
   // eslint-disable-next-line @typescript-eslint/max-params -- connection identity requires both user and device IDs
   public async create(
+    userId: string,
+    deviceId: string,
+    community: Community,
+    teamKeyring: string,
+    socket: QuietSocket,
+  ): Promise<CreatedCommunity> {
+    if (this.shuttingDown) {
+      throw new Error(
+        `Cannot create community ${community.teamId} during shutdown`,
+      )
+    }
+
+    const creation = this._create(
+      userId,
+      deviceId,
+      community,
+      teamKeyring,
+      socket,
+    )
+    this.communityCreates.add(creation)
+    try {
+      return await creation
+    } finally {
+      this.communityCreates.delete(creation)
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/max-params -- connection identity requires both user and device IDs
+  private async _create(
     userId: string,
     deviceId: string,
     community: Community,
@@ -164,8 +257,6 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         localServerContext,
         deserializedTeamKeyring,
       )
-      const chainEventHandler = this.addSigchainListener(sigChain)
-
       const userCount = sigChain.team.members().length
       if (userCount > 1) {
         throw new NoPopulatedCommunitiesError(community.teamId, userCount)
@@ -185,6 +276,8 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         throw new Error(`Failed to store community!`)
       }
 
+      this._setLastPersistedKeyring(community.teamId, serializedTeamKeyring)
+      const chainEventHandler = this.addSigchainListener(sigChain)
       this.communities.set(community.teamId, {
         teamId: community.teamId,
         sigChain,
@@ -465,6 +558,21 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       return undefined
     }
 
+    // Replacing a SigChain would strand AuthConnections that still reference
+    // the current instance. Keep it until those connections have closed.
+    const existingManagedCommunity = this.communities.get(teamId)
+    if (
+      existingManagedCommunity != null &&
+      (existingManagedCommunity.authConnections?.size ?? 0) > 0
+    ) {
+      const activeConnectionCount =
+        existingManagedCommunity.authConnections?.size ?? 0
+      this.logger.warn(
+        `Keeping cached community ${teamId}; ${activeConnectionCount} auth connection(s) still use its sigchain`,
+      )
+      return existingManagedCommunity
+    }
+
     const rawSigchain = uint8arrays.fromString(community.sigChain, 'hex')
     const localServerContext: LocalServerContext = {
       server: {
@@ -478,10 +586,18 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       teamKeys,
     )
 
-    const chainEventHandler = this.addSigchainListener(sigChain)
-
     // if we already have a managed community for this team merge it with the new data
-    const existingManagedCommunity = this.communities.get(teamId)
+    if (existingManagedCommunity != null) {
+      this.clearSigchainListeners(
+        existingManagedCommunity.sigChain,
+        existingManagedCommunity.chainEventHandler,
+      )
+    }
+    this._setLastPersistedKeyring(
+      teamId,
+      uint8arrays.fromString(JSON.stringify(teamKeys), 'utf8'),
+    )
+    const chainEventHandler = this.addSigchainListener(sigChain)
     const managedCommunity: ManagedCommunity = {
       ...(existingManagedCommunity ?? {}),
       teamId: community.teamId,
@@ -491,6 +607,26 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     // put the new managed community into memory
     this.communities.set(community.teamId, managedCommunity)
     return managedCommunity
+  }
+
+  private async _loadCommunity(
+    teamId: string,
+  ): Promise<ManagedCommunity | undefined> {
+    if (this.shuttingDown) {
+      throw new Error(`Cannot load community ${teamId} during shutdown`)
+    }
+
+    // A cache miss can race expiry cleanup, which removes the in-memory
+    // community before its final queued snapshot reaches storage.
+    await this._drainPersistenceQueue(teamId)
+
+    const community = await this.storage.getCommunity(teamId)
+    if (community == null) {
+      this.logger.warn('Community not found in local cache or storage', teamId)
+      return undefined
+    }
+
+    return await this._processCommunityToManagedCommunity(teamId, community)
   }
 
   /**
@@ -524,13 +660,14 @@ export class CommunitiesManagerService implements OnModuleDestroy {
           community.chainEventHandler,
         )
         this.communities.delete(community.teamId)
+        void this._drainPersistenceQueue(community.teamId).then(() => {
+          this.lastPersistedKeyrings.delete(community.teamId)
+        })
       }
     }
   }
 
-  private readonly addSigchainListener = (
-    sigChain: SigChain,
-  ): (() => Promise<void>) => {
+  private readonly addSigchainListener = (sigChain: SigChain): (() => void) => {
     this.logger.debug('Attaching chain update listener(s)', sigChain.team.id)
     const handler = this._updateDbOnChainUpdate(sigChain)
     sigChain.on(SigchainEvents.UPDATED, handler)
@@ -539,7 +676,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
 
   private readonly clearSigchainListeners = (
     sigChain: SigChain,
-    handler: () => Promise<void>,
+    handler: () => void,
   ): void => {
     this.logger.debug('Clearing chain update listeners', sigChain.team.id)
     sigChain.clearListeners()
@@ -547,10 +684,151 @@ export class CommunitiesManagerService implements OnModuleDestroy {
   }
 
   private readonly _updateDbOnChainUpdate =
-    (sigChain: SigChain): (() => Promise<void>) =>
-    async (): Promise<void> => {
-      await this.update(sigChain.team.id, {
-        sigChain: sigChain.serialize(true),
-      })
+    (sigChain: SigChain): (() => void) =>
+    (): void => {
+      this._enqueueSigchainPersistence(sigChain)
     }
+
+  private _enqueueSigchainPersistence(sigChain: SigChain): void {
+    if (this.shuttingDown) {
+      return
+    }
+
+    const teamId = sigChain.team.id
+    const previous = this.persistenceQueues.get(teamId) ?? Promise.resolve()
+    const previousSettled = previous.catch(() => {
+      // The rejected snapshot was logged when its queue tail settled. Keep
+      // later snapshots moving so the newest state can still converge.
+    })
+    const capturedSnapshot = Promise.resolve().then(() =>
+      sigChain.serializeForPersistence(),
+    )
+    const queued = Promise.all([previousSettled, capturedSnapshot]).then(
+      async ([, snapshot]) => {
+        await this._persistSigchainSnapshotWithRetry(snapshot)
+      },
+    )
+
+    this.persistenceQueues.set(teamId, queued)
+    void queued.then(
+      () => {
+        this._removeSettledPersistenceQueue(teamId, queued)
+      },
+      (error: unknown) => {
+        this.logger.error(
+          `Failed to persist sigchain snapshot for ${teamId}`,
+          error,
+        )
+        this._removeSettledPersistenceQueue(teamId, queued)
+      },
+    )
+  }
+
+  private async _persistSigchainSnapshot(
+    snapshot: SigChainPersistenceSnapshot,
+  ): Promise<void> {
+    const keyringFingerprint = this._keyringFingerprint(snapshot.teamKeyring)
+    if (
+      this.lastPersistedKeyrings.get(snapshot.teamId) !== keyringFingerprint
+    ) {
+      await this.serverKeyManager.updateKeyring(
+        snapshot.teamId,
+        snapshot.teamKeyring,
+        StoredKeyRingType.TEAM_KEYRING,
+      )
+      this.lastPersistedKeyrings.set(snapshot.teamId, keyringFingerprint)
+    }
+
+    await this.update(snapshot.teamId, {
+      sigChain: snapshot.sigChain,
+    })
+  }
+
+  private async _persistSigchainSnapshotWithRetry(
+    snapshot: SigChainPersistenceSnapshot,
+  ): Promise<void> {
+    let attempt = 0
+    let shutdownRetryAttempted = false
+    while (true) {
+      try {
+        await this._persistSigchainSnapshot(snapshot)
+        return
+      } catch (error) {
+        attempt += 1
+
+        if (this.shuttingDown && shutdownRetryAttempted) {
+          throw error
+        }
+
+        const retryingDuringShutdown = this.shuttingDown
+        shutdownRetryAttempted ||= retryingDuringShutdown
+        const delayMs = retryingDuringShutdown
+          ? PERSISTENCE_RETRY_BASE_DELAY_MS
+          : Math.min(
+              PERSISTENCE_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1),
+              PERSISTENCE_RETRY_MAX_DELAY_MS,
+            )
+        this.logger.warn(
+          `Retrying sigchain snapshot persistence for ${snapshot.teamId} after attempt ${attempt}`,
+          error,
+        )
+        await sleep(delayMs)
+      }
+    }
+  }
+
+  private async _drainPersistenceQueue(teamId: string): Promise<void> {
+    while (true) {
+      const pending = this.persistenceQueues.get(teamId)
+      if (pending == null) {
+        return
+      }
+      await pending.catch(() => undefined)
+      if (this.persistenceQueues.get(teamId) === pending) {
+        return
+      }
+    }
+  }
+
+  private _setLastPersistedKeyring(
+    teamId: string,
+    serializedKeyring: Uint8Array,
+  ): void {
+    this.lastPersistedKeyrings.set(
+      teamId,
+      this._keyringFingerprint(serializedKeyring),
+    )
+  }
+
+  private _keyringFingerprint(serializedKeyring: Uint8Array): string {
+    const keyring = JSON.parse(
+      uint8arrays.toString(serializedKeyring, 'utf8'),
+    ) as Keyring
+    const canonicalKeyring = Object.fromEntries(
+      Object.entries(keyring).sort(([left], [right]) =>
+        left.localeCompare(right),
+      ),
+    )
+    return createHash('sha256')
+      .update(JSON.stringify(canonicalKeyring))
+      .digest('base64')
+  }
+
+  private _removeSettledPersistenceQueue(
+    teamId: string,
+    settled: Promise<void>,
+  ): void {
+    if (this.persistenceQueues.get(teamId) === settled) {
+      this.persistenceQueues.delete(teamId)
+    }
+  }
+
+  private _clearAllSigchainListeners(): void {
+    for (const community of this.communities.values()) {
+      this.clearSigchainListeners(
+        community.sigChain,
+        community.chainEventHandler,
+      )
+    }
+  }
 }
