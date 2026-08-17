@@ -90,6 +90,8 @@ const createCommunity = async (
 
     const server: Server = {
       host: ConfigService.getString(EnvVars.QSS_HOSTNAME)!,
+      serverId: genKeysResponse!.payload!.serverId!,
+      identityKeys: genKeysResponse!.payload!.identityKeys!,
       keys: genKeysResponse!.payload!.keys!,
     }
     serializedSigchain.addServer(server)

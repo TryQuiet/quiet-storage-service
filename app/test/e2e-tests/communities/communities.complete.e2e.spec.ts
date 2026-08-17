@@ -71,6 +71,8 @@ describe('Communities', () => {
   let serializer: Serializer
   let community: Community
   let testTeam: TestTeam
+  let serverId: string | undefined = undefined
+  let serverIdentityKeys: Keyset | undefined = undefined
   let serverKeys: Keyset | undefined = undefined
   let teamTestUtils: TeamTestUtils
 
@@ -141,7 +143,7 @@ describe('Communities', () => {
       expect(testTeam.team).toBeDefined()
       expect(testTeam.testUserContext).toBeDefined()
       expect(testTeam.server).toBeUndefined()
-      expect(testTeam.serverKeys).toBeUndefined()
+      expect(testTeam.serverWithSecrets).toBeUndefined()
     })
 
     it('should validate the connection with captcha', async () => {
@@ -176,6 +178,8 @@ describe('Communities', () => {
           message,
           true,
         )
+      serverId = response?.payload?.serverId
+      serverIdentityKeys = response?.payload?.identityKeys
       serverKeys = response?.payload?.keys
       expect(response).toEqual(
         expect.objectContaining({
@@ -183,9 +187,15 @@ describe('Communities', () => {
           status: CommunityOperationStatus.SUCCESS,
           payload: {
             teamId: testTeam.team.id,
+            serverId: expect.any(String),
+            identityKeys: expect.objectContaining({
+              type: 'SERVER',
+              signature: expect.any(String),
+              encryption: expect.any(String),
+              generation: 0,
+            }),
             keys: expect.objectContaining({
               type: 'SERVER',
-              name: SERVER_NAME,
               signature: expect.any(String),
               encryption: expect.any(String),
               generation: 0,
@@ -196,12 +206,16 @@ describe('Communities', () => {
     })
 
     it('should validate that the server keys are defined', () => {
+      expect(serverId).toBeDefined()
+      expect(serverIdentityKeys).toBeDefined()
       expect(serverKeys).toBeDefined()
     })
 
     it('should add the server to the team', () => {
       const server: Server = {
         host: SERVER_NAME,
+        serverId: serverId!,
+        identityKeys: serverIdentityKeys!,
         keys: serverKeys!,
       }
       testTeam.team.addServer(server)

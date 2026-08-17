@@ -72,8 +72,10 @@ export function registerCommunitiesAuthHandlers(
         callback(errorResponse)
         return
       }
-      // generate the keys for this community and return to the user
-      const keysetWithSecrets = await config.communitiesManager.getServerKeys(
+      // provision the server identity for this community and return its public record. A server now
+      // has a self-certifying id (`serverId`, the fingerprint of its immutable `identityKeys`) plus
+      // a separate rotatable member keyset (`keys`); the client registers all three on the chain.
+      const serverWithSecrets = await config.communitiesManager.getServerKeys(
         teamId,
         AllowedServerKeyState.NOT_STORED,
       )
@@ -82,8 +84,10 @@ export function registerCommunitiesAuthHandlers(
         ts: DateTime.utc().toMillis(),
         status: CommunityOperationStatus.SUCCESS,
         payload: {
-          keys: redactKeys(keysetWithSecrets) as Keyset,
           teamId,
+          serverId: serverWithSecrets.serverId,
+          identityKeys: redactKeys(serverWithSecrets.identityKeys) as Keyset,
+          keys: redactKeys(serverWithSecrets.keys) as Keyset,
         },
       }
       callback(response)
