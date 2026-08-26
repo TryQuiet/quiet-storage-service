@@ -20,21 +20,6 @@ import {
   type Server,
 } from '@localfirst/auth'
 
-/**
- * Mint an identity the way local-first-auth path A requires: a user's id is derived from their
- * founding device, so mint the device first, derive the id, then create the user and attach it.
- * (The old `createUser` -> `createDevice({ userId })` order produces a member whose id is not
- * derived from its device, which A's `admittedMemberIdIsDerivedFromDevice` validator rejects.)
- */
-const mintContext = (
-  userName: string,
-  deviceName: string,
-): LocalUserContext => {
-  const foundingDevice = createFirstUseDevice({ deviceName })
-  const userId = deriveUserId(foundingDevice.deviceId)
-  const user = createUser(userName, userId)
-  return { user, device: { ...foundingDevice, userId } }
-}
 import {
   type Community,
   type EncryptedAndSignedPayload,
@@ -68,6 +53,22 @@ import {
 } from '../../../src/nest/websocket/handlers/types/captcha.types.js'
 import { WebsocketGateway } from '../../../src/nest/websocket/ws.gateway.js'
 import { waitFor } from '../../utils/waitFor.js'
+
+/**
+ * Mint an identity the way local-first-auth path A requires: a user's id is derived from their
+ * founding device, so mint the device first, derive the id, then create the user and attach it.
+ * (The old `createUser` -> `createDevice({ userId })` order produces a member whose id is not
+ * derived from its device, which A's `admittedMemberIdIsDerivedFromDevice` validator rejects.)
+ */
+const mintContext = (
+  userName: string,
+  deviceName: string,
+): LocalUserContext => {
+  const foundingDevice = createFirstUseDevice({ deviceName })
+  const userId = deriveUserId(foundingDevice.deviceId)
+  const user = createUser(userName, userId)
+  return { user, device: { ...foundingDevice, userId } }
+}
 
 describe('Communities', () => {
   let testClient: TestClient
@@ -370,6 +371,7 @@ describe('Communities', () => {
         {
           ...secondClientContext,
           invitationSeed: invite.seed,
+          expectedTeamId: invite.teamId,
         },
       )
       let authorized = false
@@ -626,6 +628,7 @@ describe('Communities', () => {
         {
           ...invalidClientContext,
           invitationSeed: 'foobar',
+          expectedTeamId: testTeam.team.id,
         },
       )
       let authorized = false

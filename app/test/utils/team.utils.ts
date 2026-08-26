@@ -50,7 +50,7 @@ function buildMemberAdmission(seed: string, context: LocalUserContext) {
     device: redactDevice(context.device),
   }
   const nonces = {
-    acceptorNonce: randomKey() as Base58,
+    identityNonce: randomKey() as Base58,
     inviteeNonce: randomKey() as Base58,
   }
   const proof = invitation.generateProof({ seed, claim, ...nonces })

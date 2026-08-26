@@ -5,6 +5,7 @@ import { EncryptionModule } from '../../encryption/enc.module.js'
 import { TeamTestUtils } from '../../../../test/utils/team.utils.js'
 import type { TestTeam } from '../../../../test/utils/types.js'
 import * as uint8arrays from 'uint8arrays'
+import type { Keyring } from '@localfirst/auth'
 
 describe('SigChain', () => {
   let module: TestingModule | undefined = undefined
@@ -43,7 +44,7 @@ describe('SigChain', () => {
     const sigchain = SigChain.create(
       testTeam.team.save(),
       { server: testTeam.server },
-      testTeam.team.teamKeyring(),
+      testTeam.team.teamKeyring() as Keyring,
     )
     expect(sigchain.serialize()).toEqual(testTeam.team.save())
   })
@@ -57,7 +58,7 @@ describe('SigChain', () => {
     const sigchain = SigChain.create(
       testTeam.team.save(),
       { server: testTeam.server },
-      testTeam.team.teamKeyring(),
+      testTeam.team.teamKeyring() as Keyring,
     )
     const hexChain = sigchain.serialize(true)
     const hexBaseChain = uint8arrays.toString(testTeam.team.save(), 'hex')

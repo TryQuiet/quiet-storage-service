@@ -7,8 +7,8 @@ import {
   castServer,
   Connection as LFAConnection,
   type ServerContext,
+  type ServerWithSecrets,
   type UserWithSecrets,
-  type Team,
 } from '@localfirst/auth'
 import { WebsocketEvents } from '../../websocket/ws.types.js'
 import { createLogger } from '../../app/logger/logger.js'
@@ -66,7 +66,8 @@ export class AuthConnection extends EventEmitter {
   ) {
     super()
 
-    const server = this.sigChain.context.server
+    // The pinned auth package's generated declarations lose this concrete type.
+    const server = this.sigChain.context.server as ServerWithSecrets
     // This server participates as a first-class server on the team: its identity is its serverId,
     // and localfirst/auth derives whatever user-shaped view it needs internally (extendServerContext
     // casts the server to a user for the handshake). We no longer fake a device — servers don't have
@@ -77,7 +78,7 @@ export class AuthConnection extends EventEmitter {
     }
     // The server cast to a user, used for the sync-event payload and as the routing id on outbound
     // auth-sync messages (stable across calls for the same server).
-    this.localUser = castServer.toUser(server) as UserWithSecrets
+    this.localUser = castServer.toUser(server)
     // create a new LFA auth sync connection that routes auth sync messages through an existing websocket connection
     this.lfaConnection = new LFAConnection({
       context: this.serverContext,
@@ -125,9 +126,9 @@ export class AuthConnection extends EventEmitter {
         this.logger.debug(
           `Sending sync message because our chain is initialized`,
         )
-        const { team } = this.serverContext
+        const team = this.sigChain.team
         this.lfaConnection.emit('sync', { team, user: this.localUser })
-        const teamId = (team as Team).id
+        const teamId = team.id
         this._status = AuthStatus.JOINED
         this.logger.debug(
           'Joining new socket to room on sign-in',
@@ -172,7 +173,7 @@ export class AuthConnection extends EventEmitter {
     })
 
     this.logger.log(
-      `Auth connection established with Peer for ${(this.serverContext.team as Team).id}`,
+      `Auth connection established with Peer for ${this.sigChain.team.id}`,
     )
     this._status = AuthStatus.JOINING
     this.lfaConnection.start()
