@@ -19,10 +19,10 @@ import {
 import {
   Keyring,
   LocalServerContext,
-  createKeyset,
+  createServer,
   redactKeys,
   Keyset,
-  KeysetWithSecrets,
+  ServerWithSecrets,
 } from '@localfirst/auth'
 import { ServerKeyManagerService } from '../encryption/server-key-manager.service.js'
 import { StoredKeyRingType } from '../encryption/types.js'
@@ -141,17 +141,14 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       ) as Keyring
 
       this.logger.log(`Deserializing and joining team`)
-      // get the previously created server LFA keys from the AWS secrets manager
-      const serverKeysWithSecrets = await this.getServerKeys(
+      // get the previously created server identity from the AWS secrets manager
+      const serverWithSecrets = await this.getServerKeys(
         community.teamId,
         AllowedServerKeyState.STORED_ONLY,
       )
       const rawSigchain = uint8arrays.fromString(community.sigChain, 'hex')
       const localServerContext: LocalServerContext = {
-        server: {
-          host: this.hostname,
-          keys: serverKeysWithSecrets,
-        },
+        server: serverWithSecrets,
       }
 
       const sigChain: SigChain = SigChain.create(
@@ -193,7 +190,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       })
 
       return {
-        serverKeys: redactKeys(serverKeysWithSecrets) as Keyset,
+        serverKeys: redactKeys(serverWithSecrets.keys) as Keyset,
         community,
       }
     } catch (e) {
@@ -330,44 +327,48 @@ export class CommunitiesManagerService implements OnModuleDestroy {
   public async getServerKeys(
     teamId: string,
     allowedKeyState: AllowedServerKeyState,
-  ): Promise<KeysetWithSecrets> {
-    // fetch the existing keyset from the AWS secrets manager
-    const existingKeyset = await this.serverKeyManager.retrieveKeyring(
+  ): Promise<ServerWithSecrets> {
+    // fetch the existing server identity from the AWS secrets manager
+    const existingServer = await this.serverKeyManager.retrieveKeyring(
       teamId,
       StoredKeyRingType.SERVER_KEYRING,
     )
-    if (existingKeyset != null) {
-      // if we require that a keyset must be newly generated throw an error when keys are already stored
+    if (existingServer != null) {
+      // if we require that a server identity must be newly generated throw an error when one is already stored
       if (allowedKeyState === AllowedServerKeyState.NOT_STORED) {
         throw new Error(
           `Keys for this team were already stored but allowed state was set to ${AllowedServerKeyState.NOT_STORED}`,
         )
       }
       return JSON.parse(
-        uint8arrays.toString(existingKeyset, 'utf8'),
-      ) as KeysetWithSecrets
+        uint8arrays.toString(existingServer, 'utf8'),
+      ) as ServerWithSecrets
     }
 
-    // if we require that a keyset must be already stored throw an error when not found in the secrets manager
+    // if we require that a server identity must be already stored throw an error when not found in the secrets manager
     if (allowedKeyState === AllowedServerKeyState.STORED_ONLY) {
       throw new Error(
         `Keys for this team were not stored locally or in the secrets manager but the allowed state was set to ${AllowedServerKeyState.STORED_ONLY}`,
       )
     }
 
-    // create a new LFA keyset for this team and store in the AWS secrets manager
-    this.logger.log(`Initializing new server keyset for ${teamId}`)
-    const serverKeysWithSecrets = createKeyset(
-      { type: 'SERVER', name: this.hostname },
-      this.serverKeyManager.generateRandomBytes(32, 'base64'),
-    )
+    // Create a new self-certifying server identity for this team and store it. A server now has two
+    // keysets: an immutable signing identity (`identityKeys`, whose fingerprint is the stable
+    // `serverId`) and a rotatable member keyset (`keys`). We persist the whole ServerWithSecrets, so
+    // every later retrieval returns the same identity — `serverId` is stable per team, which is what
+    // the client's `hasServer(serverId)` dedupe relies on.
+    this.logger.log(`Initializing new server identity for ${teamId}`)
+    const serverWithSecrets = createServer({
+      host: this.hostname,
+      seed: this.serverKeyManager.generateRandomBytes(32, 'base64'),
+    })
     await this.serverKeyManager.storeKeyring(
       teamId,
-      uint8arrays.fromString(JSON.stringify(serverKeysWithSecrets), 'utf8'),
+      uint8arrays.fromString(JSON.stringify(serverWithSecrets), 'utf8'),
       StoredKeyRingType.SERVER_KEYRING,
     )
 
-    return serverKeysWithSecrets
+    return serverWithSecrets
   }
 
   /**
@@ -401,13 +402,13 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     teamId: string,
     community: Community,
   ): Promise<ManagedCommunity | undefined> {
-    // server's personal keys created when joing this LFA sigchain
-    let serverKeys: KeysetWithSecrets | undefined = undefined
+    // server's self-certifying identity created when joining this LFA sigchain
+    let server: ServerWithSecrets | undefined = undefined
     // team key ring owned by this LFA sigchain
     let teamKeys: Keyring | undefined = undefined
     try {
-      // get the server keys from the AWS secrets manager and require that the keys already exist
-      serverKeys = await this.getServerKeys(
+      // get the server identity from the AWS secrets manager and require that it already exists
+      server = await this.getServerKeys(
         teamId,
         AllowedServerKeyState.STORED_ONLY,
       )
@@ -423,10 +424,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
 
     const rawSigchain = uint8arrays.fromString(community.sigChain, 'hex')
     const localServerContext: LocalServerContext = {
-      server: {
-        host: this.hostname,
-        keys: serverKeys,
-      },
+      server,
     }
     const sigChain: SigChain = SigChain.create(
       rawSigchain,

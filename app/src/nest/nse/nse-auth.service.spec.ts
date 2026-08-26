@@ -4,7 +4,19 @@ import { UnauthorizedException } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { NseAuthService } from './nse-auth.service.js'
 import { CommunitiesManagerService } from '../communities/communities-manager.service.js'
-import { signatures } from '@localfirst/crypto'
+import { signatures, base58 } from '@localfirst/crypto'
+import sodium from 'libsodium-wrappers-sumo'
+import { pack } from 'msgpackr'
+
+/**
+ * The NSE verifies a raw Ed25519 signature over `msgpackr.pack(challenge)` (it deliberately does
+ * NOT use @localfirst/crypto's `signatures.sign`/`verify`, which now domain-separate by binding a
+ * context tag into the signed bytes). Sign the same way the service verifies.
+ */
+const signChallenge = (challenge: unknown, secretKey: string): string =>
+  base58.encode(
+    sodium.crypto_sign_detached(pack(challenge), base58.decode(secretKey)),
+  )
 
 const TEAM_ID = 'test-team-id'
 const DEVICE_ID = 'test-device-id'
@@ -168,7 +180,7 @@ describe('NseAuthService', () => {
 
       await expect(
         service.verifyAndIssueToken(challengeId, DEVICE_ID, {
-          signature: signatures.sign(challenge, otherKeys.secretKey),
+          signature: signChallenge(challenge, otherKeys.secretKey),
           publicKey: otherKeys.publicKey,
         }),
       ).rejects.toThrow(UnauthorizedException)
@@ -184,7 +196,7 @@ describe('NseAuthService', () => {
 
       await expect(
         service.verifyAndIssueToken(challengeId, DEVICE_ID, {
-          signature: signatures.sign(challenge, otherKeys.secretKey),
+          signature: signChallenge(challenge, otherKeys.secretKey),
           publicKey: otherKeys.publicKey,
         }),
       ).rejects.toThrow(UnauthorizedException)
@@ -198,7 +210,7 @@ describe('NseAuthService', () => {
       setRegisteredDevice()
 
       const result = await service.verifyAndIssueToken(challengeId, DEVICE_ID, {
-        signature: signatures.sign(challenge, registeredKeys.secretKey),
+        signature: signChallenge(challenge, registeredKeys.secretKey),
         publicKey: registeredKeys.publicKey,
       })
 

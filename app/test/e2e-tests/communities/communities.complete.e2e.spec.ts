@@ -12,13 +12,14 @@ import { AppModule } from '../../../src/nest/app/app.module.js'
 import { CommunitiesManagerService } from '../../../src/nest/communities/communities-manager.service.js'
 import type { GeneratePublicKeysMessage } from '../../../src/nest/websocket/handlers/types/gen-pub-keys.types.js'
 import {
-  createDevice,
+  createFirstUseDevice,
   createUser,
-  type DeviceWithSecrets,
+  deriveUserId,
   type InviteResult,
   type LocalUserContext,
   type Server,
 } from '@localfirst/auth'
+
 import {
   type Community,
   type EncryptedAndSignedPayload,
@@ -53,6 +54,22 @@ import {
 import { WebsocketGateway } from '../../../src/nest/websocket/ws.gateway.js'
 import { waitFor } from '../../utils/waitFor.js'
 
+/**
+ * Mint an identity the way local-first-auth path A requires: a user's id is derived from their
+ * founding device, so mint the device first, derive the id, then create the user and attach it.
+ * (The old `createUser` -> `createDevice({ userId })` order produces a member whose id is not
+ * derived from its device, which A's `admittedMemberIdIsDerivedFromDevice` validator rejects.)
+ */
+const mintContext = (
+  userName: string,
+  deviceName: string,
+): LocalUserContext => {
+  const foundingDevice = createFirstUseDevice({ deviceName })
+  const userId = deriveUserId(foundingDevice.deviceId)
+  const user = createUser(userName, userId)
+  return { user, device: { ...foundingDevice, userId } }
+}
+
 describe('Communities', () => {
   let testClient: TestClient
   let secondTestClient: TestClient
@@ -71,6 +88,8 @@ describe('Communities', () => {
   let serializer: Serializer
   let community: Community
   let testTeam: TestTeam
+  let serverId: string | undefined = undefined
+  let serverIdentityKeys: Keyset | undefined = undefined
   let serverKeys: Keyset | undefined = undefined
   let teamTestUtils: TeamTestUtils
 
@@ -141,7 +160,7 @@ describe('Communities', () => {
       expect(testTeam.team).toBeDefined()
       expect(testTeam.testUserContext).toBeDefined()
       expect(testTeam.server).toBeUndefined()
-      expect(testTeam.serverKeys).toBeUndefined()
+      expect(testTeam.serverWithSecrets).toBeUndefined()
     })
 
     it('should validate the connection with captcha', async () => {
@@ -176,6 +195,8 @@ describe('Communities', () => {
           message,
           true,
         )
+      serverId = response?.payload?.serverId
+      serverIdentityKeys = response?.payload?.identityKeys
       serverKeys = response?.payload?.keys
       expect(response).toEqual(
         expect.objectContaining({
@@ -183,9 +204,15 @@ describe('Communities', () => {
           status: CommunityOperationStatus.SUCCESS,
           payload: {
             teamId: testTeam.team.id,
+            serverId: expect.any(String),
+            identityKeys: expect.objectContaining({
+              type: 'SERVER_IDENTITY',
+              signature: expect.any(String),
+              encryption: expect.any(String),
+              generation: 0,
+            }),
             keys: expect.objectContaining({
               type: 'SERVER',
-              name: SERVER_NAME,
               signature: expect.any(String),
               encryption: expect.any(String),
               generation: 0,
@@ -196,12 +223,16 @@ describe('Communities', () => {
     })
 
     it('should validate that the server keys are defined', () => {
+      expect(serverId).toBeDefined()
+      expect(serverIdentityKeys).toBeDefined()
       expect(serverKeys).toBeDefined()
     })
 
     it('should add the server to the team', () => {
       const server: Server = {
         host: SERVER_NAME,
+        serverId: serverId!,
+        identityKeys: serverIdentityKeys!,
         keys: serverKeys!,
       }
       testTeam.team.addServer(server)
@@ -289,16 +320,7 @@ describe('Communities', () => {
     })
 
     it('should sign into the community as a new user', async () => {
-      const prospectiveUser = createUser(SECOND_USER_NAME)
-      const prospectiveDevice: DeviceWithSecrets = createDevice({
-        userId: prospectiveUser.userId,
-        deviceName: SECOND_DEVICE_NAME,
-      })
-
-      secondClientContext = {
-        user: prospectiveUser,
-        device: prospectiveDevice,
-      }
+      secondClientContext = mintContext(SECOND_USER_NAME, SECOND_DEVICE_NAME)
 
       const message: CommunitySignInMessage = {
         ts: DateTime.utc().toMillis(),
@@ -349,6 +371,7 @@ describe('Communities', () => {
         {
           ...secondClientContext,
           invitationSeed: invite.seed,
+          expectedTeamId: invite.teamId,
         },
       )
       let authorized = false
@@ -557,15 +580,7 @@ describe('Communities', () => {
 
   describe('Invalid Sign In Attempt', () => {
     it('should try to sign in with invalid user', async () => {
-      const invalidUser = createUser(INVALID_USER_NAME)
-      const invalidDevice: DeviceWithSecrets = createDevice({
-        userId: invalidUser.userId,
-        deviceName: INVALID_DEVICE_NAME,
-      })
-      invalidClientContext = {
-        user: invalidUser,
-        device: invalidDevice,
-      }
+      invalidClientContext = mintContext(INVALID_USER_NAME, INVALID_DEVICE_NAME)
 
       const message: CommunitySignInMessage = {
         ts: DateTime.utc().toMillis(),
@@ -613,6 +628,7 @@ describe('Communities', () => {
         {
           ...invalidClientContext,
           invitationSeed: 'foobar',
+          expectedTeamId: testTeam.team.id,
         },
       )
       let authorized = false
