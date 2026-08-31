@@ -129,44 +129,7 @@ export const sendPushNotification = async (
   // Trim whitespace and remove any newlines that might have been introduced
   const ucan = ucanInput.trim().replace(/\s+/g, '')
 
-  const title = await input({
-    message: 'Enter notification title (optional, press Enter to skip):',
-    default: undefined,
-  })
-
-  const body = await input({
-    message: 'Enter notification body (optional, press Enter to skip):',
-    default: undefined,
-  })
-
-  const dataInput = await input({
-    message:
-      'Enter custom data as JSON (optional, press Enter to skip, e.g., {"key":"value"}):',
-    default: undefined,
-    validate: (value: string | undefined) => {
-      if (value == null || value === '') {
-        return true
-      }
-      try {
-        JSON.parse(value)
-        return true
-      } catch {
-        return 'Invalid JSON format'
-      }
-    },
-  })
-
   const payload: SendPushMessage['payload'] = { ucan }
-  if (title !== '') {
-    payload.title = title
-  }
-  if (body !== '') {
-    payload.body = body
-  }
-  if (dataInput !== '') {
-    const parsed: unknown = JSON.parse(dataInput)
-    payload.data = parsed as Record<string, string>
-  }
 
   const result = await promiseWithSpinner(
     async () => {
@@ -230,44 +193,7 @@ export const sendBatchPushNotification = async (
     .map(u => u.trim().replace(/\s+/g, ''))
     .filter(u => u !== '')
 
-  const title = await input({
-    message: 'Enter notification title (optional, press Enter to skip):',
-    default: undefined,
-  })
-
-  const body = await input({
-    message: 'Enter notification body (optional, press Enter to skip):',
-    default: undefined,
-  })
-
-  const dataInput = await input({
-    message:
-      'Enter custom data as JSON (optional, press Enter to skip, e.g., {"key":"value"}):',
-    default: undefined,
-    validate: (value: string | undefined) => {
-      if (value == null || value === '') {
-        return true
-      }
-      try {
-        JSON.parse(value)
-        return true
-      } catch {
-        return 'Invalid JSON format'
-      }
-    },
-  })
-
   const payload: SendBatchPushMessage['payload'] = { ucans }
-  if (title !== '') {
-    payload.title = title
-  }
-  if (body !== '') {
-    payload.body = body
-  }
-  if (dataInput !== '') {
-    const parsed: unknown = JSON.parse(dataInput)
-    payload.data = parsed as Record<string, string>
-  }
 
   const result = await promiseWithSpinner(
     async () => {

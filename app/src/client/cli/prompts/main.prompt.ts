@@ -56,13 +56,13 @@ const mainLoop = async (
       {
         name: 'Send push notification',
         value: 'sendPush',
-        description: 'Send a push notification using a UCAN token',
+        description: 'Send a generic push notification using a UCAN token',
       },
       {
         name: 'Send batch push notification',
         value: 'sendBatchPush',
         description:
-          'Send push notifications to multiple devices using UCAN tokens',
+          'Send generic push notifications to multiple devices using UCAN tokens',
       },
       {
         name: 'Disconnect',
