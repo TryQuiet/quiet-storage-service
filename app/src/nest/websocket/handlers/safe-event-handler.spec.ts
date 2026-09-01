@@ -7,6 +7,7 @@ import {
 } from 'socket.io-client'
 import type { QuietLogger } from '../../app/logger/types.js'
 import { WebsocketEvents, type QuietSocket } from '../ws.types.js'
+import { WebsocketGateway } from '../ws.gateway.js'
 import {
   registerAcknowledgedEvent,
   registerFireAndForgetEvent,
@@ -115,32 +116,20 @@ describe('safe websocket event registration with Socket.IO', () => {
   it('keeps every public event boundary healthy for missing acks and malformed messages', async () => {
     const httpServer = createServer()
     const socketServer = new Server(httpServer, { transports: ['websocket'] })
-    const logger = { warn: jest.fn() } as unknown as QuietLogger
-    const handled = jest.fn()
+    /* eslint-disable @typescript-eslint/consistent-type-assertions -- malformed requests must not reach these gateway dependencies */
+    const gateway = new WebsocketGateway(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      { getSiteKey: () => 'test-site-key' } as never,
+      {} as never,
+    )
+    /* eslint-enable @typescript-eslint/consistent-type-assertions */
+    gateway.io = socketServer
 
     socketServer.on('connection', rawSocket => {
-      const socket = rawSocket as QuietSocket
-      for (const event of acknowledgedEvents) {
-        registerAcknowledgedEvent(
-          socket,
-          event,
-          (_message, acknowledge) => {
-            handled(event)
-            acknowledge({ status: 'success' })
-          },
-          logger,
-          { requiresPayload: event !== WebsocketEvents.GetCaptchaSiteKey },
-        )
-      }
-      registerFireAndForgetEvent(
-        socket,
-        WebsocketEvents.AuthSync,
-        () => {
-          handled(WebsocketEvents.AuthSync)
-        },
-        logger,
-        { requiresPayload: true },
-      )
+      gateway.handleConnection(rawSocket as QuietSocket)
     })
 
     await new Promise<void>(resolve =>
@@ -176,8 +165,12 @@ describe('safe websocket event registration with Socket.IO', () => {
         WebsocketEvents.GetCaptchaSiteKey,
         {},
       )
-      expect(healthResponse).toEqual({ status: 'success' })
-      expect(handled).toHaveBeenCalledTimes(1)
+      expect(healthResponse).toEqual(
+        expect.objectContaining({
+          status: 'success',
+          payload: { siteKey: 'test-site-key' },
+        }),
+      )
     } finally {
       client.close()
       await new Promise<void>(resolve => {
