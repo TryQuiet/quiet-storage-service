@@ -13,6 +13,7 @@ import type {
   SendPushMessage,
   SendPushResponse,
 } from './types/qps.types.js'
+import { registerAcknowledgedEvent } from './safe-event-handler.js'
 
 const baseLogger = createLogger('Websocket:Event:QPS')
 
@@ -257,7 +258,25 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
     }
   }
 
-  config.socket.on(WebsocketEvents.QPSRegisterDevice, handleRegisterDevice)
-  config.socket.on(WebsocketEvents.QPSSendPush, handleSendPush)
-  config.socket.on(WebsocketEvents.QPSSendBatchPush, handleSendBatchPush)
+  registerAcknowledgedEvent(
+    config.socket,
+    WebsocketEvents.QPSRegisterDevice,
+    handleRegisterDevice,
+    _logger,
+    { requiresPayload: true },
+  )
+  registerAcknowledgedEvent(
+    config.socket,
+    WebsocketEvents.QPSSendPush,
+    handleSendPush,
+    _logger,
+    { requiresPayload: true },
+  )
+  registerAcknowledgedEvent(
+    config.socket,
+    WebsocketEvents.QPSSendBatchPush,
+    handleSendBatchPush,
+    _logger,
+    { requiresPayload: true },
+  )
 }
