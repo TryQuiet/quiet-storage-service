@@ -35,7 +35,7 @@ export class NseAuthController {
    */
   @Post('challenge')
   async issueChallenge(
-    @Body() body: Record<string, unknown>,
+    @Body() body: unknown,
     @Req() request: { ip?: string },
   ): Promise<{
     challengeId: string
@@ -61,7 +61,7 @@ export class NseAuthController {
   @Post('token')
   async verifyAndIssueToken(
     @Body()
-    body: Record<string, unknown>,
+    body: unknown,
     @Req() request: { ip?: string },
   ): Promise<{ token: string; expiresIn: number }> {
     this.requireExactBody(body, ['challengeId', 'deviceId', 'signature'])
@@ -82,9 +82,12 @@ export class NseAuthController {
   }
 
   private requireExactBody(
-    body: Record<string, unknown>,
+    body: unknown,
     expectedKeys: string[],
-  ): void {
+  ): asserts body is Record<string, unknown> {
+    if (body == null || typeof body !== 'object' || Array.isArray(body)) {
+      throw new UnauthorizedException('Unexpected request schema')
+    }
     const actual = Object.keys(body).sort()
     if (
       actual.length !== expectedKeys.length ||

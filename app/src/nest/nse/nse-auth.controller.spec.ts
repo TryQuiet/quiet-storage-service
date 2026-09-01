@@ -116,6 +116,21 @@ describe('NseAuthController', () => {
         ),
       ).rejects.toThrow(UnauthorizedException)
     })
+
+    it.each([
+      ['missing deviceId', { teamId: TEAM_ID }],
+      ['missing teamId', { deviceId: DEVICE_ID }],
+      [
+        'extra field',
+        { deviceId: DEVICE_ID, teamId: TEAM_ID, publicKey: 'claimant-key' },
+      ],
+      ['null', null],
+    ])('rejects an exact-schema violation: %s', async (_label, body) => {
+      await expect(
+        controller.issueChallenge(body, { ip: '192.0.2.5' }),
+      ).rejects.toThrow('Unexpected request schema')
+      expect(mockService.issueChallenge).not.toHaveBeenCalled()
+    })
   })
 
   describe('verifyAndIssueToken', () => {
@@ -157,6 +172,27 @@ describe('NseAuthController', () => {
           { ip: '192.0.2.4' },
         ),
       ).rejects.toThrow(UnauthorizedException)
+    })
+
+    it.each([
+      ['missing challengeId', { deviceId: DEVICE_ID, signature: SIGNATURE }],
+      ['missing deviceId', { challengeId: 'chal-id', signature: SIGNATURE }],
+      ['missing signature', { challengeId: 'chal-id', deviceId: DEVICE_ID }],
+      [
+        'extra claimant key',
+        {
+          challengeId: 'chal-id',
+          deviceId: DEVICE_ID,
+          signature: SIGNATURE,
+          publicKey: 'claimant-key',
+        },
+      ],
+      ['null', null],
+    ])('rejects an exact-schema violation: %s', async (_label, body) => {
+      await expect(
+        controller.verifyAndIssueToken(body, { ip: '192.0.2.6' }),
+      ).rejects.toThrow('Unexpected request schema')
+      expect(mockService.verifyAndIssueToken).not.toHaveBeenCalled()
     })
   })
 

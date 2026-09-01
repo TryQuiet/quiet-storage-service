@@ -99,7 +99,7 @@ describe('NseAuthService v1 device proof', () => {
   const sign = (
     challenge: ChallengePayload,
     context = NSE_AUTH_SIGNATURE_CONTEXT,
-  ): string =>
+  ): ReturnType<typeof signatures.sign> =>
     signatures.sign(
       canonicalPayload(challenge),
       registeredKeys.secretKey,
@@ -242,12 +242,87 @@ describe('NseAuthService v1 device proof', () => {
     ).resolves.toMatchObject({ expiresIn: 900 })
   })
 
-  it('rejects raw legacy and LFA-domain signatures', async () => {
-    for (const context of [
+  it.each([
+    [
+      'protocolVersion',
+      (challenge: ChallengePayload) => ({ ...challenge, protocolVersion: 2 }),
+    ],
+    [
+      'type',
+      (challenge: ChallengePayload) => ({ ...challenge, type: 'SERVER' }),
+    ],
+    [
+      'deviceId',
+      (challenge: ChallengePayload) => ({
+        ...challenge,
+        deviceId: 'other-device',
+      }),
+    ],
+    [
+      'teamId',
+      (challenge: ChallengePayload) => ({ ...challenge, teamId: 'other-team' }),
+    ],
+    [
+      'qssServerId',
+      (challenge: ChallengePayload) => ({
+        ...challenge,
+        qssServerId: 'qss-server-b',
+      }),
+    ],
+    [
+      'challengeId',
+      (challenge: ChallengePayload) => ({
+        ...challenge,
+        challengeId: 'ffffffffffffffffffffffffffffffff',
+      }),
+    ],
+    [
+      'nonce',
+      (challenge: ChallengePayload) => ({
+        ...challenge,
+        nonce: encodeBase58(new Uint8Array(32).fill(7)),
+      }),
+    ],
+    [
+      'issuedAtMs',
+      (challenge: ChallengePayload) => ({
+        ...challenge,
+        issuedAtMs: challenge.issuedAtMs + 1,
+      }),
+    ],
+    [
+      'expiresAtMs',
+      (challenge: ChallengePayload) => ({
+        ...challenge,
+        expiresAtMs: challenge.expiresAtMs + 1,
+      }),
+    ],
+  ] satisfies Array<
+    [string, (challenge: ChallengePayload) => ChallengePayload]
+  >)('binds the signature to canonical %s', async (_field, mutate) => {
+    const { challengeId, challenge } = await service.issueChallenge(
+      DEVICE_ID,
+      TEAM_ID,
+    )
+
+    await expect(
+      service.verifyAndIssueToken(
+        challengeId,
+        DEVICE_ID,
+        sign(mutate(challenge)),
+      ),
+    ).rejects.toThrow('Invalid signature')
+  })
+
+  it('enforces bidirectional separation from raw and every relevant LFA domain', async () => {
+    const lfaContexts = [
       'lf/auth/identity-challenge',
+      'lf/auth/invitation-proof',
       'lf/crdx/link-authorship',
       'lf/auth/team-message',
-    ]) {
+      'lf/auth/device-possession',
+    ]
+    for (const context of lfaContexts) {
       const { challengeId, challenge } = await service.issueChallenge(
         DEVICE_ID,
         TEAM_ID,
@@ -260,19 +335,39 @@ describe('NseAuthService v1 device proof', () => {
         ),
       ).rejects.toThrow('Invalid signature')
     }
+
     const { challengeId, challenge } = await service.issueChallenge(
       DEVICE_ID,
       TEAM_ID,
     )
     const raw = encodeBase58(
       sodium.crypto_sign_detached(
-        pack(challenge),
+        pack(canonicalPayload(challenge)),
         decodeBase58(registeredKeys.secretKey),
       ),
     )
     await expect(
       service.verifyAndIssueToken(challengeId, DEVICE_ID, raw),
     ).rejects.toThrow('Invalid signature')
+
+    const nseProof = sign(challenge)
+    for (const context of lfaContexts) {
+      expect(
+        signatures.verify({
+          payload: canonicalPayload(challenge),
+          signature: nseProof,
+          publicKey: registeredKeys.publicKey,
+          context,
+        }),
+      ).toBe(false)
+    }
+    expect(
+      sodium.crypto_sign_verify_detached(
+        decodeBase58(nseProof),
+        pack(canonicalPayload(challenge)),
+        decodeBase58(registeredKeys.publicKey),
+      ),
+    ).toBe(false)
   })
 
   it('prevents a live relay between QSS identities', async () => {
