@@ -17,18 +17,6 @@ import { NestFastifyLogger } from '../logger/nest.fastify.logger.js'
 import { ConfigService } from '../../utils/config/config.service.js'
 import { EnvVars } from '../../utils/config/env_vars.js'
 
-export const parseTrustProxyHops = (rawValue: string | undefined): number => {
-  const value = rawValue ?? '0'
-  if (!/^(0|[1-9]\d*)$/.test(value)) {
-    throw new Error('TRUST_PROXY_HOPS must be a nonnegative integer')
-  }
-  const parsed = Number(value)
-  if (!Number.isSafeInteger(parsed)) {
-    throw new Error('TRUST_PROXY_HOPS must be a safe integer')
-  }
-  return parsed
-}
-
 @Module({
   imports: [],
   providers: [
@@ -38,17 +26,10 @@ export const parseTrustProxyHops = (rawValue: string | undefined): number => {
       useFactory: (
         fastifyLogger: NestFastifyLogger,
       ): ReturnType<typeof Fastify> => {
-        const trustProxyHops = parseTrustProxyHops(
-          ConfigService.getString(EnvVars.TRUST_PROXY_HOPS),
-        )
         const fastify = Fastify({
           logger: fastifyLogger,
           requestTimeout: 120, // https://fastify.dev/docs/latest/Reference/Server/#requesttimeout,
           disableRequestLogging: false,
-          // Zero trusts only the direct peer. Deployments behind a controlled
-          // ingress must set this to their exact proxy hop count so request.ip
-          // cannot be selected by an attacker-supplied X-Forwarded-For chain.
-          trustProxy: trustProxyHops,
         })
         fastify.register(fastifyGracefulExit, { timeout: 15_000 })
         return fastify

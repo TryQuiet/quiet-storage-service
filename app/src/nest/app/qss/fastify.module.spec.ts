@@ -1,19 +1,17 @@
-import { parseTrustProxyHops } from './fastify.module.js'
+import Fastify from 'fastify'
 
-describe('parseTrustProxyHops', () => {
-  it.each([
-    [undefined, 0],
-    ['0', 0],
-    ['1', 1],
-    ['12', 12],
-  ])('parses %s as an exact hop count', (raw, expected) => {
-    expect(parseTrustProxyHops(raw)).toBe(expected)
+describe('Fastify direct-peer configuration', () => {
+  it('does not accept a client-supplied forwarded address by default', async () => {
+    const fastify = Fastify()
+    fastify.get('/', request => ({ ip: request.ip }))
+
+    const response = await fastify.inject({
+      method: 'GET',
+      url: '/',
+      headers: { 'x-forwarded-for': '203.0.113.99' },
+    })
+
+    expect(response.json()).toEqual({ ip: '127.0.0.1' })
+    await fastify.close()
   })
-
-  it.each(['', '-1', '+1', '01', '1garbage', '1.0', '9007199254740992'])(
-    'rejects malformed or unsafe value %s',
-    raw => {
-      expect(() => parseTrustProxyHops(raw)).toThrow('TRUST_PROXY_HOPS must be')
-    },
-  )
 })
