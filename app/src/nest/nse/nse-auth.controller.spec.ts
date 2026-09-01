@@ -123,17 +123,21 @@ describe('NseAuthController', () => {
       const expected = { token: 'tok.sig', expiresIn: 900 }
       mockService.verifyAndIssueToken.mockResolvedValue(expected)
 
-      const result = await controller.verifyAndIssueToken({
-        challengeId: 'chal-id',
-        deviceId: DEVICE_ID,
-        signature: SIGNATURE,
-      })
+      const result = await controller.verifyAndIssueToken(
+        {
+          challengeId: 'chal-id',
+          deviceId: DEVICE_ID,
+          signature: SIGNATURE,
+        },
+        { ip: '192.0.2.3' },
+      )
 
       // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock; method ref is safe
       expect(mockService.verifyAndIssueToken).toHaveBeenCalledWith(
         'chal-id',
         DEVICE_ID,
         SIGNATURE,
+        '192.0.2.3',
       )
       expect(result).toBe(expected)
     })
@@ -144,11 +148,14 @@ describe('NseAuthController', () => {
       )
 
       await expect(
-        controller.verifyAndIssueToken({
-          challengeId: 'expired-id',
-          deviceId: DEVICE_ID,
-          signature: SIGNATURE,
-        }),
+        controller.verifyAndIssueToken(
+          {
+            challengeId: 'expired-id',
+            deviceId: DEVICE_ID,
+            signature: SIGNATURE,
+          },
+          { ip: '192.0.2.4' },
+        ),
       ).rejects.toThrow(UnauthorizedException)
     })
   })

@@ -62,6 +62,7 @@ export class NseAuthController {
   async verifyAndIssueToken(
     @Body()
     body: Record<string, unknown>,
+    @Req() request: { ip?: string },
   ): Promise<{ token: string; expiresIn: number }> {
     this.requireExactBody(body, ['challengeId', 'deviceId', 'signature'])
     if (
@@ -76,6 +77,7 @@ export class NseAuthController {
       body.challengeId,
       body.deviceId,
       body.signature,
+      request.ip ?? 'unknown',
     )
   }
 

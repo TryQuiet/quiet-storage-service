@@ -65,11 +65,16 @@ describe('NseAuthService v1 device proof', () => {
   let mockCommunitiesManager: jest.Mocked<
     Pick<CommunitiesManagerService, 'get'>
   >
-  const registeredKeys = signatures.keyPair('registered-device')
+  const registeredKeys = signatures.keyPair('nse-auth-v1-fixture')
 
   const setCommunity = (
     qssServerId = QSS_SERVER_ID,
-    options: { hasDevice?: boolean; removed?: boolean } = {},
+    options: {
+      hasDevice?: boolean
+      removed?: boolean
+      hasServer?: boolean
+      serverRemoved?: boolean
+    } = {},
   ): void => {
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- minimal LFA fixture
     mockCommunitiesManager.get.mockResolvedValue({
@@ -79,6 +84,10 @@ describe('NseAuthService v1 device proof', () => {
         team: {
           deviceWasRemoved: jest.fn().mockReturnValue(options.removed ?? false),
           hasDevice: jest.fn().mockReturnValue(options.hasDevice ?? true),
+          serverWasRemoved: jest
+            .fn()
+            .mockReturnValue(options.serverRemoved ?? false),
+          hasServer: jest.fn().mockReturnValue(options.hasServer ?? true),
           device: jest
             .fn()
             .mockReturnValue({ keys: { signature: registeredKeys.publicKey } }),
@@ -175,6 +184,19 @@ describe('NseAuthService v1 device proof', () => {
     ).rejects.toThrow('Unknown team')
   })
 
+  it.each([
+    ['missing', { hasServer: false }],
+    ['removed', { serverRemoved: true }],
+  ])(
+    'rejects a challenge when this QSS is %s from the team',
+    async (_label, options) => {
+      setCommunity(QSS_SERVER_ID, options)
+      await expect(
+        service.issueChallenge(DEVICE_ID, TEAM_ID, '192.0.2.4'),
+      ).rejects.toThrow('QSS server is not active for team')
+    },
+  )
+
   it('issues a JWT for the registered device without accepting claimant key material', async () => {
     const { challengeId, challenge } = await service.issueChallenge(
       DEVICE_ID,
@@ -187,6 +209,37 @@ describe('NseAuthService v1 device proof', () => {
     )
     expect(result.expiresIn).toBe(900)
     expect(result.token).toEqual(expect.any(String))
+  })
+
+  it('accepts the fixed signature fixture emitted by native implementations', async () => {
+    const challenge: ChallengePayload = {
+      protocolVersion: 1,
+      type: 'DEVICE',
+      deviceId: 'device-test-1',
+      teamId: 'team-test-1',
+      qssServerId: 'qss-test-1',
+      challengeId: '00112233445566778899aabbccddeeff',
+      nonce: '11111111111111111111111111111111',
+      issuedAtMs: 1_700_000_000_000,
+      expiresAtMs: 1_700_000_030_000,
+    }
+    expect(registeredKeys.publicKey).toBe(
+      '3J7vYeD99DJiP2mjAkCgtxBk6Pkx4CXEDNsgz3Vc7Ted',
+    )
+    setCommunity('qss-test-1')
+    const challengeStore = service as unknown as {
+      challenges: Map<string, { challenge: ChallengePayload }>
+    }
+    challengeStore.challenges.set(challenge.challengeId, { challenge })
+    jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+    await expect(
+      service.verifyAndIssueToken(
+        challenge.challengeId,
+        challenge.deviceId,
+        '62XsfcCvq4SeRxmVK6LNyjuPpLyUSaCxPD315LRtfet9GnHQ6zu5sg8muz1eh4ZvvnZ6m3SH88KRztu4gm8W5YQk',
+      ),
+    ).resolves.toMatchObject({ expiresIn: 900 })
   })
 
   it('rejects raw legacy and LFA-domain signatures', async () => {
@@ -239,6 +292,17 @@ describe('NseAuthService v1 device proof', () => {
     ).rejects.toThrow('Invalid signature')
   })
 
+  it('rejects redemption if this QSS was removed after issuing the challenge', async () => {
+    const { challengeId, challenge } = await service.issueChallenge(
+      DEVICE_ID,
+      TEAM_ID,
+    )
+    setCommunity(QSS_SERVER_ID, { serverRemoved: true })
+    await expect(
+      service.verifyAndIssueToken(challengeId, DEVICE_ID, sign(challenge)),
+    ).rejects.toThrow('QSS server is not active for team')
+  })
+
   it('requires a canonical 64-byte Base58 signature', async () => {
     const { challengeId } = await service.issueChallenge(DEVICE_ID, TEAM_ID)
     await expect(
@@ -275,5 +339,26 @@ describe('NseAuthService v1 device proof', () => {
     await expect(
       service.issueChallenge(DEVICE_ID, TEAM_ID),
     ).resolves.toBeDefined()
+  })
+
+  it('rate limits token attempts per source IP', async () => {
+    for (let index = 0; index < 60; index += 1) {
+      await expect(
+        service.verifyAndIssueToken(
+          '00000000000000000000000000000000',
+          DEVICE_ID,
+          'invalid',
+          '192.0.2.9',
+        ),
+      ).rejects.toThrow('Challenge expired or not found')
+    }
+    await expect(
+      service.verifyAndIssueToken(
+        '00000000000000000000000000000000',
+        DEVICE_ID,
+        'invalid',
+        '192.0.2.9',
+      ),
+    ).rejects.toThrow('Token rate limit exceeded')
   })
 })

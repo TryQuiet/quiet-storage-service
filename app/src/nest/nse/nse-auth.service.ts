@@ -29,6 +29,8 @@ export const NSE_AUTH_CHALLENGE_TTL_MS = 30_000
 export const NSE_AUTH_CLOCK_SKEW_MS = 5_000
 const MAX_OUTSTANDING_CHALLENGES_PER_DEVICE = 5
 const MAX_CHALLENGES_PER_IP_PER_MINUTE = 30
+const MAX_TOKEN_REQUESTS_PER_IP_PER_MINUTE = 60
+const MAX_TRACKED_RATE_LIMIT_IPS = 10_000
 
 const BASE58_ALPHABET =
   '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
@@ -96,6 +98,7 @@ export interface NseLogEntriesResponse {
 export class NseAuthService implements OnModuleInit, OnModuleDestroy {
   private readonly challenges = new Map<string, StoredChallenge>()
   private readonly challengeRequestsByIp = new Map<string, number[]>()
+  private readonly tokenRequestsByIp = new Map<string, number[]>()
 
   // Periodic cleanup so stale challenges don't accumulate between requests.
   private readonly cleanupInterval: ReturnType<typeof setInterval> =
@@ -159,6 +162,9 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
     // The pinned auth package's generated declarations lose this concrete type.
     const qssServer = community.sigChain.context.server as ServerWithSecrets
     const { serverId: qssServerId } = qssServer
+    if (team.serverWasRemoved(qssServerId) || !team.hasServer(qssServerId)) {
+      throw new UnauthorizedException('QSS server is not active for team')
+    }
     const challenge: ChallengePayload = {
       protocolVersion: NSE_AUTH_PROTOCOL_VERSION,
       type: 'DEVICE',
@@ -190,7 +196,14 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
     challengeId: string,
     deviceId: string,
     signature: string,
+    sourceIp = 'unknown',
   ): Promise<{ token: string; expiresIn: number }> {
+    this.enforceRateLimit(
+      this.tokenRequestsByIp,
+      sourceIp,
+      MAX_TOKEN_REQUESTS_PER_IP_PER_MINUTE,
+      'Token rate limit exceeded',
+    )
     if (
       challengeId.length !== 32 ||
       !/^[0-9a-f]{32}$/.test(challengeId) ||
@@ -231,6 +244,7 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
     const expectedPubKey = await this.getRegisteredDeviceSignatureKey(
       stored.challenge.teamId,
       deviceId,
+      stored.challenge.qssServerId,
     )
     let valid = false
     try {
@@ -277,6 +291,7 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
   private async getRegisteredDeviceSignatureKey(
     teamId: string,
     deviceId: string,
+    qssServerId: string,
   ): Promise<Base58> {
     const community = await this.communitiesManager.get(teamId)
     if (community == null) {
@@ -285,6 +300,15 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
     }
 
     const { team } = community.sigChain
+    const currentQssServer = community.sigChain.context
+      .server as ServerWithSecrets
+    if (
+      currentQssServer.serverId !== qssServerId ||
+      team.serverWasRemoved(qssServerId) ||
+      !team.hasServer(qssServerId)
+    ) {
+      throw new UnauthorizedException('QSS server is not active for team')
+    }
     if (team.deviceWasRemoved(deviceId)) {
       logger.warn(
         `Removed device ${deviceId} attempted NSE auth for team ${teamId}`,
@@ -333,14 +357,39 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
   }
 
   private enforceChallengeRateLimit(sourceIp: string): void {
+    this.enforceRateLimit(
+      this.challengeRequestsByIp,
+      sourceIp,
+      MAX_CHALLENGES_PER_IP_PER_MINUTE,
+      'Challenge rate limit exceeded',
+    )
+  }
+
+  private enforceRateLimit(
+    requestsByIp: Map<string, number[]>,
+    sourceIp: string,
+    maximum: number,
+    message: string,
+  ): void {
     const now = Date.now()
-    const recent = (this.challengeRequestsByIp.get(sourceIp) ?? []).filter(
+    for (const [ip, timestamps] of requestsByIp) {
+      if (timestamps.every(timestamp => now - timestamp >= 60_000)) {
+        requestsByIp.delete(ip)
+      }
+    }
+    if (
+      !requestsByIp.has(sourceIp) &&
+      requestsByIp.size >= MAX_TRACKED_RATE_LIMIT_IPS
+    ) {
+      throw new UnauthorizedException('Rate limiter capacity exceeded')
+    }
+    const recent = (requestsByIp.get(sourceIp) ?? []).filter(
       timestamp => now - timestamp < 60_000,
     )
-    if (recent.length >= MAX_CHALLENGES_PER_IP_PER_MINUTE) {
-      throw new UnauthorizedException('Challenge rate limit exceeded')
+    if (recent.length >= maximum) {
+      throw new UnauthorizedException(message)
     }
     recent.push(now)
-    this.challengeRequestsByIp.set(sourceIp, recent)
+    requestsByIp.set(sourceIp, recent)
   }
 }
