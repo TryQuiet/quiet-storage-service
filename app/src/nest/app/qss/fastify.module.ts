@@ -17,6 +17,18 @@ import { NestFastifyLogger } from '../logger/nest.fastify.logger.js'
 import { ConfigService } from '../../utils/config/config.service.js'
 import { EnvVars } from '../../utils/config/env_vars.js'
 
+export const parseTrustProxyHops = (rawValue: string | undefined): number => {
+  const value = rawValue ?? '0'
+  if (!/^(0|[1-9]\d*)$/.test(value)) {
+    throw new Error('TRUST_PROXY_HOPS must be a nonnegative integer')
+  }
+  const parsed = Number(value)
+  if (!Number.isSafeInteger(parsed)) {
+    throw new Error('TRUST_PROXY_HOPS must be a safe integer')
+  }
+  return parsed
+}
+
 @Module({
   imports: [],
   providers: [
@@ -26,14 +38,9 @@ import { EnvVars } from '../../utils/config/env_vars.js'
       useFactory: (
         fastifyLogger: NestFastifyLogger,
       ): ReturnType<typeof Fastify> => {
-        const trustProxyHops = ConfigService.getInt(EnvVars.TRUST_PROXY_HOPS, 0)
-        if (
-          trustProxyHops == null ||
-          !Number.isSafeInteger(trustProxyHops) ||
-          trustProxyHops < 0
-        ) {
-          throw new Error('TRUST_PROXY_HOPS must be a nonnegative integer')
-        }
+        const trustProxyHops = parseTrustProxyHops(
+          ConfigService.getString(EnvVars.TRUST_PROXY_HOPS),
+        )
         const fastify = Fastify({
           logger: fastifyLogger,
           requestTimeout: 120, // https://fastify.dev/docs/latest/Reference/Server/#requesttimeout,
