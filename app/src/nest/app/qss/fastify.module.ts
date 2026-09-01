@@ -26,6 +26,14 @@ import { EnvVars } from '../../utils/config/env_vars.js'
       useFactory: (
         fastifyLogger: NestFastifyLogger,
       ): ReturnType<typeof Fastify> => {
+        const trustProxyHops = ConfigService.getInt(EnvVars.TRUST_PROXY_HOPS, 0)
+        if (
+          trustProxyHops == null ||
+          !Number.isSafeInteger(trustProxyHops) ||
+          trustProxyHops < 0
+        ) {
+          throw new Error('TRUST_PROXY_HOPS must be a nonnegative integer')
+        }
         const fastify = Fastify({
           logger: fastifyLogger,
           requestTimeout: 120, // https://fastify.dev/docs/latest/Reference/Server/#requesttimeout,
@@ -33,7 +41,7 @@ import { EnvVars } from '../../utils/config/env_vars.js'
           // Zero trusts only the direct peer. Deployments behind a controlled
           // ingress must set this to their exact proxy hop count so request.ip
           // cannot be selected by an attacker-supplied X-Forwarded-For chain.
-          trustProxy: ConfigService.getInt(EnvVars.TRUST_PROXY_HOPS, 0),
+          trustProxy: trustProxyHops,
         })
         fastify.register(fastifyGracefulExit, { timeout: 15_000 })
         return fastify

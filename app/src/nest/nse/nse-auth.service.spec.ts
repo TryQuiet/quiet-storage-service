@@ -361,4 +361,20 @@ describe('NseAuthService v1 device proof', () => {
       ),
     ).rejects.toThrow('Token rate limit exceeded')
   })
+
+  it('rate limits challenge attempts and prunes an expired IP window', async () => {
+    const now = Date.now()
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now)
+    for (let index = 0; index < 30; index += 1) {
+      await service.issueChallenge(`device-${index}`, TEAM_ID, '192.0.2.10')
+    }
+    await expect(
+      service.issueChallenge('device-over-limit', TEAM_ID, '192.0.2.10'),
+    ).rejects.toThrow('Challenge rate limit exceeded')
+
+    nowSpy.mockReturnValue(now + 60_001)
+    await expect(
+      service.issueChallenge('device-after-window', TEAM_ID, '192.0.2.10'),
+    ).resolves.toBeDefined()
+  })
 })
