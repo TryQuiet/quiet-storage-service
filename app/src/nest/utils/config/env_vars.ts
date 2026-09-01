@@ -63,6 +63,7 @@ export enum EnvVars {
 
   // QPS (Quiet Push Service) settings
   QPS_ENABLED = 'QPS_ENABLED',
+  QPS_PUSH_RELAY_FUNCTION_ARN = 'QPS_PUSH_RELAY_FUNCTION_ARN',
 
   // Firebase Cloud Messaging settings — iOS
   FIREBASE_IOS_PROJECT_ID = 'FIREBASE_IOS_PROJECT_ID',

@@ -11,6 +11,39 @@ import {
   HealthIndicatorFunction,
 } from '@nestjs/terminus'
 import { createLogger } from '../../app/logger/logger.js'
+import { ConfigService } from '../../utils/config/config.service.js'
+import { EnvVars } from '../../utils/config/env_vars.js'
+import { Environment } from '../../utils/config/types.js'
+import { QPS_PUSH_RELAY_VERSION } from '../../qps/push/push-relay.types.js'
+
+export function getQssCapabilities(): {
+  qps: {
+    payloadBinding: 'ucan-v1'
+    pushCredentialIsolation:
+      | typeof QPS_PUSH_RELAY_VERSION
+      | 'development-direct'
+      | 'unavailable'
+  }
+} {
+  const env = ConfigService.getEnv()
+  const relayConfigured =
+    ConfigService.getString(EnvVars.QPS_PUSH_RELAY_FUNCTION_ARN) != null
+  const networkEnvironment = [
+    Environment.Development,
+    Environment.Production,
+  ].includes(env)
+
+  return {
+    qps: {
+      payloadBinding: 'ucan-v1',
+      pushCredentialIsolation: networkEnvironment
+        ? relayConfigured
+          ? QPS_PUSH_RELAY_VERSION
+          : 'unavailable'
+        : 'development-direct',
+    },
+  }
+}
 
 // associate with the /health path prefix
 @Controller('health')
@@ -31,6 +64,15 @@ export class HealthController {
   @HealthCheck()
   public async check(): Promise<HealthCheckResult> {
     return await this.health.check([this.postgresCheck()])
+  }
+
+  /**
+   * Stable, unauthenticated deployment capabilities used by release gates.
+   * Values describe wire behavior, not whether an optional service is enabled.
+   */
+  @Get('capabilities')
+  public capabilities(): ReturnType<typeof getQssCapabilities> {
+    return getQssCapabilities()
   }
 
   /**
