@@ -27,7 +27,8 @@ export function getQssCapabilities(): {
 } {
   const env = ConfigService.getEnv()
   const relayConfigured =
-    ConfigService.getString(EnvVars.QPS_PUSH_RELAY_FUNCTION_ARN) != null
+    ConfigService.getString(EnvVars.QPS_PUSH_RELAY_FUNCTION_ARN) != null &&
+    ConfigService.getString(EnvVars.AWS_REGION) != null
   const networkEnvironment = [
     Environment.Development,
     Environment.Production,
