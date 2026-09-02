@@ -31,13 +31,6 @@ export interface RegisterDeviceResponse
 
 export interface SendPushPayload {
   ucan: string
-  /**
-   * Legacy fields are accepted for wire compatibility but ignored. QPS derives
-   * the payload from the validated UCAN rather than trusting the sender.
-   */
-  title?: string
-  body?: string
-  data?: Record<string, string>
 }
 
 export interface SendPushMessage extends BaseWebsocketMessage<SendPushPayload> {
@@ -50,10 +43,6 @@ export interface SendPushResponse extends BaseWebsocketMessage<undefined> {
 
 export interface SendBatchPushPayload {
   ucans: string[]
-  /** @see SendPushPayload */
-  title?: string
-  body?: string
-  data?: Record<string, string>
 }
 
 export interface SendBatchPushMessage

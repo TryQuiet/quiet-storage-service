@@ -15,17 +15,10 @@ import {
   PushErrorCode,
 } from './push.types.js'
 import { ConfigService } from '../../utils/config/config.service.js'
-import { Environment } from '../../utils/config/types.js'
 import { QpsErrorReason } from '../qps.types.js'
-import type { PushPlatform, PushRelayResponse } from './push-relay.types.js'
-import { TrustedPushRelayClient } from './push-relay.client.js'
-import { initializeDirectFirebase } from './direct-firebase.client.js'
 
 @Injectable()
 export class PushService implements OnModuleInit, OnModuleDestroy {
-  private relay: TrustedPushRelayClient | undefined
-  private relayAvailable = false
-
   private iosApp: admin.app.App | undefined
   private iosMessaging: admin.messaging.Messaging | undefined
   private iosAvailable = false
@@ -39,24 +32,10 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly awsSecretsService: AWSSecretsService) {}
 
   async onModuleInit(): Promise<void> {
-    if (this.requiresCredentialIsolation()) {
-      this.initializeRelay()
-      return
-    }
-    const [ios, android] = await Promise.all([
-      initializeDirectFirebase('ios', this.awsSecretsService),
-      initializeDirectFirebase('android', this.awsSecretsService),
-    ])
-    this.iosApp = ios?.app
-    this.iosMessaging = ios?.messaging
-    this.iosAvailable = ios != null
-    this.androidApp = android?.app
-    this.androidMessaging = android?.messaging
-    this.androidAvailable = android != null
+    await Promise.all([this.initializeIos(), this.initializeAndroid()])
   }
 
   async onModuleDestroy(): Promise<void> {
-    this.relay?.destroy()
     await Promise.all([this.iosApp?.delete(), this.androidApp?.delete()])
   }
 
@@ -64,7 +43,6 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
    * Check if push service is available for the given platform
    */
   isAvailable(platform: 'ios' | 'android' = 'ios'): boolean {
-    if (this.relayAvailable) return true
     return platform === 'android' ? this.androidAvailable : this.iosAvailable
   }
 
@@ -95,23 +73,6 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    if (this.relayAvailable) {
-      const result = await this.sendViaRelay([deviceToken], payload, platform)
-      if (result.successCount > 0) return { success: true }
-      if (result.invalidTokens.includes(deviceToken)) {
-        return {
-          success: false,
-          error: 'Device token is invalid or no longer registered',
-          errorCode: PushErrorCode.FCM_NOT_REGISTERED,
-        }
-      }
-      return {
-        success: false,
-        error: 'Trusted push relay failed to deliver notification',
-        errorCode: PushErrorCode.UNKNOWN_ERROR,
-      }
-    }
-
     return await this.sendFcm(deviceToken, payload, platform)
   }
 
@@ -128,7 +89,8 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     payload: PushPayload,
     platform: 'ios' | 'android' = 'ios',
   ): Promise<MulticastPushResult> {
-    if (!this.isAvailable(platform)) {
+    const messaging = this.messagingFor(platform)
+    if (!this.isAvailable(platform) || messaging == null) {
       this.logger.warn(
         `Push service not available for multicast (platform=${platform})`,
       )
@@ -143,19 +105,6 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       return {
         successCount: 0,
         failureCount: 0,
-        invalidTokens: [],
-      }
-    }
-
-    if (this.relayAvailable) {
-      return await this.sendViaRelay(deviceTokens, payload, platform)
-    }
-
-    const messaging = this.messagingFor(platform)
-    if (messaging == null) {
-      return {
-        successCount: 0,
-        failureCount: deviceTokens.length,
         invalidTokens: [],
       }
     }
@@ -236,49 +185,6 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private requiresCredentialIsolation(): boolean {
-    return [Environment.Development, Environment.Production].includes(
-      ConfigService.getEnv(),
-    )
-  }
-
-  private initializeRelay(): void {
-    const functionArn = ConfigService.getString(
-      EnvVars.QPS_PUSH_RELAY_FUNCTION_ARN,
-    )
-    const region = ConfigService.getString(EnvVars.AWS_REGION)
-    if (functionArn == null || region == null) {
-      this.logger.error(
-        'QPS push is fail-closed: QPS_PUSH_RELAY_FUNCTION_ARN and AWS_REGION are required outside local/test environments',
-      )
-      return
-    }
-
-    this.relay = TrustedPushRelayClient.create(region, functionArn)
-    this.relayAvailable = true
-    this.logger.log('Trusted QPS push relay initialized')
-  }
-
-  private async sendViaRelay(
-    deviceTokens: string[],
-    payload: PushPayload,
-    platform: PushPlatform,
-  ): Promise<PushRelayResponse> {
-    const failure: PushRelayResponse = {
-      successCount: 0,
-      failureCount: deviceTokens.length,
-      invalidTokens: [],
-    }
-
-    try {
-      if (this.relay == null) return failure
-      return await this.relay.send(deviceTokens, payload, platform)
-    } catch (error) {
-      this.logger.error('Trusted push relay invocation failed', error)
-      return failure
-    }
-  }
-
   /**
    * Send via real FCM using the correct app for the given platform
    */
@@ -346,6 +252,122 @@ export class PushService implements OnModuleInit, OnModuleDestroy {
       return { success: true }
     } catch (error) {
       return this.handleFcmError(error, deviceToken)
+    }
+  }
+
+  /**
+   * Initialize the iOS FCM client
+   */
+  private async initializeIos(): Promise<void> {
+    const projectId = ConfigService.getString(EnvVars.FIREBASE_IOS_PROJECT_ID)
+    const clientEmail = ConfigService.getString(
+      EnvVars.FIREBASE_IOS_CLIENT_EMAIL,
+    )
+    let privateKey: string | undefined
+    try {
+      privateKey = await this.awsSecretsService.getSecretEnvVar(
+        EnvVars.FIREBASE_IOS_PRIVATE_KEY,
+      )
+    } catch (error) {
+      this.logger.error(
+        `Failed to retrieve iOS FCM private key from secrets manager. iOS push notifications will be unavailable.`,
+        error,
+      )
+      this.iosAvailable = false
+      return
+    }
+
+    if (projectId == null || clientEmail == null || privateKey == null) {
+      this.logger.error(
+        `iOS FCM credentials not configured. iOS push notifications will be unavailable. ` +
+          `Please configure FIREBASE_IOS_PROJECT_ID, FIREBASE_IOS_CLIENT_EMAIL, and FIREBASE_IOS_PRIVATE_KEY.`,
+      )
+      this.iosAvailable = false
+      return
+    }
+
+    try {
+      const formattedPrivateKey = privateKey.replace(/\\n/g, '\n')
+      const existingApp = admin.apps.find(a => a?.name === 'ios')
+      if (existingApp != null) {
+        this.iosApp = existingApp
+      } else {
+        this.iosApp = admin.initializeApp(
+          {
+            credential: admin.credential.cert({
+              projectId,
+              clientEmail,
+              privateKey: formattedPrivateKey,
+            }),
+          },
+          'ios',
+        )
+      }
+      this.iosMessaging = this.iosApp.messaging()
+      this.iosAvailable = true
+      this.logger.log(`iOS FCM client initialized for project ${projectId}`)
+    } catch (error) {
+      this.logger.error(`Failed to initialize iOS FCM client`, error)
+      this.iosAvailable = false
+    }
+  }
+
+  /**
+   * Initialize the Android FCM client (separate Firebase project)
+   */
+  private async initializeAndroid(): Promise<void> {
+    const projectId = ConfigService.getString(
+      EnvVars.FIREBASE_ANDROID_PROJECT_ID,
+    )
+    const clientEmail = ConfigService.getString(
+      EnvVars.FIREBASE_ANDROID_CLIENT_EMAIL,
+    )
+    let privateKey: string | undefined
+    try {
+      privateKey = await this.awsSecretsService.getSecretEnvVar(
+        EnvVars.FIREBASE_ANDROID_PRIVATE_KEY,
+      )
+    } catch (error) {
+      this.logger.error(
+        `Failed to retrieve Android FCM private key from secrets manager. Android push notifications will be unavailable.`,
+        error,
+      )
+      this.androidAvailable = false
+      return
+    }
+
+    if (projectId == null || clientEmail == null || privateKey == null) {
+      this.logger.warn(
+        `Android FCM credentials not configured. Android push notifications will be unavailable. ` +
+          `Please configure FIREBASE_ANDROID_PROJECT_ID, FIREBASE_ANDROID_CLIENT_EMAIL, and FIREBASE_ANDROID_PRIVATE_KEY.`,
+      )
+      this.androidAvailable = false
+      return
+    }
+
+    try {
+      const formattedPrivateKey = privateKey.replace(/\\n/g, '\n')
+      const existingApp = admin.apps.find(a => a?.name === 'android')
+      if (existingApp != null) {
+        this.androidApp = existingApp
+      } else {
+        this.androidApp = admin.initializeApp(
+          {
+            credential: admin.credential.cert({
+              projectId,
+              clientEmail,
+              privateKey: formattedPrivateKey,
+            }),
+          },
+          'android',
+        )
+      }
+      this.androidMessaging = this.androidApp.messaging()
+      this.androidAvailable = true
+      this.logger.log(`Android FCM client initialized for project ${projectId}`)
+    } catch (error) {
+      this.logger.error(`Failed to initialize Android FCM client`, error)
+      this.androidAvailable = false
     }
   }
 

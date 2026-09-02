@@ -4,6 +4,7 @@ export enum QpsErrorReason {
   PushNotificationServiceNotAvailable = 'Push notification service not available',
   UnknownRegistrationError = 'Unknown error during registration',
   RegistrationFailed = 'Registration failed',
+  InvalidPushPayload = 'Invalid push payload',
   InvalidUcanToken = 'Invalid UCAN token',
   DeviceTokenNoLongerValid = 'Device token no longer valid',
   PushNotificationFailed = 'Push notification failed',

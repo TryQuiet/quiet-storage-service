@@ -17,6 +17,41 @@ import { registerAcknowledgedEvent } from './safe-event-handler.js'
 
 const baseLogger = createLogger('Websocket:Event:QPS')
 
+function hasExactKeys(
+  value: unknown,
+  expectedKeys: readonly string[],
+): value is Record<string, unknown> {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+    return false
+  }
+
+  const keys = Object.keys(value)
+  return (
+    keys.length === expectedKeys.length &&
+    keys.every(key => expectedKeys.includes(key))
+  )
+}
+
+function isSendPushPayload(
+  value: unknown,
+): value is SendPushMessage['payload'] {
+  return (
+    hasExactKeys(value, ['ucan']) &&
+    typeof value.ucan === 'string' &&
+    value.ucan.length > 0
+  )
+}
+
+function isSendBatchPushPayload(
+  value: unknown,
+): value is SendBatchPushMessage['payload'] {
+  return (
+    hasExactKeys(value, ['ucans']) &&
+    Array.isArray(value.ucans) &&
+    value.ucans.every(ucan => typeof ucan === 'string' && ucan.length > 0)
+  )
+}
+
 export function registerQpsHandlers(config: QPSHandlerConfig): void {
   const _logger = baseLogger.extend(config.socket.id)
   _logger.debug(`Initializing QPS WS event handlers`)
@@ -103,6 +138,16 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
     callback: (response: SendPushResponse) => void,
   ): Promise<void> {
     try {
+      if (!isSendPushPayload(message.payload)) {
+        const response: SendPushResponse = {
+          ts: DateTime.utc().toMillis(),
+          status: CommunityOperationStatus.ERROR,
+          reason: QpsErrorReason.InvalidPushPayload,
+        }
+        callback(response)
+        return
+      }
+
       const ucanInfo = await config.qpsService.validateUcan(
         message.payload.ucan,
       )
@@ -170,8 +215,7 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
     callback: (response: SendBatchPushResponse) => void,
   ): Promise<void> {
     try {
-      const { ucans } = message.payload
-      if (!Array.isArray(ucans)) {
+      if (!isSendBatchPushPayload(message.payload)) {
         const response: SendBatchPushResponse = {
           ts: DateTime.utc().toMillis(),
           status: CommunityOperationStatus.ERROR,
@@ -181,6 +225,7 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
         callback(response)
         return
       }
+      const { ucans } = message.payload
       if (ucans.length > QPS_MAX_BATCH_UCANS) {
         const response: SendBatchPushResponse = {
           ts: DateTime.utc().toMillis(),

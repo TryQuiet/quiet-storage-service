@@ -81,25 +81,6 @@ $ pnpm run start:prod
 
 _NOTE: Running with `start` and `start:debug` will spin up dockerized dependencies (e.g. postgres) and run database migrations_
 
-### Production QPS push credential isolation
-
-Development and production QSS deployments fail closed unless
-`QPS_PUSH_RELAY_FUNCTION_ARN` names the trusted QPS push-relay Lambda. Local and
-test environments may still use Firebase directly.
-
-Deploy `app/dist/src/nest/qps/push/push-relay.handler.handler` as that Lambda.
-The relay's execution role/environment owns the iOS and Android
-`FIREBASE_*_{PROJECT_ID,CLIENT_EMAIL,PRIVATE_KEY}` values. The QSS instance role
-gets only `lambda:InvokeFunction` for this one function. As part of deployment,
-remove the QSS role's access to the Firebase private-key secrets and remove
-those secret values from the QSS runtime. This IAM change is what prevents a
-compromised QSS from bypassing the iOS notification-service extension or
-sending an Android OS-rendered notification.
-
-The relay accepts only platform, team ID, and device tokens. It constructs a
-fixed iOS fallback with `mutable-content` or an Android data-only payload; QSS
-cannot supply title, body, or arbitrary FCM/APNs fields.
-
 ## Running the app in docker
 
 ```bash
