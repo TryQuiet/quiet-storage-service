@@ -268,7 +268,7 @@ describe('QPS WebSocket Handlers', () => {
       )
     })
 
-    it('should return SUCCESS on successful push', async () => {
+    it('ignores caller-controlled push content', async () => {
       mockQpsService.sendPush.mockResolvedValue({ success: true })
 
       const callback = jest.fn()
@@ -288,12 +288,7 @@ describe('QPS WebSocket Handlers', () => {
       )
 
       // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
-      expect(mockQpsService.sendPush).toHaveBeenCalledWith(
-        'valid-ucan',
-        'Test',
-        'Hello',
-        { key: 'value' },
-      )
+      expect(mockQpsService.sendPush).toHaveBeenCalledWith('valid-ucan')
       expect(callback).toHaveBeenCalledWith(
         expect.objectContaining({
           status: CommunityOperationStatus.SUCCESS,
@@ -547,12 +542,7 @@ describe('QPS WebSocket Handlers', () => {
       )
 
       // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
-      expect(mockQpsService.sendBatchPush).toHaveBeenCalledWith(
-        ['ucan-1'],
-        'Batch Test',
-        'Hello All',
-        { key: 'value' },
-      )
+      expect(mockQpsService.sendBatchPush).toHaveBeenCalledWith(['ucan-1'])
       expect(callback).toHaveBeenCalledWith(
         expect.objectContaining({
           status: CommunityOperationStatus.SUCCESS,
@@ -584,12 +574,11 @@ describe('QPS WebSocket Handlers', () => {
       )
 
       // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
-      expect(mockQpsService.sendBatchPush).toHaveBeenCalledWith(
-        ['ucan-1', 'ucan-2', 'ucan-3'],
-        'Batch Test',
-        'Hello All',
-        { key: 'value' },
-      )
+      expect(mockQpsService.sendBatchPush).toHaveBeenCalledWith([
+        'ucan-1',
+        'ucan-2',
+        'ucan-3',
+      ])
       expect(callback).toHaveBeenCalledWith(
         expect.objectContaining({
           status: CommunityOperationStatus.SUCCESS,

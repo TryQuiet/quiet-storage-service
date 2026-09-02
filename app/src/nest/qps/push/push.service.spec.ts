@@ -7,6 +7,7 @@ import { PushService } from './push.service.js'
 import { PushErrorCode } from './push.types.js'
 import { QpsErrorReason } from '../qps.types.js'
 import { AWSSecretsService } from '../../utils/aws/aws-secrets.service.js'
+import { IOS_FALLBACK_BODY, IOS_FALLBACK_TITLE } from './push-relay.types.js'
 
 // Mock firebase-admin
 jest.unstable_mockModule('firebase-admin', () => ({
@@ -20,6 +21,8 @@ jest.unstable_mockModule('firebase-admin', () => ({
 
 // Interface for accessing private members in tests
 interface PushServicePrivate {
+  relayAvailable: boolean
+  relay: unknown
   iosAvailable: boolean
   iosMessaging: unknown
   androidAvailable: boolean
@@ -50,6 +53,12 @@ describe('PushService', () => {
 
     privateService.iosAvailable = true
     privateService.iosMessaging = messaging
+  }
+
+  const setRelayAvailable = (relay: unknown): void => {
+    const privateService = getPrivate()
+    privateService.relayAvailable = true
+    privateService.relay = relay
   }
 
   beforeEach(async () => {
@@ -236,6 +245,86 @@ describe('PushService', () => {
         error: 'unexpected failure',
         errorCode: PushErrorCode.UNKNOWN_ERROR,
       })
+    })
+  })
+
+  describe('trusted relay', () => {
+    it('fails closed in production when the relay is not configured', async () => {
+      const oldEnv = process.env.ENV
+      const oldRegion = process.env.AWS_REGION
+      const oldRelay = process.env.QPS_PUSH_RELAY_FUNCTION_ARN
+      try {
+        process.env.ENV = 'production'
+        process.env.AWS_REGION = 'us-east-1'
+        delete process.env.QPS_PUSH_RELAY_FUNCTION_ARN
+
+        await pushService!.onModuleInit()
+
+        expect(pushService!.isAvailable('ios')).toBe(false)
+        expect(pushService!.isAvailable('android')).toBe(false)
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
+        expect(awsSecretsServiceMock!.getSecretEnvVar).not.toHaveBeenCalled()
+      } finally {
+        if (oldEnv == null) delete process.env.ENV
+        else process.env.ENV = oldEnv
+        if (oldRegion == null) delete process.env.AWS_REGION
+        else process.env.AWS_REGION = oldRegion
+        if (oldRelay == null) delete process.env.QPS_PUSH_RELAY_FUNCTION_ARN
+        else process.env.QPS_PUSH_RELAY_FUNCTION_ARN = oldRelay
+      }
+    })
+
+    it('does not load Firebase credentials in a production environment', async () => {
+      const oldEnv = process.env.ENV
+      const oldRegion = process.env.AWS_REGION
+      const oldRelay = process.env.QPS_PUSH_RELAY_FUNCTION_ARN
+      try {
+        process.env.ENV = 'production'
+        process.env.AWS_REGION = 'us-east-1'
+        process.env.QPS_PUSH_RELAY_FUNCTION_ARN = 'test-relay'
+
+        await pushService!.onModuleInit()
+
+        expect(pushService!.isAvailable('ios')).toBe(true)
+        expect(pushService!.isAvailable('android')).toBe(true)
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
+        expect(awsSecretsServiceMock!.getSecretEnvVar).not.toHaveBeenCalled()
+      } finally {
+        if (oldEnv == null) delete process.env.ENV
+        else process.env.ENV = oldEnv
+        if (oldRegion == null) delete process.env.AWS_REGION
+        else process.env.AWS_REGION = oldRegion
+        if (oldRelay == null) delete process.env.QPS_PUSH_RELAY_FUNCTION_ARN
+        else process.env.QPS_PUSH_RELAY_FUNCTION_ARN = oldRelay
+      }
+    })
+
+    it('delegates canonical notifications to the trusted relay', async () => {
+      const send = jest
+        .fn<
+          () => Promise<{
+            successCount: number
+            failureCount: number
+            invalidTokens: string[]
+          }>
+        >()
+        .mockResolvedValue({
+          successCount: 1,
+          failureCount: 0,
+          invalidTokens: [],
+        })
+      setRelayAvailable({ send, destroy: jest.fn() })
+
+      const payload = {
+        title: IOS_FALLBACK_TITLE,
+        body: IOS_FALLBACK_BODY,
+        data: { teamId: 'team-1' },
+      }
+      await expect(
+        pushService!.send('token-1', payload, 'ios'),
+      ).resolves.toEqual({ success: true })
+
+      expect(send).toHaveBeenCalledWith(['token-1'], payload, 'ios')
     })
   })
 

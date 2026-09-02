@@ -71,17 +71,16 @@ describe('QPSService', () => {
     })
   })
 
-  it('sends data-only pushes to Android devices', async () => {
+  it('sends UCAN-bound data-only pushes to Android devices', async () => {
     validateUcan.mockResolvedValue({
       valid: true,
       deviceToken: 'android-token',
       platform: 'android',
+      teamId: 'team-1',
     })
     send.mockResolvedValue({ success: true })
 
-    await service.sendPush('test-ucan', undefined, undefined, {
-      teamId: 'team-1',
-    })
+    await service.sendPush('test-ucan')
 
     expect(send).toHaveBeenCalledWith(
       'android-token',
@@ -90,17 +89,16 @@ describe('QPSService', () => {
     )
   })
 
-  it('keeps fallback notification content for iOS devices', async () => {
+  it('uses fixed fallback notification content for iOS devices', async () => {
     validateUcan.mockResolvedValue({
       valid: true,
       deviceToken: 'ios-token',
       platform: 'ios',
+      teamId: 'team-1',
     })
     send.mockResolvedValue({ success: true })
 
-    await service.sendPush('test-ucan', undefined, undefined, {
-      teamId: 'team-1',
-    })
+    await service.sendPush('test-ucan')
 
     expect(send).toHaveBeenCalledWith(
       'ios-token',
@@ -119,11 +117,13 @@ describe('QPSService', () => {
         valid: true,
         deviceToken: 'ios-token',
         platform: 'ios',
+        teamId: 'team-1',
       })
       .mockResolvedValueOnce({
         valid: true,
         deviceToken: 'android-token',
         platform: 'android',
+        teamId: 'team-1',
       })
     sendMulticast.mockResolvedValue({
       successCount: 1,
@@ -131,14 +131,7 @@ describe('QPSService', () => {
       invalidTokens: [],
     })
 
-    await service.sendBatchPush(
-      ['ios-ucan', 'android-ucan'],
-      undefined,
-      undefined,
-      {
-        teamId: 'team-1',
-      },
-    )
+    await service.sendBatchPush(['ios-ucan', 'android-ucan'])
 
     expect(sendMulticast).toHaveBeenNthCalledWith(
       1,
@@ -155,6 +148,50 @@ describe('QPSService', () => {
       ['android-token'],
       { data: { teamId: 'team-1' } },
       'android',
+    )
+  })
+
+  it('keeps each recipient in the team bound into its UCAN', async () => {
+    validateUcan
+      .mockResolvedValueOnce({
+        valid: true,
+        deviceToken: 'team-a-token',
+        platform: 'ios',
+        teamId: 'team-a',
+      })
+      .mockResolvedValueOnce({
+        valid: true,
+        deviceToken: 'team-b-token',
+        platform: 'ios',
+        teamId: 'team-b',
+      })
+    sendMulticast.mockResolvedValue({
+      successCount: 1,
+      failureCount: 0,
+      invalidTokens: [],
+    })
+
+    await service.sendBatchPush(['team-a-ucan', 'team-b-ucan'])
+
+    expect(sendMulticast).toHaveBeenNthCalledWith(
+      1,
+      ['team-a-token'],
+      {
+        title: 'Quiet',
+        body: 'You have new activity',
+        data: { teamId: 'team-a' },
+      },
+      'ios',
+    )
+    expect(sendMulticast).toHaveBeenNthCalledWith(
+      2,
+      ['team-b-token'],
+      {
+        title: 'Quiet',
+        body: 'You have new activity',
+        data: { teamId: 'team-b' },
+      },
+      'ios',
     )
   })
 })

@@ -127,12 +127,7 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
         return
       }
 
-      const result = await config.qpsService.sendPush(
-        message.payload.ucan,
-        message.payload.title,
-        message.payload.body,
-        message.payload.data,
-      )
+      const result = await config.qpsService.sendPush(message.payload.ucan)
 
       if (!result.success) {
         if (result.tokenInvalid === true) {
@@ -222,12 +217,7 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
         return
       }
 
-      const result = await config.qpsService.sendBatchPush(
-        authorizedUcans,
-        message.payload.title,
-        message.payload.body,
-        message.payload.data,
-      )
+      const result = await config.qpsService.sendBatchPush(authorizedUcans)
 
       if (!result.success) {
         const response: SendBatchPushResponse = {
