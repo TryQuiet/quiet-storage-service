@@ -15,6 +15,7 @@ import type {
   GetCaptchaSiteKeyResponse,
 } from './types/captcha.types.js'
 import { DateTime } from 'luxon'
+import { registerAcknowledgedEvent } from './safe-event-handler.js'
 
 const baseLogger = createLogger('Websocket:Event:Captcha')
 
@@ -101,6 +102,17 @@ export function registerCaptchaHandlers(config: CaptchaHandlerConfig): void {
   }
 
   // register event handlers on this socket
-  config.socket.on(WebsocketEvents.VerifyCaptcha, handleVerifyCaptcha)
-  config.socket.on(WebsocketEvents.GetCaptchaSiteKey, handleGetCaptchaSiteKey)
+  registerAcknowledgedEvent(
+    config.socket,
+    WebsocketEvents.VerifyCaptcha,
+    handleVerifyCaptcha,
+    _logger,
+    { requiresPayload: true },
+  )
+  registerAcknowledgedEvent(
+    config.socket,
+    WebsocketEvents.GetCaptchaSiteKey,
+    handleGetCaptchaSiteKey,
+    _logger,
+  )
 }

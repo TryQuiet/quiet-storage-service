@@ -26,6 +26,7 @@ import {
   CommunityNotFoundError,
 } from '../../utils/errors.js'
 import { CaptchaErrorMessages } from './types/captcha.types.js'
+import { registerAcknowledgedEvent } from './safe-event-handler.js'
 
 const baseLogger = createLogger('Websocket:Event:Communities')
 
@@ -249,7 +250,25 @@ export function registerCommunitiesHandlers(
   }
 
   // register event handlers on this socket
-  config.socket.on(WebsocketEvents.CreateCommunity, handleCreateCommunity)
-  config.socket.on(WebsocketEvents.GetCommunity, handleGetCommunity)
-  config.socket.on(WebsocketEvents.SignInCommunity, handleSignInToCommunity)
+  registerAcknowledgedEvent(
+    config.socket,
+    WebsocketEvents.CreateCommunity,
+    handleCreateCommunity,
+    _logger,
+    { requiresPayload: true },
+  )
+  registerAcknowledgedEvent(
+    config.socket,
+    WebsocketEvents.GetCommunity,
+    handleGetCommunity,
+    _logger,
+    { requiresPayload: true },
+  )
+  registerAcknowledgedEvent(
+    config.socket,
+    WebsocketEvents.SignInCommunity,
+    handleSignInToCommunity,
+    _logger,
+    { requiresPayload: true },
+  )
 }

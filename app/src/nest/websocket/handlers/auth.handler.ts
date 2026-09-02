@@ -16,6 +16,10 @@ import type { AuthConnection } from '../../communities/auth/auth.connection.js'
 import { type Keyset, redactKeys } from '@localfirst/crdx'
 import { AllowedServerKeyState } from '../../communities/types.js'
 import { CaptchaErrorMessages } from './types/captcha.types.js'
+import {
+  registerAcknowledgedEvent,
+  registerFireAndForgetEvent,
+} from './safe-event-handler.js'
 
 const baseLogger = createLogger('Websocket:Event:Communities:Auth')
 
@@ -151,6 +155,18 @@ export function registerCommunitiesAuthHandlers(
   }
 
   // register event handlers on this socket
-  config.socket.on(WebsocketEvents.GeneratePublicKeys, handleGeneratePublicKeys)
-  config.socket.on(WebsocketEvents.AuthSync, handleAuthSync)
+  registerAcknowledgedEvent(
+    config.socket,
+    WebsocketEvents.GeneratePublicKeys,
+    handleGeneratePublicKeys,
+    _logger,
+    { requiresPayload: true },
+  )
+  registerFireAndForgetEvent(
+    config.socket,
+    WebsocketEvents.AuthSync,
+    handleAuthSync,
+    _logger,
+    { requiresPayload: true },
+  )
 }
