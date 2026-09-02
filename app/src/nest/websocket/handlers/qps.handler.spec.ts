@@ -268,30 +268,38 @@ describe('QPS WebSocket Handlers', () => {
       )
     })
 
-    it('ignores caller-controlled push content', async () => {
-      mockQpsService.sendPush.mockResolvedValue({ success: true })
-
+    it.each([
+      ['title', { ucan: 'valid-ucan', title: 'Attacker title' }],
+      ['body', { ucan: 'valid-ucan', body: 'Attacker body' }],
+      ['data', { ucan: 'valid-ucan', data: { teamId: otherTeamId } }],
+      [
+        'notification envelope',
+        {
+          ucan: 'valid-ucan',
+          notification: { title: 'Attacker title', body: 'Attacker body' },
+        },
+      ],
+      ['unknown field', { ucan: 'valid-ucan', arbitrary: true }],
+    ])('rejects caller-controlled %s content', async (_label, payload) => {
       const callback = jest.fn()
       const handler = handlers.get(WebsocketEvents.QPSSendPush)!
       await handler(
         {
           ts: Date.now(),
           status: '',
-          payload: {
-            ucan: 'valid-ucan',
-            title: 'Test',
-            body: 'Hello',
-            data: { key: 'value' },
-          },
+          payload,
         },
         callback,
       )
 
       // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
-      expect(mockQpsService.sendPush).toHaveBeenCalledWith('valid-ucan')
+      expect(mockQpsService.validateUcan).not.toHaveBeenCalled()
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
+      expect(mockQpsService.sendPush).not.toHaveBeenCalled()
       expect(callback).toHaveBeenCalledWith(
         expect.objectContaining({
-          status: CommunityOperationStatus.SUCCESS,
+          status: CommunityOperationStatus.ERROR,
+          reason: QpsErrorReason.InvalidPushPayload,
         }),
       )
     })
@@ -533,9 +541,6 @@ describe('QPS WebSocket Handlers', () => {
           status: '',
           payload: {
             ucans: ['ucan-1', 'ucan-2', 'ucan-3'],
-            title: 'Batch Test',
-            body: 'Hello All',
-            data: { key: 'value' },
           },
         },
         callback,
@@ -565,9 +570,6 @@ describe('QPS WebSocket Handlers', () => {
           status: '',
           payload: {
             ucans: ['ucan-1', 'ucan-2', 'ucan-3'],
-            title: 'Batch Test',
-            body: 'Hello All',
-            data: { key: 'value' },
           },
         },
         callback,
@@ -696,6 +698,46 @@ describe('QPS WebSocket Handlers', () => {
         }),
       )
     })
+
+    it.each([
+      ['title', { ucans: ['ucan-1'], title: 'Attacker title' }],
+      ['body', { ucans: ['ucan-1'], body: 'Attacker body' }],
+      ['data', { ucans: ['ucan-1'], data: { teamId: otherTeamId } }],
+      [
+        'notification envelope',
+        {
+          ucans: ['ucan-1'],
+          notification: { title: 'Attacker title', body: 'Attacker body' },
+        },
+      ],
+      ['unknown field', { ucans: ['ucan-1'], arbitrary: true }],
+    ])(
+      'rejects caller-controlled batch %s content',
+      async (_label, payload) => {
+        const callback = jest.fn()
+        const handler = handlers.get(WebsocketEvents.QPSSendBatchPush)!
+        await handler(
+          {
+            ts: Date.now(),
+            status: '',
+            payload,
+          },
+          callback,
+        )
+
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
+        expect(mockQpsService.validateUcan).not.toHaveBeenCalled()
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock assertion
+        expect(mockQpsService.sendBatchPush).not.toHaveBeenCalled()
+        expect(callback).toHaveBeenCalledWith(
+          expect.objectContaining({
+            status: CommunityOperationStatus.ERROR,
+            reason: QpsErrorReason.InvalidBatchPayload,
+            payload: { invalidTokens: [] },
+          }),
+        )
+      },
+    )
 
     it('should return ERROR when service throws', async () => {
       mockQpsService.sendBatchPush.mockRejectedValue(
