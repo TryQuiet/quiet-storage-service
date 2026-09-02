@@ -6,6 +6,7 @@ import {
   Post,
   Query,
   Request,
+  Req,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common'
@@ -33,34 +34,67 @@ export class NseAuthController {
    * Returns: { challengeId: string; challenge: ChallengePayload }
    */
   @Post('challenge')
-  issueChallenge(@Body() body: { deviceId: string; teamId: string }): {
+  async issueChallenge(
+    @Body() body: unknown,
+    @Req() request: { ip?: string },
+  ): Promise<{
     challengeId: string
     challenge: ChallengePayload
-  } {
+  }> {
+    this.requireExactBody(body, ['deviceId', 'teamId'])
+    if (typeof body.deviceId !== 'string' || typeof body.teamId !== 'string') {
+      throw new UnauthorizedException('Invalid challenge request')
+    }
     logger.debug(`Challenge request from device ${body.deviceId}`)
-    return this.nseAuthService.issueChallenge(body.deviceId, body.teamId)
+    return await this.nseAuthService.issueChallenge(
+      body.deviceId,
+      body.teamId,
+      request.ip ?? 'unknown',
+    )
   }
 
   /**
    * POST /nse-auth/token
-   * Body: { challengeId: string; deviceId: string; proof: { signature: string; publicKey: string } }
+   * Body: { challengeId: string; deviceId: string; signature: string }
    * Returns: { token: string; expiresIn: number }
    */
   @Post('token')
   async verifyAndIssueToken(
     @Body()
-    body: {
-      challengeId: string
-      deviceId: string
-      proof: { signature: string; publicKey: string }
-    },
+    body: unknown,
+    @Req() request: { ip?: string },
   ): Promise<{ token: string; expiresIn: number }> {
+    this.requireExactBody(body, ['challengeId', 'deviceId', 'signature'])
+    if (
+      typeof body.challengeId !== 'string' ||
+      typeof body.deviceId !== 'string' ||
+      typeof body.signature !== 'string'
+    ) {
+      throw new UnauthorizedException('Invalid token request')
+    }
     logger.debug(`Token request for device ${body.deviceId}`)
     return await this.nseAuthService.verifyAndIssueToken(
       body.challengeId,
       body.deviceId,
-      body.proof,
+      body.signature,
+      request.ip ?? 'unknown',
     )
+  }
+
+  private requireExactBody(
+    body: unknown,
+    expectedKeys: string[],
+  ): asserts body is Record<string, unknown> {
+    if (body == null || typeof body !== 'object' || Array.isArray(body)) {
+      throw new UnauthorizedException('Unexpected request schema')
+    }
+    const actual = Object.keys(body).sort()
+    if (
+      actual.length !== expectedKeys.length ||
+      !expectedKeys.sort().every((key, index) => actual[index] === key)
+    ) {
+      throw new UnauthorizedException('Unexpected request schema')
+    }
   }
 
   /**
