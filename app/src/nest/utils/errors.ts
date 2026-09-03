@@ -59,6 +59,25 @@ export class CommunityNotFoundError extends Error {
  * would commit a graph that does not contain the admission, and the connection would then release
  * the acceptance anyway. Failing here keeps the gate closed (QSS-006 / private#203).
  */
+/**
+ * Raised when a team's durable-write backlog is at its limit.
+ *
+ * Awaiting durability before releasing an acceptance turns repeated handshake traffic into
+ * repeated serialize-and-write work. One invitation holder must not be able to make that queue grow
+ * without bound, so past the limit the admission gate fails closed rather than queueing more
+ * (audit finding M-4).
+ */
+export class PersistenceBacklogError extends Error {
+  constructor(
+    public readonly communityId: string,
+    public readonly pending: number,
+  ) {
+    super(
+      `Community ${communityId} already has ${pending} durable writes pending, so this admission was not persisted`,
+    )
+  }
+}
+
 export class AdmittingSigChainReplacedError extends Error {
   constructor(public readonly communityId: string) {
     super(

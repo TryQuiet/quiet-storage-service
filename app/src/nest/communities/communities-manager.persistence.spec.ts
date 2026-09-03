@@ -559,6 +559,131 @@ describe('CommunitiesManagerService durable persistence', () => {
     })
   })
 
+  describe('bounded persistence work (M-4)', () => {
+    /** The manager's private queue for a team, for asserting depth and coalescing. */
+    const queueOf = (
+      teamId: string,
+    ):
+      | {
+          pending: number
+          coalescedUpdate?: unknown
+          durableHeads: Set<string>
+        }
+      | undefined =>
+      (
+        manager as unknown as {
+          persistQueues: Map<
+            string,
+            {
+              pending: number
+              coalescedUpdate?: unknown
+              durableHeads: Set<string>
+            }
+          >
+        }
+      ).persistQueues.get(teamId)
+
+    /** Count writes without letting them reach PostgreSQL, optionally holding them open. */
+    const countWrites = (
+      gate?: ReturnType<typeof createGate>,
+    ): { count: () => number } => {
+      let writes = 0
+      jest
+        .spyOn(storage, 'updateCommunity')
+        .mockImplementation(async (): Promise<boolean> => {
+          writes += 1
+          if (gate != null) {
+            await gate.promise
+          }
+          return true
+        })
+      return { count: () => writes }
+    }
+
+    it('re-persisting an already durable admission does no new work', async () => {
+      const { teamId } = await createCommunity()
+      const { team } = (await manager.get(teamId))!.sigChain
+      const writes = countWrites()
+
+      await manager.persistAdmittedTeam(team)
+      expect(writes.count()).toBe(1)
+
+      // A peer that re-runs the handshake for an admission we have committed must not make us
+      // serialize and store the same state again.
+      await manager.persistAdmittedTeam(team)
+      await manager.persistAdmittedTeam(team)
+      expect(writes.count()).toBe(1)
+    })
+
+    it('joins an in-flight admission write instead of queueing another', async () => {
+      const { teamId } = await createCommunity()
+      const { team } = (await manager.get(teamId))!.sigChain
+      const gate = createGate()
+      const writes = countWrites(gate)
+
+      const first = manager.persistAdmittedTeam(team)
+      await waitFor(() => {
+        expect(writes.count()).toBe(1)
+      })
+
+      const second = manager.persistAdmittedTeam(team)
+      expect(queueOf(teamId)!.pending).toBe(1)
+
+      gate.open()
+      await Promise.all([first, second])
+      expect(writes.count()).toBe(1)
+    })
+
+    it('coalesces chain updates into a single pending write', async () => {
+      const { testTeam, teamId } = await createCommunity()
+      const gate = createGate()
+      const writes = countWrites(gate)
+
+      const holding = manager.persistCommunity(teamId)
+      await waitFor(() => {
+        expect(writes.count()).toBe(1)
+      })
+
+      // five chain updates arrive while that write is held
+      for (let i = 0; i < 5; i++) {
+        await rotateAndSyncToServer(testTeam)
+      }
+
+      // the running write plus one coalesced slot, never one task per update
+      expect(queueOf(teamId)!.pending).toBeLessThanOrEqual(2)
+
+      gate.open()
+      await holding
+      await manager.persistCommunity(teamId)
+
+      // one held write, one coalesced write covering all five updates, one final drain
+      expect(writes.count()).toBe(3)
+    })
+
+    it('fails the admission gate closed once the backlog is at its limit', async () => {
+      const { teamId } = await createCommunity()
+      const { team } = (await manager.get(teamId))!.sigChain
+      const gate = createGate()
+      const writes = countWrites(gate)
+
+      const backlog: Array<Promise<void>> = []
+      for (let i = 0; i < 8; i++) {
+        backlog.push(manager.persistCommunity(teamId))
+      }
+      expect(queueOf(teamId)!.pending).toBe(8)
+
+      // One invitation holder must not be able to grow this without bound, so past the limit the
+      // gate refuses rather than queueing more work.
+      await expect(manager.persistAdmittedTeam(team)).rejects.toThrow(
+        'durable writes pending',
+      )
+
+      gate.open()
+      await Promise.all(backlog)
+      expect(writes.count()).toBe(8)
+    })
+  })
+
   describe('chain update listener', () => {
     it('persists the graph when the chain changes', async () => {
       const { testTeam, teamId } = await createCommunity()
