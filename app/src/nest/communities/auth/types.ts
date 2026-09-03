@@ -4,6 +4,15 @@ import type { CommunitiesManagerService } from '../communities-manager.service.j
 export interface AuthConnectionConfig {
   socket: Socket
   communitiesManager: CommunitiesManagerService
+  /**
+   * Durably persist this team's current sigchain and team keyring.
+   *
+   * localfirst/auth calls this after it has appended an ADMIT_* link in memory and before it
+   * queues the acceptance that hands the invitee the graph and the team keyring. It must resolve
+   * only once both are on disk, and reject if either write fails, so that a QSS crash can never
+   * leave an invitee holding keys for an admission the server has forgotten.
+   */
+  persistAdmission?: () => Promise<void>
 }
 
 export enum AuthStatus {
@@ -31,4 +40,10 @@ export enum LFAEvents {
  */
 export enum SigchainEvents {
   UPDATED = 'sigchainUpdated',
+  /**
+   * Emitted when a chain update could not be written to durable storage. LFA emits its `updated`
+   * event synchronously and discards whatever the listener returns, so without this a failed write
+   * would be invisible outside the logs.
+   */
+  PERSIST_FAILED = 'sigchainPersistFailed',
 }

@@ -31,12 +31,16 @@ export class ServerKeyManagerService implements OnModuleDestroy {
    * @param id ID of the team this keyring belongs to
    * @param keyring Bytes for this keyring
    * @param type Type string for storing this keyring
+   * @param overwrite Replace the value if a keyring of this type is already stored for this team.
+   *   Off by default: a server's identity keyring is written once and must never be replaced.
+   *   A team keyring, on the other hand, gains a keyset on every rotation and has to be re-stored.
    * @returns Stored secret JSON
    */
   public async storeKeyring(
     id: string,
     keyring: Uint8Array,
     type: StoredKeyRingType,
+    overwrite = false,
   ): Promise<StoredKeyring> {
     // ensure the server encryption key is generated and stored
     await this._initOrRetrieveServerEncKey()
@@ -51,8 +55,13 @@ export class ServerKeyManagerService implements OnModuleDestroy {
         ...encPayload,
         type,
       }
-      // add the new secret to the AWS secrets manager
-      await this.awsSecretsService.create(secretName, JSON.stringify(secret))
+      // write the secret to the AWS secrets manager
+      const serializedSecret = JSON.stringify(secret)
+      if (overwrite) {
+        await this.awsSecretsService.upsert(secretName, serializedSecret)
+      } else {
+        await this.awsSecretsService.create(secretName, serializedSecret)
+      }
       return secret
     } catch (e) {
       throw new CompoundError(

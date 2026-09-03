@@ -10,6 +10,8 @@ import {
   CreateSecretCommandInput,
   CreateSecretCommand,
   CreateSecretCommandOutput,
+  PutSecretValueCommand,
+  PutSecretValueCommandOutput,
 } from '@aws-sdk/client-secrets-manager'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '../config/config.service.js'
@@ -194,13 +196,7 @@ export class AWSSecretsService {
       // generate the AWS secrets command and insert the secret
       const commandInput: CreateSecretCommandInput = {
         Name: secretName,
-      }
-      if (typeof secret === 'string') {
-        commandInput.SecretString = secret
-      } else if (isUint8Array(secret)) {
-        commandInput.SecretBinary = secret
-      } else {
-        throw new Error(`Secret must be a string or Uint8Array!`)
+        ...AWSSecretsService.secretValueFields(secret),
       }
 
       const command = new CreateSecretCommand(commandInput)
@@ -216,12 +212,76 @@ export class AWSSecretsService {
   }
 
   /**
+   * Write a secret by name, replacing the value if the secret already exists.
+   *
+   * `create` is a strict insert — AWS rejects a name that is already taken — which is what we want
+   * for identity material that must never be replaced. Rotatable material has to be re-written:
+   * the team keyring gains a keyset every time team keys rotate, and the newest generation has to
+   * reach durable storage or a cold reload can no longer decrypt the graph it is stored alongside.
+   *
+   * @param secretName Secret name we are writing
+   * @param secret Encrypted secret to write
+   */
+  public async upsert(
+    secretName: string,
+    secret: string | Uint8Array,
+  ): Promise<void> {
+    try {
+      // if local write the secret to Redis, which is already last-write-wins
+      if (this.local) {
+        await this.redisClient.set(secretName, secret)
+        this.updateCachedSecretEnvVar(secretName, secret)
+        return
+      }
+
+      const secretValue = AWSSecretsService.secretValueFields(secret)
+      try {
+        // add a new version to the existing secret
+        await this.executePutSecretValueCommandAws(
+          new PutSecretValueCommand({ SecretId: secretName, ...secretValue }),
+        )
+      } catch (e) {
+        if (!AWSSecretsService.isSecretNotFoundError(e)) {
+          throw e
+        }
+        // nothing has ever been stored under this name, so there is no version to replace
+        this.logger.log(
+          `Secret ${secretName} did not exist yet, creating it instead`,
+        )
+        await this.executeCreateSecretCommandAws(
+          new CreateSecretCommand({ Name: secretName, ...secretValue }),
+        )
+      }
+      this.updateCachedSecretEnvVar(secretName, secret)
+    } catch (e) {
+      this.logger.error('Error upserting secret:', e)
+      throw new CompoundError(
+        'Error upserting secret into AWS',
+        AWSSecretsService.normalizeError(e),
+      )
+    }
+  }
+
+  /**
    * Close the Redis client, if applicable
    */
   public async close(): Promise<void> {
     if (this.redisClient.enabled) {
       await this.redisClient.close()
     }
+  }
+
+  private static secretValueFields(secret: string | Uint8Array): {
+    SecretString?: string
+    SecretBinary?: Uint8Array
+  } {
+    if (typeof secret === 'string') {
+      return { SecretString: secret }
+    }
+    if (isUint8Array(secret)) {
+      return { SecretBinary: secret }
+    }
+    throw new Error(`Secret must be a string or Uint8Array!`)
   }
 
   private static parseSecretString(
@@ -366,6 +426,12 @@ export class AWSSecretsService {
   private async executeCreateSecretCommandAws(
     command: CreateSecretCommand,
   ): Promise<CreateSecretCommandOutput> {
+    return await this.getAwsClient().send(command)
+  }
+
+  private async executePutSecretValueCommandAws(
+    command: PutSecretValueCommand,
+  ): Promise<PutSecretValueCommandOutput> {
     return await this.getAwsClient().send(command)
   }
 }

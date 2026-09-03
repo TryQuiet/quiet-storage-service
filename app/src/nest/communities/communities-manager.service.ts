@@ -59,6 +59,29 @@ export class CommunitiesManagerService implements OnModuleDestroy {
    */
   private readonly _communityExpiryHandler: NodeJS.Timeout
 
+  /**
+   * Per-team tail of the durable-persistence queue.
+   *
+   * Every write of a team's keyring and graph is chained onto this promise, so two persists that
+   * overlap can't interleave their writes and leave an older serialization committed on top of a
+   * newer one. `pending` counts writes that have been queued but haven't settled; the expiry sweep
+   * uses it to avoid dropping a team's queue out from under an in-flight write.
+   */
+  private readonly persistQueues = new Map<
+    string,
+    { tail: Promise<void>; pending: number }
+  >()
+
+  /**
+   * Fingerprint of the team keyring most recently written to the secrets manager, per team.
+   *
+   * QSS used to store the team keyring only at community creation, so once team keys rotated the
+   * newest generation existed nowhere durable: a cold reload of the stored graph failed with
+   * "Can't decrypt link" (GLOBAL-QSS-002 / private#192). Remembering what we last wrote lets us
+   * re-store the keyring exactly when it has changed, and skip the write when it hasn't.
+   */
+  private readonly persistedTeamKeyringFingerprints = new Map<string, string>()
+
   private readonly logger = createLogger(CommunitiesManagerService.name)
 
   /* eslint-disable-next-line @typescript-eslint/max-params --  we can't do much about this */
@@ -88,6 +111,8 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     this.logger.info('Clearing CommunitesManagerService')
     clearTimeout(this._communityExpiryHandler)
     this.communities.clear()
+    this.persistQueues.clear()
+    this.persistedTeamKeyringFingerprints.clear()
   }
 
   /**
@@ -170,6 +195,13 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         serializedTeamKeyring,
         StoredKeyRingType.TEAM_KEYRING,
       )
+      // record what we just wrote so the next persist only re-stores the keyring if it changed
+      this.persistedTeamKeyringFingerprints.set(
+        community.teamId,
+        CommunitiesManagerService.fingerprintTeamKeyring(
+          deserializedTeamKeyring,
+        ),
+      )
       this.logger.verbose(`Storing community metadata`)
       // put the community metadata into the database
       const stored = await this.storage.addCommunity(community)
@@ -222,6 +254,31 @@ export class CommunitiesManagerService implements OnModuleDestroy {
   }
 
   /**
+   * Durably persist a community's current LFA state before anything is allowed to depend on it.
+   *
+   * The team keyring is written first and the serialized graph second. That order is the whole
+   * point: a crash between the two writes then leaves a stored keyring that is a superset of what
+   * the stored graph needs, which reloads cleanly. The reverse order can store a graph whose links
+   * are encrypted under a keyset that was never written down, which is unrecoverable.
+   *
+   * Writes are serialized per team, and the graph is serialized inside the queued task rather than
+   * at call time, so a persist that starts later always commits state at least as new as one that
+   * started earlier.
+   *
+   * @param teamId Team ID of the community to persist
+   * @throws CommunityNotFoundError if the community isn't loaded, or the underlying error if
+   *   either write fails
+   */
+  public async persistCommunity(teamId: string): Promise<void> {
+    const managedCommunity = this.communities.get(teamId)
+    if (managedCommunity == null) {
+      throw new CommunityNotFoundError(teamId)
+    }
+
+    await this.persistSigChain(teamId, managedCommunity.sigChain)
+  }
+
+  /**
    * Start an LFA auth sync connection over an existing websocket connection with a user
    *
    * @param userId ID of the user we are connecting with
@@ -265,11 +322,20 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       authConnections.delete(userId)
     }
 
-    // create and start a new LFA auth sync connection with this user
+    // create and start a new LFA auth sync connection with this user. The connection is handed the
+    // callback that makes an admission durable; localfirst/auth invokes it before releasing an
+    // acceptance to an invitee.
     const authConnection = new AuthConnection(
       userId,
       managedCommunity.sigChain,
-      config,
+      {
+        ...config,
+        persistAdmission:
+          config.persistAdmission ??
+          (async (): Promise<void> => {
+            await this.persistCommunity(teamId)
+          }),
+      },
     )
     authConnections.set(userId, authConnection)
     this.communities.set(teamId, {
@@ -414,6 +480,11 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       )
       // get the team key ring from the AWS secrets manager
       teamKeys = await this.getTeamKeys(teamId)
+      // this is the keyring currently in durable storage, so treat it as the last thing persisted
+      this.persistedTeamKeyringFingerprints.set(
+        teamId,
+        CommunitiesManagerService.fingerprintTeamKeyring(teamKeys),
+      )
     } catch (e) {
       this.logger.error(
         `Error occurred while pulling keys from secrets manager`,
@@ -448,6 +519,109 @@ export class CommunitiesManagerService implements OnModuleDestroy {
   }
 
   /**
+   * Persist a specific sigchain for a team, keyring first and graph second, on the team's queue.
+   *
+   * Takes the sigchain explicitly rather than looking it up so that chain-update listeners keep
+   * working for a community that has already been swept out of the in-memory cache.
+   *
+   * @param teamId Team ID of the community we are persisting
+   * @param sigChain Sigchain to persist
+   */
+  private async persistSigChain(
+    teamId: string,
+    sigChain: SigChain,
+  ): Promise<void> {
+    await this.enqueuePersist(teamId, async () => {
+      await this.persistTeamKeyringIfChanged(teamId, sigChain)
+      await this.update(teamId, { sigChain: sigChain.serialize(true) })
+    })
+  }
+
+  /**
+   * Run a persistence task after every task already queued for this team has settled
+   *
+   * @param teamId Team ID whose queue we are joining
+   * @param task Work to run once the queue drains
+   */
+  private async enqueuePersist(
+    teamId: string,
+    task: () => Promise<void>,
+  ): Promise<void> {
+    const queue = this.persistQueues.get(teamId) ?? {
+      tail: Promise.resolve(),
+      pending: 0,
+    }
+    queue.pending += 1
+    this.persistQueues.set(teamId, queue)
+
+    // Wait for the previous write to settle either way — a failed persist orders later writes but
+    // must never wedge the queue.
+    const current = queue.tail.then(task, task)
+    // The stored tail must not be a rejected promise nobody handles; the caller gets `current`.
+    queue.tail = current.then(
+      () => {
+        queue.pending -= 1
+      },
+      () => {
+        queue.pending -= 1
+      },
+    )
+
+    await current
+  }
+
+  /**
+   * Write the team's current keyring to the secrets manager if it differs from the one we last
+   * stored for this team
+   *
+   * @param teamId Team ID of the community we are persisting
+   * @param sigChain Sigchain holding the keyring
+   */
+  private async persistTeamKeyringIfChanged(
+    teamId: string,
+    sigChain: SigChain,
+  ): Promise<void> {
+    // the pinned auth package's generated declarations lose the concrete keyring type
+    const teamKeyring = sigChain.team.teamKeyring() as Keyring
+    const fingerprint =
+      CommunitiesManagerService.fingerprintTeamKeyring(teamKeyring)
+    if (fingerprint === this.persistedTeamKeyringFingerprints.get(teamId)) {
+      this.logger.verbose(
+        `Team keyring is unchanged since the last persist, skipping`,
+        teamId,
+      )
+      return
+    }
+
+    this.logger.log(`Storing updated team keyring`, teamId)
+    await this.serverKeyManager.storeKeyring(
+      teamId,
+      uint8arrays.fromString(JSON.stringify(teamKeyring), 'utf8'),
+      StoredKeyRingType.TEAM_KEYRING,
+      // the team keyring is rotatable, so re-storing it has to replace what is already there
+      true,
+    )
+    this.persistedTeamKeyringFingerprints.set(teamId, fingerprint)
+  }
+
+  /**
+   * Identify a keyring by the public part of every keyset it holds.
+   *
+   * A keyring is a map of keysets indexed by their public encryption key, so the sorted set of
+   * those ids and the generation each belongs to changes exactly when the keyring gains or rotates
+   * a keyset. No secret material goes into the fingerprint.
+   *
+   * @param keyring Keyring to fingerprint
+   * @returns Stable string identifying the keyring's contents
+   */
+  private static fingerprintTeamKeyring(keyring: Keyring): string {
+    return Object.entries(keyring)
+      .map(([id, keys]) => `${id}:${keys.type}:${keys.name}:${keys.generation}`)
+      .sort()
+      .join('|')
+  }
+
+  /**
    * Check for expired/stale communities in memory and delete if necessary (or remove expiry if there are
    * open connections)
    *
@@ -472,12 +646,24 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         community.expiryMs != null &&
         community.expiryMs <= DateTime.utc().toMillis()
       ) {
+        // don't tear a community down while one of its writes is still in flight
+        const persistQueue = this.persistQueues.get(community.teamId)
+        if (persistQueue != null && persistQueue.pending > 0) {
+          this.logger.verbose(
+            'Community has a persist in flight, deferring removal',
+            community.teamId,
+          )
+          continue
+        }
+
         this.logger.verbose('Removing stale community', community.teamId)
         this.clearSigchainListeners(
           community.sigChain,
           community.chainEventHandler,
         )
         this.communities.delete(community.teamId)
+        this.persistQueues.delete(community.teamId)
+        this.persistedTeamKeyringFingerprints.delete(community.teamId)
       }
     }
   }
@@ -500,11 +686,26 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     sigChain.removeListener(SigchainEvents.UPDATED, handler)
   }
 
+  /**
+   * Persist the chain whenever LFA reports that it changed.
+   *
+   * This listener still covers every dispatch that isn't an admission — removals, rotations,
+   * role changes — and admissions reach durable storage through the connection's
+   * `persistAdmission` hook before any acceptance is released. LFA emits `updated` synchronously
+   * from `Team.dispatch` and drops the promise we return, so a failure here has to be reported
+   * rather than propagated.
+   */
   private readonly _updateDbOnChainUpdate =
     (sigChain: SigChain): (() => Promise<void>) =>
     async (): Promise<void> => {
-      await this.update(sigChain.team.id, {
-        sigChain: sigChain.serialize(true),
-      })
+      try {
+        await this.persistSigChain(sigChain.team.id, sigChain)
+      } catch (e) {
+        this.logger.error(
+          `Failed to persist chain update for team ${sigChain.team.id}`,
+          e,
+        )
+        sigChain.notifyPersistFailed(e)
+      }
     }
 }
