@@ -83,7 +83,8 @@ export class AuthConnection extends EventEmitter {
     this.lfaConnection = new LFAConnection({
       context: this.serverContext,
       // The durable-admission gate: membership is bound to its record, so the ADMIT_* link must be
-      // on disk before the acceptance carrying the graph and keyring goes out. localfirst/auth
+      // on disk before the acceptance carrying the graph and keyring goes out. The adversary is the
+      // joiner, who may hold a valid invitation and still want to join unrecorded. localfirst/auth
       // appends the link, then waits on this before it queues ACCEPT_INVITATION; if it rejects, the
       // connection fails closed with ADMISSION_NOT_PERSISTED and the invitee is sent nothing
       // (QSS-006 / private#203).
