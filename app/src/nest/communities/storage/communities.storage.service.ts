@@ -107,6 +107,7 @@ export class CommunitiesStorageService implements OnModuleInit {
     entity.assign({
       id: payload.teamId,
       sigChain: Buffer.from(uint8arrays.fromString(payload.sigChain, 'hex')),
+      teamKeyringDigest: payload.teamKeyringDigest,
     })
     return entity
   }
@@ -119,6 +120,7 @@ export class CommunitiesStorageService implements OnModuleInit {
         payload.sigChain != null
           ? Buffer.from(uint8arrays.fromString(payload.sigChain, 'hex'))
           : undefined,
+      teamKeyringDigest: payload.teamKeyringDigest,
     }
     return Object.fromEntries(
       Object.entries(entityData).filter(([_, v]) => v != null),
@@ -129,6 +131,10 @@ export class CommunitiesStorageService implements OnModuleInit {
     return {
       teamId: entity.id,
       sigChain: uint8arrays.toString(Uint8Array.from(entity.sigChain), 'hex'),
+      // omitted rather than undefined for rows written before the digest was recorded
+      ...(entity.teamKeyringDigest != null && {
+        teamKeyringDigest: entity.teamKeyringDigest,
+      }),
     }
   }
 

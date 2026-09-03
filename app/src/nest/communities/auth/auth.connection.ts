@@ -21,7 +21,7 @@ import {
   CommunityOperationStatus,
 } from '../../websocket/handlers/types/index.js'
 import type { QuietLogger } from '../../app/logger/types.js'
-import { type AuthConnectionConfig, AuthStatus, LFAEvents } from './types.js'
+import { type AuthConnectionParams, AuthStatus, LFAEvents } from './types.js'
 import EventEmitter from 'events'
 import { type AuthDisconnectedPayload, AuthEvents } from './auth.events.js'
 
@@ -62,7 +62,7 @@ export class AuthConnection extends EventEmitter {
   constructor(
     private readonly userId: string,
     private readonly sigChain: SigChain,
-    private readonly config: AuthConnectionConfig,
+    private readonly config: AuthConnectionParams,
   ) {
     super()
 
@@ -82,6 +82,13 @@ export class AuthConnection extends EventEmitter {
     // create a new LFA auth sync connection that routes auth sync messages through an existing websocket connection
     this.lfaConnection = new LFAConnection({
       context: this.serverContext,
+      // The durable-admission gate: membership is bound to its record, so the ADMIT_* link must be
+      // on disk before the acceptance carrying the graph and keyring goes out. The adversary is the
+      // joiner, who may hold a valid invitation and still want to join unrecorded. localfirst/auth
+      // appends the link, then waits on this before it queues ACCEPT_INVITATION; if it rejects, the
+      // connection fails closed with ADMISSION_NOT_PERSISTED and the invitee is sent nothing
+      // (QSS-006 / private#203).
+      persistAdmission: this.config.persistAdmission,
       sendMessage: (message: Uint8Array) => {
         if (message.byteLength >= AUTH_SYNC_LARGE_MESSAGE_BYTES) {
           this.logger.warn(
