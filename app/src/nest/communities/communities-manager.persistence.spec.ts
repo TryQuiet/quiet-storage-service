@@ -485,16 +485,26 @@ describe('CommunitiesManagerService durable persistence', () => {
 
     it('records the digest of the keyring the graph was committed with', async () => {
       const { testTeam, teamId } = await createCommunity()
-      await rotateAndSyncToServer(testTeam)
-
-      const captured = capturePairs()
-      captured.gate.open()
+      // no mocked write here: the point is what actually lands in the row
       await manager.persistCommunity(teamId)
+      const firstDigest = (await storage.getCommunity(teamId))!
+        .teamKeyringDigest
+      expect(firstDigest).toBeDefined()
 
-      expect(captured.digests[0]).toBeDefined()
-      // the row's digest names the keyring that was written alongside it
-      const stored = await storage.getCommunity(teamId)
-      expect(stored).toBeDefined()
+      // the same keyring is recorded as the same digest
+      await manager.persistCommunity(teamId)
+      expect((await storage.getCommunity(teamId))!.teamKeyringDigest).toEqual(
+        firstDigest,
+      )
+
+      // and a rotation is recorded as a different one, so a cold load can tell which keyring the
+      // graph beside it was committed with
+      await rotateAndSyncToServer(testTeam)
+      await manager.persistCommunity(teamId)
+      const rotatedDigest = (await storage.getCommunity(teamId))!
+        .teamKeyringDigest
+      expect(rotatedDigest).toBeDefined()
+      expect(rotatedDigest).not.toEqual(firstDigest)
     })
 
     it('fails before the keyring reaches storage, leaving the graph untouched', async () => {
@@ -753,12 +763,11 @@ describe('CommunitiesManagerService durable persistence', () => {
 
       const { taintedTeam } = await failAnAdmission(teamId)
       // connections are stopped on the next tick, after the library has reported the failure
-      await new Promise(resolve => {
-        setImmediate(resolve)
+      await waitFor(() => {
+        for (const stopSpy of stopSpies) {
+          expect(stopSpy).toHaveBeenCalled()
+        }
       })
-      for (const stopSpy of stopSpies) {
-        expect(stopSpy).toHaveBeenCalled()
-      }
 
       jest.restoreAllMocks()
       const reloaded = await manager.get(teamId)
