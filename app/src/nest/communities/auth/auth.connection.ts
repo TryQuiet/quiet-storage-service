@@ -82,9 +82,11 @@ export class AuthConnection extends EventEmitter {
     // create a new LFA auth sync connection that routes auth sync messages through an existing websocket connection
     this.lfaConnection = new LFAConnection({
       context: this.serverContext,
-      // The durable-admission gate. localfirst/auth appends the ADMIT_* link, then waits on this
-      // before it queues ACCEPT_INVITATION; if it rejects, the connection fails closed with
-      // ADMISSION_NOT_PERSISTED and the invitee is sent nothing (QSS-006 / private#203).
+      // The durable-admission gate: membership is bound to its record, so the ADMIT_* link must be
+      // on disk before the acceptance carrying the graph and keyring goes out. localfirst/auth
+      // appends the link, then waits on this before it queues ACCEPT_INVITATION; if it rejects, the
+      // connection fails closed with ADMISSION_NOT_PERSISTED and the invitee is sent nothing
+      // (QSS-006 / private#203).
       persistAdmission: this.config.persistAdmission,
       sendMessage: (message: Uint8Array) => {
         if (message.byteLength >= AUTH_SYNC_LARGE_MESSAGE_BYTES) {

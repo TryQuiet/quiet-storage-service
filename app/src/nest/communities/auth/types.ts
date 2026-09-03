@@ -5,11 +5,12 @@ import type { CommunitiesManagerService } from '../communities-manager.service.j
 /**
  * Durably persist a team's current sigchain and team keyring.
  *
- * localfirst/auth calls this on the admitting side after it has appended an ADMIT_* link to the
- * in-memory team and before it queues the acceptance that hands the invitee the graph and the team
- * keyring. It must resolve only once both are on disk, and reject if either write fails, so that a
- * QSS crash can never leave an invitee holding keys for an admission the server has forgotten
- * (QSS-006 / private#203, threat-model C3 "Option A").
+ * This binds membership to its record: nobody may hold a community's keys without a durable record
+ * of their admission on the server that admitted them. localfirst/auth calls this on the admitting
+ * side after it has appended an ADMIT_* link to the in-memory team and before it queues the
+ * acceptance that hands the invitee the graph and the team keyring. It must resolve only once both
+ * are on disk, and reject if either write fails, so that a QSS crash can never produce a member
+ * with keys but no record (QSS-006 / private#203, threat-model C3 "Option A").
  */
 export type PersistAdmission = (team: Team) => Promise<void>
 
