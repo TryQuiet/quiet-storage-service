@@ -23,6 +23,7 @@ import {
   redactKeys,
   Keyset,
   ServerWithSecrets,
+  Team,
 } from '@localfirst/auth'
 import { ServerKeyManagerService } from '../encryption/server-key-manager.service.js'
 import { StoredKeyRingType } from '../encryption/types.js'
@@ -330,11 +331,9 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       managedCommunity.sigChain,
       {
         ...config,
-        persistAdmission:
-          config.persistAdmission ??
-          (async (): Promise<void> => {
-            await this.persistCommunity(teamId)
-          }),
+        persistAdmission: async (team: Team): Promise<void> => {
+          await this.persistCommunity(team.id)
+        },
       },
     )
     authConnections.set(userId, authConnection)

@@ -1,18 +1,33 @@
 import type { Socket } from 'socket.io'
+import type { Team } from '@localfirst/auth'
 import type { CommunitiesManagerService } from '../communities-manager.service.js'
+
+/**
+ * Durably persist a team's current sigchain and team keyring.
+ *
+ * localfirst/auth calls this on the admitting side after it has appended an ADMIT_* link to the
+ * in-memory team and before it queues the acceptance that hands the invitee the graph and the team
+ * keyring. It must resolve only once both are on disk, and reject if either write fails, so that a
+ * QSS crash can never leave an invitee holding keys for an admission the server has forgotten
+ * (QSS-006 / private#203, threat-model C3 "Option A").
+ */
+export type PersistAdmission = (team: Team) => Promise<void>
 
 export interface AuthConnectionConfig {
   socket: Socket
   communitiesManager: CommunitiesManagerService
-  /**
-   * Durably persist this team's current sigchain and team keyring.
-   *
-   * localfirst/auth calls this after it has appended an ADMIT_* link in memory and before it
-   * queues the acceptance that hands the invitee the graph and the team keyring. It must resolve
-   * only once both are on disk, and reject if either write fails, so that a QSS crash can never
-   * leave an invitee holding keys for an admission the server has forgotten.
-   */
-  persistAdmission?: () => Promise<void>
+}
+
+/**
+ * What an {@link AuthConnection} actually needs.
+ *
+ * The durable-admission gate is required here, not optional. The library treats a missing hook as
+ * "nothing to wait for" and releases the acceptance immediately, so leaving it off would silently
+ * reopen the finding. `CommunitiesManagerService` is the only place connections are built, and it
+ * always supplies one.
+ */
+export type AuthConnectionParams = AuthConnectionConfig & {
+  persistAdmission: PersistAdmission
 }
 
 export enum AuthStatus {
