@@ -24,6 +24,7 @@ import {
   createUser,
   deriveUserId,
   type DeviceWithSecrets,
+  type Hash,
   type InviteeMemberContext,
   type Keyring,
   type UserWithSecrets,
@@ -42,8 +43,10 @@ import { UtilsModule } from '../../utils/utils.module.js'
 import { TeamTestUtils } from '../../../../test/utils/team.utils.js'
 import { waitFor } from '../../../../test/utils/waitFor.js'
 import type { TestTeam } from '../../../../test/utils/types.js'
-import type { CommunityUpdate } from '../types.js'
+import type { CommunityUpdate, ManagedCommunity } from '../types.js'
 import type { AuthConnection } from './auth.connection.js'
+import { SigChain } from './sigchain.js'
+import { SigchainEvents } from './types.js'
 import type { QuietSocket } from '../../websocket/ws.types.js'
 import { WebsocketEvents } from '../../websocket/ws.types.js'
 import type { AuthSyncMessage } from '../../websocket/handlers/types/auth-sync.types.js'
@@ -53,6 +56,15 @@ import type { AuthSyncMessage } from '../../websocket/handlers/types/auth-sync.t
  * exports its error constants as types only from the package root, and the wire carries the string.
  */
 const ADMISSION_NOT_PERSISTED = 'ADMISSION_NOT_PERSISTED'
+
+/**
+ * The graph head a sigchain currently sits at. The pinned auth package's generated declarations
+ * lose the concrete type of `graph`.
+ */
+const headOf = (sigChain: SigChain): string => {
+  const graph = sigChain.team.graph as { head: Hash[] }
+  return graph.head.join(',')
+}
 
 interface Gate {
   promise: Promise<undefined>
@@ -125,6 +137,28 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
   })
 
   /**
+   * Rebuild a community's sigchain from the bytes in storage alone, the way a restarted process
+   * would. Touches nothing the manager holds in memory.
+   */
+  const buildSigChainFromStorage = async (
+    teamId: string,
+    testTeam: TestTeam,
+  ): Promise<SigChain> => {
+    const community = await storage.getCommunity(teamId)
+    expect(community).toBeDefined()
+    const keyringBytes = await serverKeyManager.retrieveKeyring(
+      teamId,
+      StoredKeyRingType.TEAM_KEYRING,
+    )
+    expect(keyringBytes).toBeDefined()
+    return SigChain.create(
+      uint8arrays.fromString(community!.sigChain, 'hex'),
+      { server: testTeam.serverWithSecrets! },
+      JSON.parse(uint8arrays.toString(keyringBytes!, 'utf8')) as Keyring,
+    )
+  }
+
+  /**
    * What the harness reports back about a run: the ordered log of interesting moments, the
    * connections, and the errors each side saw.
    */
@@ -135,6 +169,10 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
     joined: () => boolean
     localErrors: string[]
     remoteErrors: string[]
+    /** Rebuild the community from the stored graph and stored keyring, as a restarted QSS would. */
+    coldLoadFromStorage: () => Promise<SigChain>
+    /** The sigchain the connection was built over, and appends its ADMIT_* link to. */
+    admittingSigChain: SigChain
   }
 
   /**
@@ -150,6 +188,12 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
     overrideUpdateCommunity?: (
       events: string[],
     ) => (teamId: string, payload: CommunityUpdate) => Promise<boolean>,
+    onChainUpdated?: (context: {
+      admittingSigChain: SigChain
+      /** An independent sigchain for the same community, built from the pre-admission bytes. */
+      rivalSigChain: SigChain
+      replaceCachedSigChain: (replacement: SigChain) => void
+    }) => void,
   ): Promise<Harness> => {
     const testTeam: TestTeam = await teamTestUtils.createTestTeam()
     const { id: teamId } = testTeam.team
@@ -234,6 +278,28 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
     qssConnection = openedCommunity!.authConnections!.get(invitee.user.userId)
     expect(qssConnection).toBeDefined()
 
+    const replaceCachedSigChain = (replacement: SigChain): void => {
+      const cache = (
+        manager as unknown as { communities: Map<string, ManagedCommunity> }
+      ).communities
+      cache.set(teamId, { ...cache.get(teamId)!, sigChain: replacement })
+    }
+
+    if (onChainUpdated != null) {
+      // Built now, from the pre-admission bytes, so it genuinely lacks the ADMIT_* link.
+      const rivalSigChain = await buildSigChainFromStorage(teamId, testTeam)
+      const { sigChain: admittingSigChain } = openedCommunity!
+      // Team.dispatch emits `updated` synchronously from admitMember, before the state machine
+      // reaches the persistence gate, so this runs in exactly the window the race needs.
+      admittingSigChain.once(SigchainEvents.UPDATED, () => {
+        onChainUpdated({
+          admittingSigChain,
+          rivalSigChain,
+          replaceCachedSigChain,
+        })
+      })
+    }
+
     qssConnection!.lfaConnection.on('localError', error => {
       localErrors.push(error.type)
     })
@@ -268,6 +334,9 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
       joined: () => joined,
       localErrors,
       remoteErrors,
+      admittingSigChain: openedCommunity!.sigChain,
+      coldLoadFromStorage: async (): Promise<SigChain> =>
+        await buildSigChainFromStorage(teamId, testTeam),
     }
   }
 
@@ -323,11 +392,44 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
       { timeout: 20_000 },
     )
 
-    // Read the community back out of PostgreSQL and confirm the admission survived the round trip:
-    // this is the state a restarted QSS would come up with.
-    const reloaded = await manager.get(harness.teamId, true)
-    expect(reloaded).toBeDefined()
-    expect(reloaded!.sigChain.team.members().length).toBe(2)
+    // Rebuild from the stored bytes alone, touching nothing this process holds in memory: this is
+    // the state a restarted QSS would come up with. Reading it back through the manager's cache
+    // would pass even if the admission had never reached PostgreSQL.
+    const coldLoaded = await harness.coldLoadFromStorage()
+    expect(coldLoaded.team.members().length).toBe(2)
+  }, 30_000)
+
+  it('fails closed when the cached sigchain is replaced mid-admission (M-2)', async () => {
+    // The race: a concurrent or forced load builds a second sigchain for the same community and
+    // installs it between ADMIT_* and the persistence gate. A gate that re-fetched the community by
+    // id would persist that replacement, which does not contain the admission, and the connection
+    // would release the graph and keyring anyway.
+    const harness = await startAdmission(
+      undefined,
+      ({ rivalSigChain, replaceCachedSigChain }) => {
+        replaceCachedSigChain(rivalSigChain)
+      },
+    )
+
+    await waitFor(
+      () => {
+        expect(harness.localErrors.length).toBeGreaterThan(0)
+      },
+      { timeout: 20_000 },
+    )
+
+    expect(harness.localErrors).toContain(ADMISSION_NOT_PERSISTED)
+    expect(harness.acceptanceCount()).toBe(0)
+    expect(harness.joined()).toBe(false)
+
+    // The invariant, stated independently of how the gate fails: an acceptance may only go out if
+    // the graph durably stored is the one the connection admitted into.
+    const durable = await harness.coldLoadFromStorage()
+    const admittingHead = headOf(harness.admittingSigChain)
+    const durableHead = headOf(durable)
+    expect(
+      harness.acceptanceCount() === 0 || durableHead === admittingHead,
+    ).toBe(true)
   }, 30_000)
 
   it('fails closed with ADMISSION_NOT_PERSISTED when the write fails', async () => {

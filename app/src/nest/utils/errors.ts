@@ -49,3 +49,20 @@ export class CommunityNotFoundError extends Error {
     super(`No community found for this community ID: ${communityId}`)
   }
 }
+
+/**
+ * Raised when the durable-admission gate is asked to persist a team that is no longer the one the
+ * manager holds for that community.
+ *
+ * An LFA connection appends ADMIT_* to the specific `Team` instance it was constructed over. If the
+ * cached sigchain for that community has since been replaced, persisting "the community" by id
+ * would commit a graph that does not contain the admission, and the connection would then release
+ * the acceptance anyway. Failing here keeps the gate closed (QSS-006 / private#203).
+ */
+export class AdmittingSigChainReplacedError extends Error {
+  constructor(public readonly communityId: string) {
+    super(
+      `The in-memory sigchain for community ${communityId} was replaced while an admission was in flight, so the admitting graph was not persisted`,
+    )
+  }
+}

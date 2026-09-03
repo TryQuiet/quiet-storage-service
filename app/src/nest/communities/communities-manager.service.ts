@@ -29,6 +29,7 @@ import { ServerKeyManagerService } from '../encryption/server-key-manager.servic
 import { StoredKeyRingType } from '../encryption/types.js'
 import * as uint8arrays from 'uint8arrays'
 import {
+  AdmittingSigChainReplacedError,
   CommunityNotFoundError,
   CompoundError,
   NoPopulatedCommunitiesError,
@@ -83,6 +84,19 @@ export class CommunitiesManagerService implements OnModuleDestroy {
    */
   private readonly persistedTeamKeyringFingerprints = new Map<string, string>()
 
+  /**
+   * In-flight community load per team.
+   *
+   * Two concurrent cache misses used to build two `SigChain` instances for the same community and
+   * race to install them. A connection holds the instance it was constructed over, so the loser's
+   * graph could be persisted in place of the one that actually admitted an invitee. Loads are
+   * single-flight per team: everyone waits on the same load and gets the same instance.
+   */
+  private readonly communityLoads = new Map<
+    string,
+    Promise<ManagedCommunity | undefined>
+  >()
+
   private readonly logger = createLogger(CommunitiesManagerService.name)
 
   /* eslint-disable-next-line @typescript-eslint/max-params --  we can't do much about this */
@@ -114,6 +128,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     this.communities.clear()
     this.persistQueues.clear()
     this.persistedTeamKeyringFingerprints.clear()
+    this.communityLoads.clear()
   }
 
   /**
@@ -131,6 +146,32 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       return this.communities.get(teamId)
     }
 
+    // Join a load that is already running for this team rather than starting a second one; two
+    // loads would build two sigchains for the same community and one would replace the other.
+    const inFlight = this.communityLoads.get(teamId)
+    if (inFlight != null) {
+      this.logger.verbose('Joining an in-flight community load', teamId)
+      return await inFlight
+    }
+
+    const load = this.loadCommunityFromStorage(teamId)
+    this.communityLoads.set(teamId, load)
+    try {
+      return await load
+    } finally {
+      this.communityLoads.delete(teamId)
+    }
+  }
+
+  /**
+   * Read a community out of storage and turn it into a managed community
+   *
+   * @param teamId Team ID of the community we are loading
+   * @returns Managed community, if one is stored
+   */
+  private async loadCommunityFromStorage(
+    teamId: string,
+  ): Promise<ManagedCommunity | undefined> {
     const community = await this.storage.getCommunity(teamId)
     if (community == null) {
       this.logger.warn('Community not found in local cache or storage', teamId)
@@ -276,7 +317,36 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       throw new CommunityNotFoundError(teamId)
     }
 
-    await this.persistSigChain(teamId, managedCommunity.sigChain)
+    await this.persistTeamState(teamId, managedCommunity.sigChain.team)
+  }
+
+  /**
+   * Durably persist the exact team an LFA connection has just admitted someone into.
+   *
+   * This is the durable-admission gate. localfirst/auth hands us the `Team` object it appended the
+   * ADMIT_* link to, and that object — not "whatever this community currently maps to" — is what
+   * has to reach storage before the acceptance is released. Looking the community up by id instead
+   * would let a cache replacement commit a different graph, one without the admission, and the
+   * connection would then release the graph and keyring anyway.
+   *
+   * Fails closed if the manager no longer holds this instance for the community, which the caller
+   * turns into ADMISSION_NOT_PERSISTED with nothing sent to the invitee.
+   *
+   * @param team Team the connection admitted into
+   * @throws CommunityNotFoundError if the community isn't loaded, AdmittingSigChainReplacedError if
+   *   it is no longer the instance we hold, or the underlying error if either write fails
+   */
+  public async persistAdmittedTeam(team: Team): Promise<void> {
+    const teamId = team.id
+    const managedCommunity = this.communities.get(teamId)
+    if (managedCommunity == null) {
+      throw new CommunityNotFoundError(teamId)
+    }
+    if (managedCommunity.sigChain.team !== team) {
+      throw new AdmittingSigChainReplacedError(teamId)
+    }
+
+    await this.persistTeamState(teamId, team)
   }
 
   /**
@@ -332,7 +402,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       {
         ...config,
         persistAdmission: async (team: Team): Promise<void> => {
-          await this.persistCommunity(team.id)
+          await this.persistAdmittedTeam(team)
         },
       },
     )
@@ -467,6 +537,19 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     teamId: string,
     community: Community,
   ): Promise<ManagedCommunity | undefined> {
+    // Never swap the sigchain out from under work that is already using it. An auth connection
+    // appends ADMIT_* to the specific instance it was built over, and a queued write serializes a
+    // specific instance; replacing either would let QSS commit a graph that is missing an admission
+    // whose acceptance is about to go out (QSS-006 / private#203).
+    const liveManagedCommunity = this.communities.get(teamId)
+    if (liveManagedCommunity != null && this.communityIsLive(teamId)) {
+      this.logger.warn(
+        'Community has live auth connections or pending writes, keeping the in-memory sigchain instead of reloading it',
+        teamId,
+      )
+      return liveManagedCommunity
+    }
+
     // server's self-certifying identity created when joining this LFA sigchain
     let server: ServerWithSecrets | undefined = undefined
     // team key ring owned by this LFA sigchain
@@ -518,22 +601,35 @@ export class CommunitiesManagerService implements OnModuleDestroy {
   }
 
   /**
-   * Persist a specific sigchain for a team, keyring first and graph second, on the team's queue.
+   * Persist a specific team, keyring first and graph second, on that team's queue.
    *
-   * Takes the sigchain explicitly rather than looking it up so that chain-update listeners keep
-   * working for a community that has already been swept out of the in-memory cache.
+   * Takes the team object explicitly rather than looking the community up by id, so that what
+   * reaches storage is always the graph the caller is holding — the one an admission was appended
+   * to, or the one a chain-update listener is attached to — even if the cache has moved on.
    *
    * @param teamId Team ID of the community we are persisting
-   * @param sigChain Sigchain to persist
+   * @param team Team whose state we are persisting
    */
-  private async persistSigChain(
-    teamId: string,
-    sigChain: SigChain,
-  ): Promise<void> {
+  private async persistTeamState(teamId: string, team: Team): Promise<void> {
     await this.enqueuePersist(teamId, async () => {
-      await this.persistTeamKeyringIfChanged(teamId, sigChain)
-      await this.update(teamId, { sigChain: sigChain.serialize(true) })
+      await this.persistTeamKeyringIfChanged(teamId, team)
+      await this.update(teamId, {
+        sigChain: uint8arrays.toString(team.save(), 'hex'),
+      })
     })
+  }
+
+  /**
+   * Is anything currently depending on this community's in-memory sigchain instance?
+   *
+   * @param teamId Team ID to check
+   * @returns True if an auth connection holds it or a queued write still refers to it
+   */
+  private communityIsLive(teamId: string): boolean {
+    const managedCommunity = this.communities.get(teamId)
+    const openConnections = managedCommunity?.authConnections?.size ?? 0
+    const pendingWrites = this.persistQueues.get(teamId)?.pending ?? 0
+    return openConnections > 0 || pendingWrites > 0
   }
 
   /**
@@ -574,14 +670,14 @@ export class CommunitiesManagerService implements OnModuleDestroy {
    * stored for this team
    *
    * @param teamId Team ID of the community we are persisting
-   * @param sigChain Sigchain holding the keyring
+   * @param team Team holding the keyring
    */
   private async persistTeamKeyringIfChanged(
     teamId: string,
-    sigChain: SigChain,
+    team: Team,
   ): Promise<void> {
     // the pinned auth package's generated declarations lose the concrete keyring type
-    const teamKeyring = sigChain.team.teamKeyring() as Keyring
+    const teamKeyring = team.teamKeyring() as Keyring
     const fingerprint =
       CommunitiesManagerService.fingerprintTeamKeyring(teamKeyring)
     if (fingerprint === this.persistedTeamKeyringFingerprints.get(teamId)) {
@@ -698,7 +794,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     (sigChain: SigChain): (() => Promise<void>) =>
     async (): Promise<void> => {
       try {
-        await this.persistSigChain(sigChain.team.id, sigChain)
+        await this.persistTeamState(sigChain.team.id, sigChain.team)
       } catch (e) {
         this.logger.error(
           `Failed to persist chain update for team ${sigChain.team.id}`,

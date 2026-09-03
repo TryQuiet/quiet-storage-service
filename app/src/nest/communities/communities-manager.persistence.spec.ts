@@ -31,7 +31,7 @@ import { RedisClient } from '../storage/redis/redis.client.js'
 import { UtilsModule } from '../utils/utils.module.js'
 import { TeamTestUtils } from '../../../test/utils/team.utils.js'
 import type { TestTeam } from '../../../test/utils/types.js'
-import type { Community } from './types.js'
+import type { Community, ManagedCommunity } from './types.js'
 import type { QuietSocket } from '../websocket/ws.types.js'
 
 interface Gate {
@@ -301,6 +301,96 @@ describe('CommunitiesManagerService durable persistence', () => {
     })
   })
 
+  describe('sigchain instance identity (M-2)', () => {
+    it('rejects a persist bound to a team the manager no longer holds', async () => {
+      const { testTeam, teamId } = await createCommunity()
+      const admittingTeam = (await manager.get(teamId))!.sigChain.team
+
+      // stand in for a concurrent load winning the cache
+      const rival = SigChain.create(
+        await readStoredGraph(teamId),
+        { server: testTeam.serverWithSecrets! },
+        await readStoredKeyring(teamId),
+      )
+      const cache = (
+        manager as unknown as { communities: Map<string, ManagedCommunity> }
+      ).communities
+      cache.set(teamId, { ...cache.get(teamId)!, sigChain: rival })
+
+      await expect(manager.persistAdmittedTeam(admittingTeam)).rejects.toThrow(
+        'was replaced while an admission was in flight',
+      )
+    })
+
+    it('accepts a persist bound to the team it does hold', async () => {
+      const { teamId } = await createCommunity()
+      const { team } = (await manager.get(teamId))!.sigChain
+      await expect(manager.persistAdmittedTeam(team)).resolves.toBeUndefined()
+    })
+
+    it('serves concurrent cache misses from a single load', async () => {
+      const { teamId } = await createCommunity()
+
+      // drop the community from memory so the next reads have to go to storage
+      const cache = (
+        manager as unknown as { communities: Map<string, ManagedCommunity> }
+      ).communities
+      cache.delete(teamId)
+
+      const getCommunitySpy = jest.spyOn(storage, 'getCommunity')
+      const [first, second, third] = await Promise.all([
+        manager.get(teamId),
+        manager.get(teamId),
+        manager.get(teamId),
+      ])
+
+      // one read, one sigchain, and every caller holding the same instance
+      expect(getCommunitySpy).toHaveBeenCalledTimes(1)
+      expect(first).toBeDefined()
+      expect(second!.sigChain).toBe(first!.sigChain)
+      expect(third!.sigChain).toBe(first!.sigChain)
+    })
+
+    it('will not replace a sigchain that an auth connection is holding', async () => {
+      const { teamId } = await createCommunity()
+      const before = (await manager.get(teamId))!.sigChain
+      expect(
+        (await manager.get(teamId))!.authConnections!.size,
+      ).toBeGreaterThan(0)
+
+      const reloaded = await manager.get(teamId, true)
+
+      expect(reloaded!.sigChain).toBe(before)
+    })
+
+    it('will not replace a sigchain while a write is still in flight', async () => {
+      const { teamId } = await createCommunity()
+      const before = (await manager.get(teamId))!.sigChain
+
+      // close the auth connection so only the pending write can hold the instance
+      const managedCommunity = (await manager.get(teamId))!
+      for (const connection of managedCommunity.authConnections!.values()) {
+        connection.stop()
+      }
+      expect(managedCommunity.authConnections!.size).toBe(0)
+
+      const gate = createGate()
+      jest
+        .spyOn(storage, 'updateCommunity')
+        .mockImplementation(async (): Promise<boolean> => {
+          await gate.promise
+          return true
+        })
+
+      const persisting = manager.persistCommunity(teamId)
+      const reloaded = await manager.get(teamId, true)
+      expect(reloaded!.sigChain).toBe(before)
+
+      gate.open()
+      await persisting
+    })
+  })
+
   describe('chain update listener', () => {
     it('persists the graph when the chain changes', async () => {
       const { testTeam, teamId } = await createCommunity()
@@ -365,18 +455,27 @@ describe('CommunitiesManagerService durable persistence', () => {
       expect(() => SigChain.create(graph, context, keyringNow)).not.toThrow()
     })
 
-    it('reloads the community from storage after a rotation', async () => {
+    it('leaves a durable pair a restarted process can load', async () => {
       const { testTeam, teamId } = await createCommunity()
 
       await rotateAndSyncToServer(testTeam)
       await manager.persistCommunity(teamId)
 
-      // forceFetchFromStorage rebuilds the sigchain from the stored graph and the stored keyring,
-      // which is what a restarted QSS process does.
-      const reloaded = await manager.get(teamId, true)
-      expect(reloaded).toBeDefined()
-      expect(reloaded!.sigChain.serialize()).toEqual(
-        await readStoredGraph(teamId),
+      // Rebuild from the stored bytes alone, touching nothing this process holds in memory. This is
+      // what a restarted QSS comes up with, and asserting it through the manager's cache instead
+      // would pass even if nothing had been written.
+      const graph = await readStoredGraph(teamId)
+      const keyring = await readStoredKeyring(teamId)
+      const coldLoaded = SigChain.create(
+        graph,
+        { server: testTeam.serverWithSecrets! },
+        keyring,
+      )
+      expect(coldLoaded.serialize(true)).toEqual(
+        uint8arrays.toString(graph, 'hex'),
+      )
+      expect(coldLoaded.team.members().length).toBe(
+        (await manager.get(teamId))!.sigChain.team.members().length,
       )
     })
   })
