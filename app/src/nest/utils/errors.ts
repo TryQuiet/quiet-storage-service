@@ -78,6 +78,21 @@ export class PersistenceBacklogError extends Error {
   }
 }
 
+/**
+ * Raised when a queued durable write is discarded because its community was rolled back.
+ *
+ * A failed admission persist leaves an ADMIT link in memory that never reached disk. Every write
+ * still queued for that team would serialize that same tainted graph, so the queue is abandoned
+ * and its callers are told the write did not happen rather than being allowed to assume it did.
+ */
+export class PersistenceRolledBackError extends Error {
+  constructor(public readonly communityId: string) {
+    super(
+      `Community ${communityId} was rolled back to its last durable state, so this write was discarded`,
+    )
+  }
+}
+
 export class AdmittingSigChainReplacedError extends Error {
   constructor(public readonly communityId: string) {
     super(

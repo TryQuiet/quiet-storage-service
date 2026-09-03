@@ -16,7 +16,7 @@
 import { jest } from '@jest/globals'
 import { Test, type TestingModule } from '@nestjs/testing'
 import * as uint8arrays from 'uint8arrays'
-import type { Keyring } from '@localfirst/auth'
+import type { Keyring, Team } from '@localfirst/auth'
 
 import { CommunitiesManagerService } from './communities-manager.service.js'
 import { CommunitiesModule } from './communities.module.js'
@@ -678,9 +678,124 @@ describe('CommunitiesManagerService durable persistence', () => {
         'durable writes pending',
       )
 
+      // Refusing an admission also rolls the community back: the ADMIT link is in memory and did
+      // not reach disk, so the work queued behind it is abandoned rather than committed.
+      expect(queueOf(teamId)).toBeUndefined()
+
       gate.open()
-      await Promise.all(backlog)
-      expect(writes.count()).toBe(8)
+      const settled = await Promise.allSettled(backlog)
+      const discarded = settled.filter(result => result.status === 'rejected')
+      // the one already running finishes; the seven still queued are discarded
+      expect(discarded.length).toBe(7)
+      expect(writes.count()).toBe(1)
+    })
+  })
+
+  describe('rollback to durable state on a failed admission (M-1 fallout)', () => {
+    const cacheOf = (): Map<string, ManagedCommunity> =>
+      (manager as unknown as { communities: Map<string, ManagedCommunity> })
+        .communities
+
+    const queueOf = (teamId: string): unknown =>
+      (
+        manager as unknown as { persistQueues: Map<string, unknown> }
+      ).persistQueues.get(teamId)
+
+    /** Drive a failing admission persist against the community's current team. */
+    const failAnAdmission = async (
+      teamId: string,
+    ): Promise<{ taintedTeam: Team }> => {
+      const managedCommunity = (await manager.get(teamId))!
+      const taintedTeam = managedCommunity.sigChain.team
+      jest.spyOn(storage, 'updateCommunity').mockResolvedValue(false)
+      await expect(manager.persistAdmittedTeam(taintedTeam)).rejects.toThrow(
+        'Error while updating community',
+      )
+      return { taintedTeam }
+    }
+
+    it('evicts the community and abandons its queue', async () => {
+      const { teamId } = await createCommunity()
+
+      await failAnAdmission(teamId)
+
+      expect(cacheOf().has(teamId)).toBe(false)
+      expect(queueOf(teamId)).toBeUndefined()
+    })
+
+    it('does not let a later chain update commit the un-persisted admission', async () => {
+      const { testTeam, teamId } = await createCommunity()
+      const graphBefore = await readStoredGraph(teamId)
+      const { taintedTeam } = await failAnAdmission(teamId)
+
+      // Let the real write path work again, then move the tainted instance the way a sync would.
+      jest.restoreAllMocks()
+      const writeSpy = jest.spyOn(storage, 'updateCommunity')
+      await teamTestUtils.addUserToTeam(testTeam, 'later-update')
+      taintedTeam.merge(testTeam.team.graph)
+      await new Promise(resolve => {
+        setImmediate(resolve)
+      })
+
+      // The tainted instance is unhooked from the listener, so nothing it does reaches storage.
+      expect(writeSpy).not.toHaveBeenCalled()
+      expect(await readStoredGraph(teamId)).toEqual(graphBefore)
+    })
+
+    it('drops every auth connection and reloads an instance matching PostgreSQL', async () => {
+      const { testTeam, teamId } = await createCommunity()
+      const managedCommunity = (await manager.get(teamId))!
+      const connections = [...managedCommunity.authConnections!.values()]
+      expect(connections.length).toBeGreaterThan(0)
+      const stopSpies = connections.map(connection =>
+        jest.spyOn(connection, 'stop'),
+      )
+
+      const { taintedTeam } = await failAnAdmission(teamId)
+      // connections are stopped on the next tick, after the library has reported the failure
+      await new Promise(resolve => {
+        setImmediate(resolve)
+      })
+      for (const stopSpy of stopSpies) {
+        expect(stopSpy).toHaveBeenCalled()
+      }
+
+      jest.restoreAllMocks()
+      const reloaded = await manager.get(teamId)
+      expect(reloaded).toBeDefined()
+      expect(reloaded!.sigChain.team).not.toBe(taintedTeam)
+      expect(reloaded!.sigChain.serialize(true)).toEqual(
+        uint8arrays.toString(await readStoredGraph(teamId), 'hex'),
+      )
+      expect(reloaded!.sigChain.team.members().length).toBe(
+        // the un-persisted admission is gone; durable state is the truth again
+        SigChain.create(
+          await readStoredGraph(teamId),
+          { server: testTeam.serverWithSecrets! },
+          await readStoredKeyring(teamId),
+        ).team.members().length,
+      )
+    })
+
+    it('reloads once, through the single-flight path, and keeps no stale instance', async () => {
+      const { teamId } = await createCommunity()
+      const { taintedTeam } = await failAnAdmission(teamId)
+      jest.restoreAllMocks()
+
+      const getCommunitySpy = jest.spyOn(storage, 'getCommunity')
+      const [first, second, third] = await Promise.all([
+        manager.get(teamId),
+        manager.get(teamId),
+        manager.get(teamId),
+      ])
+
+      // eviction plus single-flight means exactly one reload, shared by every caller
+      expect(getCommunitySpy).toHaveBeenCalledTimes(1)
+      expect(second!.sigChain).toBe(first!.sigChain)
+      expect(third!.sigChain).toBe(first!.sigChain)
+      expect(first!.sigChain.team).not.toBe(taintedTeam)
+      // and the M-2 guard does not block the reload, because the rollback drained the references
+      expect(cacheOf().get(teamId)!.sigChain).toBe(first!.sigChain)
     })
   })
 

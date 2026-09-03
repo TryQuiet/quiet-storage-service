@@ -37,6 +37,7 @@ import {
   CompoundError,
   NoPopulatedCommunitiesError,
   PersistenceBacklogError,
+  PersistenceRolledBackError,
 } from '../utils/errors.js'
 import { HOSTNAME, SERIALIZER } from '../app/const.js'
 import { SigChain } from './auth/sigchain.js'
@@ -82,6 +83,11 @@ interface PersistQueue {
   admissionsInFlight: Map<string, Promise<void>>
   /** The single slot ordinary chain updates coalesce into */
   coalescedUpdate?: { team: Team; promise: Promise<void> }
+  /**
+   * Bumped when the community is rolled back. A task queued under an earlier generation holds a
+   * graph that never reached disk, so it must not be allowed to commit it.
+   */
+  generation: number
 }
 
 @Injectable()
@@ -371,6 +377,25 @@ export class CommunitiesManagerService implements OnModuleDestroy {
    */
   public async persistAdmittedTeam(team: Team): Promise<void> {
     const teamId = team.id
+    try {
+      await this.writeAdmittedTeam(team)
+    } catch (e) {
+      // The ADMIT link is in memory and did not reach disk. Nothing may be built on it: the invitee
+      // will redial and must be admitted afresh, against a graph loaded from storage, with the new
+      // handshake's proof. Leaving the link in memory would serve a retry the stale admission from
+      // the idempotent path, and the invitee would reject that proof forever.
+      this.rollbackToDurableState(teamId)
+      throw e
+    }
+  }
+
+  /**
+   * Write the admitting team, with the checks that keep the gate honest but no rollback handling
+   *
+   * @param team Team the connection admitted into
+   */
+  private async writeAdmittedTeam(team: Team): Promise<void> {
+    const teamId = team.id
     const managedCommunity = this.communities.get(teamId)
     if (managedCommunity == null) {
       throw new CommunityNotFoundError(teamId)
@@ -415,6 +440,73 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     } finally {
       queue.admissionsInFlight.delete(head)
     }
+  }
+
+  /**
+   * Discard everything this process holds for a community and fall back to what is on disk.
+   *
+   * Called when an admission could not be persisted. The in-memory team carries an ADMIT link that
+   * never reached storage, and durable state has to become the truth again: an invitee that redials
+   * must be admitted afresh, with the new handshake's proof, against a graph loaded from PostgreSQL
+   * and the secrets manager. If the tainted instance survived, a retry would find that admission
+   * already present, take the idempotent path, and be served a link carrying the first handshake's
+   * proof — which the invitee rejects, permanently.
+   *
+   * Order matters. The listener is detached and the queue abandoned before anything else, so from
+   * this point nothing can commit the tainted graph. Eviction then makes the next access reload
+   * from storage through the single-flight path. Connections are stopped last, on the next tick, so
+   * the library can still deliver ADMISSION_NOT_PERSISTED to the invitee before its transport goes
+   * away; they cannot cause a write in the meantime, because the gate now finds no community.
+   *
+   * @param teamId Team ID of the community to roll back
+   */
+  private rollbackToDurableState(teamId: string): void {
+    const managedCommunity = this.communities.get(teamId)
+    const queue = this.persistQueues.get(teamId)
+
+    // Abandon queued work first: every task holds the tainted graph.
+    if (queue != null) {
+      queue.generation += 1
+      queue.coalescedUpdate = undefined
+      queue.admissionsInFlight.clear()
+      queue.durableHeads.clear()
+      this.persistQueues.delete(teamId)
+    }
+
+    if (managedCommunity == null) {
+      return
+    }
+
+    this.logger.warn(
+      `Rolling community ${teamId} back to its last durable state after a failed admission write`,
+    )
+
+    // Unhook the tainted sigchain so no later chain update can schedule a write of it.
+    this.clearSigchainListeners(
+      managedCommunity.sigChain,
+      managedCommunity.chainEventHandler,
+    )
+
+    // Evict, so the next access reloads graph and keyring from durable storage.
+    this.communities.delete(teamId)
+    this.persistedTeamKeyringDigests.delete(teamId)
+
+    // Every connection was built over the tainted instance, so none of them may continue. The
+    // invitee redials and is admitted afresh; existing members reconnect and re-sync.
+    const connections = [...(managedCommunity.authConnections?.values() ?? [])]
+    managedCommunity.authConnections?.clear()
+    setImmediate(() => {
+      for (const connection of connections) {
+        try {
+          connection.stop()
+        } catch (e) {
+          this.logger.error(
+            `Error while stopping an auth connection during rollback of ${teamId}`,
+            e,
+          )
+        }
+      }
+    })
   }
 
   /**
@@ -867,6 +959,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       durableHeads: new Set<string>(),
       admissionsInFlight: new Map<string, Promise<void>>(),
       coalescedUpdate: undefined,
+      generation: 0,
     }
     this.persistQueues.set(teamId, queue)
     return queue
@@ -921,9 +1014,22 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       )
     }
 
+    // A rollback abandons everything queued for this team: those tasks hold a graph that never
+    // reached disk, and running one would commit the very link the rollback is discarding.
+    const generation = queue.generation
+    const guarded = async (): Promise<void> => {
+      if (queue.generation !== generation) {
+        this.logger.warn(
+          `Discarding a durable write for team ${teamId} queued before a rollback`,
+        )
+        throw new PersistenceRolledBackError(teamId)
+      }
+      await task()
+    }
+
     // Wait for the previous write to settle either way — a failed persist orders later writes but
     // must never wedge the queue.
-    const current = queue.tail.then(task, task)
+    const current = queue.tail.then(guarded, guarded)
     // The stored tail must not be a rejected promise nobody handles; the caller gets `current`.
     queue.tail = current.then(
       () => {

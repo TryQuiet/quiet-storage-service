@@ -159,6 +159,22 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
   }
 
   /**
+   * Perform the real PostgreSQL write for a team's current in-memory graph.
+   *
+   * Used by a test that fails the first write and lets the second succeed, without needing to
+   * unwind the spy mid-run.
+   */
+  const realUpdateCommunity = async (teamId: string): Promise<boolean> => {
+    const managedCommunity = await manager.get(teamId)
+    expect(managedCommunity).toBeDefined()
+    return await storage
+      .updateAndFindCommunity(teamId, {
+        sigChain: managedCommunity!.sigChain.serialize(true),
+      })
+      .then(result => result != null)
+  }
+
+  /**
    * What the harness reports back about a run: the ordered log of interesting moments, the
    * connections, and the errors each side saw.
    */
@@ -171,8 +187,12 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
     remoteErrors: string[]
     /** Rebuild the community from the stored graph and stored keyring, as a restarted QSS would. */
     coldLoadFromStorage: () => Promise<SigChain>
-    /** The sigchain the connection was built over, and appends its ADMIT_* link to. */
-    admittingSigChain: SigChain
+    /** The sigchain each dial's connection was built over, in dial order. */
+    admittingSigChains: SigChain[]
+    /** Proofs of invitation the invitee put on the wire, in handshake order. */
+    proofs: string[]
+    /** Run the handshake again over a fresh socket, as a redialing invitee would. */
+    redial: () => Promise<void>
   }
 
   /**
@@ -228,6 +248,8 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
     const remoteErrors: string[] = []
     let acceptanceCount = 0
     let joined = false
+    const admittingSigChains: SigChain[] = []
+    const proofs: string[] = []
 
     // Put the community in memory the way a cold QSS does, from stored graph + stored keyring.
     const managedCommunity = await manager.get(teamId)
@@ -242,41 +264,12 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
     }
 
     const invitee = mintInvitee('invitee')
-
-    const socket = {
-      id: 'admission-test-socket',
-      data: {},
-      on: jest.fn().mockReturnThis(),
-      join: jest.fn(async () => {
-        /* no-op */
-      }),
-      emit: (event: WebsocketEvents, message: AuthSyncMessage): boolean => {
-        if (event !== WebsocketEvents.AuthSync) {
-          return true
-        }
-        const bytes = uint8arrays.fromString(message.payload.message, 'base64')
-        // Handshake messages are msgpack, not yet encrypted, so the acceptance is visible here —
-        // which is exactly the payload that must not go out before the write lands.
-        const decoded = unpack(bytes) as { type?: string }
-        if (decoded.type === 'ACCEPT_INVITATION') {
-          acceptanceCount += 1
-          events.push('acceptance-sent')
-        }
-        // hop the event loop the way a real socket would
-        setImmediate(() => {
-          inviteeConnection?.deliver(bytes)
-        })
-        return true
-      },
-    } as unknown as QuietSocket
-
-    manager.startAuthSyncConnection(invitee.user.userId, teamId, {
-      socket,
-      communitiesManager: manager,
-    })
-    const openedCommunity = await manager.get(teamId)
-    qssConnection = openedCommunity!.authConnections!.get(invitee.user.userId)
-    expect(qssConnection).toBeDefined()
+    const inviteeContext: InviteeMemberContext = {
+      user: invitee.user,
+      device: invitee.device,
+      invitationSeed: invite.seed,
+      expectedTeamId: invite.teamId,
+    }
 
     const replaceCachedSigChain = (replacement: SigChain): void => {
       const cache = (
@@ -285,47 +278,114 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
       cache.set(teamId, { ...cache.get(teamId)!, sigChain: replacement })
     }
 
-    if (onChainUpdated != null) {
-      // Built now, from the pre-admission bytes, so it genuinely lacks the ADMIT_* link.
-      const rivalSigChain = await buildSigChainFromStorage(teamId, testTeam)
-      const { sigChain: admittingSigChain } = openedCommunity!
-      // Team.dispatch emits `updated` synchronously from admitMember, before the state machine
-      // reaches the persistence gate, so this runs in exactly the window the race needs.
-      admittingSigChain.once(SigchainEvents.UPDATED, () => {
-        onChainUpdated({
-          admittingSigChain,
-          rivalSigChain,
-          replaceCachedSigChain,
-        })
+    /**
+     * Wire one handshake attempt: a fake socket into the manager, and a real localfirst/auth
+     * invitee on the other end of it. Called again for a redial, exactly as the sign-in handler
+     * does — reload the community first, then open a connection over the new socket.
+     */
+    const dial = async (socketId: string): Promise<void> => {
+      // A mutable holder, because the socket and the invitee each need to reach the other and one
+      // of them has to be built first.
+      const peers: {
+        invitee?: LFAConnection
+        qss?: AuthConnection
+      } = {}
+
+      const socket = {
+        id: socketId,
+        data: {},
+        on: jest.fn().mockReturnThis(),
+        join: jest.fn(async () => {
+          /* no-op */
+        }),
+        emit: (event: WebsocketEvents, message: AuthSyncMessage): boolean => {
+          if (event !== WebsocketEvents.AuthSync) {
+            return true
+          }
+          const bytes = uint8arrays.fromString(
+            message.payload.message,
+            'base64',
+          )
+          // Handshake messages are msgpack, not yet encrypted, so the acceptance is visible here —
+          // which is exactly the payload that must not go out before the write lands.
+          const decoded = unpack(bytes) as { type?: string }
+          if (decoded.type === 'ACCEPT_INVITATION') {
+            acceptanceCount += 1
+            events.push('acceptance-sent')
+          }
+          // hop the event loop the way a real socket would
+          setImmediate(() => {
+            peers.invitee?.deliver(bytes)
+          })
+          return true
+        },
+      } as unknown as QuietSocket
+
+      // the sign-in handler always loads the community before opening a connection, which is what
+      // brings it back after a rollback evicted it
+      const loaded = await manager.get(teamId)
+      expect(loaded).toBeDefined()
+      manager.startAuthSyncConnection(invitee.user.userId, teamId, {
+        socket,
+        communitiesManager: manager,
       })
-    }
+      // startAuthSyncConnection installs a new managed-community object, so re-read it
+      const opened = await manager.get(teamId)
+      peers.qss = opened!.authConnections!.get(invitee.user.userId)
+      expect(peers.qss).toBeDefined()
+      qssConnection = peers.qss
+      admittingSigChains.push(opened!.sigChain)
 
-    qssConnection!.lfaConnection.on('localError', error => {
-      localErrors.push(error.type)
-    })
+      peers.qss!.lfaConnection.on('localError', error => {
+        localErrors.push(error.type)
+      })
 
-    const inviteeContext: InviteeMemberContext = {
-      user: invitee.user,
-      device: invitee.device,
-      invitationSeed: invite.seed,
-      expectedTeamId: invite.teamId,
-    }
-    inviteeConnection = new LFAConnection({
-      context: inviteeContext,
-      sendMessage: (message: Uint8Array) => {
-        setImmediate(() => {
-          qssConnection?.lfaConnection.deliver(message)
+      if (onChainUpdated != null && admittingSigChains.length === 1) {
+        // Built now, from the pre-admission bytes, so it genuinely lacks the ADMIT_* link.
+        const rivalSigChain = await buildSigChainFromStorage(teamId, testTeam)
+        const admittingSigChain = opened!.sigChain
+        // Team.dispatch emits `updated` synchronously from admitMember, before the state machine
+        // reaches the persistence gate, so this runs in exactly the window the race needs.
+        admittingSigChain.once(SigchainEvents.UPDATED, () => {
+          onChainUpdated({
+            admittingSigChain,
+            rivalSigChain,
+            replaceCachedSigChain,
+          })
         })
-      },
-    })
-    inviteeConnection.on('joined', () => {
-      joined = true
-      events.push('invitee-joined')
-    })
-    inviteeConnection.on('remoteError', error => {
-      remoteErrors.push(error.type)
-    })
-    inviteeConnection.start()
+      }
+
+      peers.invitee = new LFAConnection({
+        context: inviteeContext,
+        sendMessage: (message: Uint8Array) => {
+          const decoded = unpack(message) as {
+            type?: string
+            payload?: { proofOfInvitation?: unknown }
+          }
+          if (
+            decoded.type === 'CLAIM_IDENTITY' &&
+            decoded.payload?.proofOfInvitation != null
+          ) {
+            // a fresh handshake mints a fresh nonce, so a new proof is a different string
+            proofs.push(JSON.stringify(decoded.payload.proofOfInvitation))
+          }
+          setImmediate(() => {
+            peers.qss?.lfaConnection.deliver(message)
+          })
+        },
+      })
+      inviteeConnection = peers.invitee
+      peers.invitee.on('joined', () => {
+        joined = true
+        events.push('invitee-joined')
+      })
+      peers.invitee.on('remoteError', error => {
+        remoteErrors.push(error.type)
+      })
+      peers.invitee.start()
+    }
+
+    await dial('admission-test-socket')
 
     return {
       teamId,
@@ -334,7 +394,11 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
       joined: () => joined,
       localErrors,
       remoteErrors,
-      admittingSigChain: openedCommunity!.sigChain,
+      admittingSigChains,
+      proofs,
+      redial: async (): Promise<void> => {
+        await dial(`redial-socket-${admittingSigChains.length}`)
+      },
       coldLoadFromStorage: async (): Promise<SigChain> =>
         await buildSigChainFromStorage(teamId, testTeam),
     }
@@ -399,6 +463,61 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
     expect(coldLoaded.team.members().length).toBe(2)
   }, 30_000)
 
+  it('admits a redialing invitee afresh after a failed admission write', async () => {
+    // The invitee validates the acceptance against this handshake's own proof. If QSS kept an
+    // un-persisted ADMIT link in memory, the retry would take the idempotent path and be served a
+    // link carrying the first handshake's proof, which the invitee rejects forever. Rolling back to
+    // durable state makes the retry a genuine new admission.
+    let failWrite = true
+    const harness = await startAdmission(
+      events => async (): Promise<boolean> => {
+        events.push('write-attempted')
+        if (failWrite) {
+          return await Promise.resolve(false)
+        }
+        return await realUpdateCommunity(harness.teamId)
+      },
+    )
+
+    await waitFor(
+      () => {
+        expect(harness.localErrors).toContain(ADMISSION_NOT_PERSISTED)
+      },
+      { timeout: 20_000 },
+    )
+    expect(harness.acceptanceCount()).toBe(0)
+    expect(harness.joined()).toBe(false)
+
+    // Nothing was committed, so durable state still has only the founder.
+    const afterFailure = await harness.coldLoadFromStorage()
+    expect(afterFailure.team.members().length).toBe(1)
+
+    // let the rollback's deferred connection teardown run, then redial
+    await new Promise(resolve => {
+      setImmediate(resolve)
+    })
+    failWrite = false
+    await harness.redial()
+
+    await waitFor(
+      () => {
+        expect(harness.joined()).toBe(true)
+      },
+      { timeout: 20_000 },
+    )
+
+    // Exactly one admission for this identity is durable, and it came from the second handshake.
+    const afterRedial = await harness.coldLoadFromStorage()
+    expect(afterRedial.team.members().length).toBe(2)
+    expect(harness.proofs.length).toBe(2)
+    expect(harness.proofs[1]).not.toEqual(harness.proofs[0])
+    expect(headOf(afterRedial)).toEqual(headOf(harness.admittingSigChains[1]))
+    // the instance that held the un-persisted link is not the one that admitted
+    expect(harness.admittingSigChains[1]).not.toBe(
+      harness.admittingSigChains[0],
+    )
+  }, 30_000)
+
   it('fails closed when the cached sigchain is replaced mid-admission (M-2)', async () => {
     // The race: a concurrent or forced load builds a second sigchain for the same community and
     // installs it between ADMIT_* and the persistence gate. A gate that re-fetched the community by
@@ -425,7 +544,7 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
     // The invariant, stated independently of how the gate fails: an acceptance may only go out if
     // the graph durably stored is the one the connection admitted into.
     const durable = await harness.coldLoadFromStorage()
-    const admittingHead = headOf(harness.admittingSigChain)
+    const admittingHead = headOf(harness.admittingSigChains[0])
     const durableHead = headOf(durable)
     expect(
       harness.acceptanceCount() === 0 || durableHead === admittingHead,
