@@ -7,4 +7,9 @@ import { BasicEntityWithId } from '../../../storage/postgres/basic-id.entity.js'
 export class Community extends BasicEntityWithId {
   @Property({ type: 'bytea', columnType: 'bytea' })
   sigChain!: Buffer // this is a hex string
+
+  // Digest of the team keyring this graph was committed with; null for rows written before the
+  // digest was recorded. See Community.teamKeyringDigest.
+  @Property({ nullable: true })
+  teamKeyringDigest?: string
 }

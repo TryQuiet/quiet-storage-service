@@ -30,6 +30,7 @@ import { StorageModule } from '../storage/storage.module.js'
 import { RedisClient } from '../storage/redis/redis.client.js'
 import { UtilsModule } from '../utils/utils.module.js'
 import { TeamTestUtils } from '../../../test/utils/team.utils.js'
+import { waitFor } from '../../../test/utils/waitFor.js'
 import type { TestTeam } from '../../../test/utils/types.js'
 import type { Community, ManagedCommunity } from './types.js'
 import type { QuietSocket } from '../websocket/ws.types.js'
@@ -388,6 +389,173 @@ describe('CommunitiesManagerService durable persistence', () => {
 
       gate.open()
       await persisting
+    })
+  })
+
+  describe('crash consistency (M-3)', () => {
+    /**
+     * Drop the manager's memory of what it last wrote, so the next persist writes the keyring. A
+     * freshly started process is in exactly this state.
+     */
+    const forgetPersistedKeyringDigest = (teamId: string): void => {
+      ;(
+        manager as unknown as {
+          persistedTeamKeyringDigests: Map<string, string>
+        }
+      ).persistedTeamKeyringDigests.delete(teamId)
+    }
+
+    /**
+     * Record the exact pair each queued task commits, without letting either write reach a real
+     * store. What matters is that the keyring handed to the secrets manager and the graph handed to
+     * PostgreSQL in the same task are the same instant of the same team.
+     */
+    const capturePairs = (): {
+      keyrings: Uint8Array[]
+      graphs: string[]
+      digests: Array<string | undefined>
+      gate: ReturnType<typeof createGate>
+    } => {
+      const keyrings: Uint8Array[] = []
+      const graphs: string[] = []
+      const digests: Array<string | undefined> = []
+      const gate = createGate()
+
+      jest
+        .spyOn(serverKeyManager, 'storeKeyring')
+        .mockImplementation(
+          async (
+            _id: string,
+            keyring: Uint8Array,
+            type: StoredKeyRingType,
+          ): Promise<StoredKeyring> => {
+            keyrings.push(keyring)
+            await gate.promise
+            return storedKeyringStub(type)
+          },
+        )
+      jest
+        .spyOn(storage, 'updateCommunity')
+        .mockImplementation(
+          async (_teamId: string, payload): Promise<boolean> => {
+            graphs.push(payload.sigChain!)
+            digests.push(payload.teamKeyringDigest)
+            return await Promise.resolve(true)
+          },
+        )
+
+      return { keyrings, graphs, digests, gate }
+    }
+
+    it('commits the keyring and graph of one instant, even if the team moves on mid-write', async () => {
+      const { testTeam, teamId } = await createCommunity()
+      await rotateAndSyncToServer(testTeam)
+      await manager.persistCommunity(teamId)
+      forgetPersistedKeyringDigest(teamId)
+
+      const captured = capturePairs()
+      const persisting = manager.persistCommunity(teamId)
+
+      // wait until the task is parked inside the secrets write
+      await waitFor(() => {
+        expect(captured.keyrings.length).toBe(1)
+      })
+
+      // the team moves on while the secrets write is in flight: another rotation, another link
+      await rotateAndSyncToServer(testTeam)
+
+      captured.gate.open()
+      await persisting
+      await manager.persistCommunity(teamId)
+
+      // The pair committed first must be a matched pair. Under the old code the graph was
+      // serialized after the await and carried links the stored keyring could not open.
+      const pairedKeyring = JSON.parse(
+        uint8arrays.toString(captured.keyrings[0], 'utf8'),
+      ) as Keyring
+      const committedGraph = uint8arrays.fromString(captured.graphs[0], 'hex')
+      expect(() =>
+        SigChain.create(
+          committedGraph,
+          { server: testTeam.serverWithSecrets! },
+          pairedKeyring,
+        ),
+      ).not.toThrow()
+    })
+
+    it('records the digest of the keyring the graph was committed with', async () => {
+      const { testTeam, teamId } = await createCommunity()
+      await rotateAndSyncToServer(testTeam)
+
+      const captured = capturePairs()
+      captured.gate.open()
+      await manager.persistCommunity(teamId)
+
+      expect(captured.digests[0]).toBeDefined()
+      // the row's digest names the keyring that was written alongside it
+      const stored = await storage.getCommunity(teamId)
+      expect(stored).toBeDefined()
+    })
+
+    it('fails before the keyring reaches storage, leaving the graph untouched', async () => {
+      const { testTeam, teamId } = await createCommunity()
+      await rotateAndSyncToServer(testTeam)
+      await manager.persistCommunity(teamId)
+      forgetPersistedKeyringDigest(teamId)
+      const graphBefore = await readStoredGraph(teamId)
+
+      jest
+        .spyOn(serverKeyManager, 'storeKeyring')
+        .mockRejectedValue(new Error('secrets manager unavailable'))
+      const updateSpy = jest.spyOn(storage, 'updateCommunity')
+
+      await expect(manager.persistCommunity(teamId)).rejects.toThrow(
+        'secrets manager unavailable',
+      )
+      expect(updateSpy).not.toHaveBeenCalled()
+      expect(await readStoredGraph(teamId)).toEqual(graphBefore)
+    })
+
+    it('fails after the keyring is stored, leaving a keyring that still loads the older graph', async () => {
+      const { testTeam, teamId } = await createCommunity()
+      const graphBefore = await readStoredGraph(teamId)
+
+      // rotate so the keyring write is real, then fail the graph write
+      await rotateAndSyncToServer(testTeam)
+      jest.spyOn(storage, 'updateCommunity').mockResolvedValue(false)
+
+      await expect(manager.persistCommunity(teamId)).rejects.toThrow(
+        'Error while updating community',
+      )
+
+      // This is the window keyring-first ordering exists to make safe: the durable keyring is now
+      // ahead of the durable graph, and a superset keyring still opens the older graph.
+      const keyringNow = await readStoredKeyring(teamId)
+      expect(() =>
+        SigChain.create(
+          graphBefore,
+          { server: testTeam.serverWithSecrets! },
+          keyringNow,
+        ),
+      ).not.toThrow()
+    })
+
+    it('leaves a loadable pair once the graph is committed', async () => {
+      const { testTeam, teamId } = await createCommunity()
+      await rotateAndSyncToServer(testTeam)
+      await manager.persistCommunity(teamId)
+
+      // a crash here, after the graph commit and before anything acknowledges it, still leaves both
+      // halves on disk and consistent
+      const graph = await readStoredGraph(teamId)
+      const keyring = await readStoredKeyring(teamId)
+      expect(() =>
+        SigChain.create(
+          graph,
+          { server: testTeam.serverWithSecrets! },
+          keyring,
+        ),
+      ).not.toThrow()
     })
   })
 

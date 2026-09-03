@@ -15,6 +15,7 @@ import {
   CreatedCommunity,
   MANAGED_COMMUNITY_TTL_MS,
   ManagedCommunity,
+  TeamStateSnapshot,
 } from './types.js'
 import {
   Keyring,
@@ -24,10 +25,12 @@ import {
   Keyset,
   ServerWithSecrets,
   Team,
+  Hash,
 } from '@localfirst/auth'
 import { ServerKeyManagerService } from '../encryption/server-key-manager.service.js'
 import { StoredKeyRingType } from '../encryption/types.js'
 import * as uint8arrays from 'uint8arrays'
+import { createHash } from 'crypto'
 import {
   AdmittingSigChainReplacedError,
   CommunityNotFoundError,
@@ -75,14 +78,14 @@ export class CommunitiesManagerService implements OnModuleDestroy {
   >()
 
   /**
-   * Fingerprint of the team keyring most recently written to the secrets manager, per team.
+   * Digest of the team keyring most recently written to the secrets manager, per team.
    *
    * QSS used to store the team keyring only at community creation, so once team keys rotated the
    * newest generation existed nowhere durable: a cold reload of the stored graph failed with
    * "Can't decrypt link" (GLOBAL-QSS-002 / private#192). Remembering what we last wrote lets us
    * re-store the keyring exactly when it has changed, and skip the write when it hasn't.
    */
-  private readonly persistedTeamKeyringFingerprints = new Map<string, string>()
+  private readonly persistedTeamKeyringDigests = new Map<string, string>()
 
   /**
    * In-flight community load per team.
@@ -127,7 +130,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     clearTimeout(this._communityExpiryHandler)
     this.communities.clear()
     this.persistQueues.clear()
-    this.persistedTeamKeyringFingerprints.clear()
+    this.persistedTeamKeyringDigests.clear()
     this.communityLoads.clear()
   }
 
@@ -238,11 +241,9 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         StoredKeyRingType.TEAM_KEYRING,
       )
       // record what we just wrote so the next persist only re-stores the keyring if it changed
-      this.persistedTeamKeyringFingerprints.set(
+      this.persistedTeamKeyringDigests.set(
         community.teamId,
-        CommunitiesManagerService.fingerprintTeamKeyring(
-          deserializedTeamKeyring,
-        ),
+        CommunitiesManagerService.digestTeamKeyring(deserializedTeamKeyring),
       )
       this.logger.verbose(`Storing community metadata`)
       // put the community metadata into the database
@@ -563,9 +564,9 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       // get the team key ring from the AWS secrets manager
       teamKeys = await this.getTeamKeys(teamId)
       // this is the keyring currently in durable storage, so treat it as the last thing persisted
-      this.persistedTeamKeyringFingerprints.set(
+      this.persistedTeamKeyringDigests.set(
         teamId,
-        CommunitiesManagerService.fingerprintTeamKeyring(teamKeys),
+        CommunitiesManagerService.digestTeamKeyring(teamKeys),
       )
     } catch (e) {
       this.logger.error(
@@ -579,11 +580,35 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     const localServerContext: LocalServerContext = {
       server,
     }
-    const sigChain: SigChain = SigChain.create(
-      rawSigchain,
-      localServerContext,
-      teamKeys,
-    )
+
+    // The graph and the keyring live in different stores with no shared transaction. The row
+    // records which keyring its graph was committed with, so a drift between the two is named here
+    // rather than surfacing later as an opaque "Can't decrypt link".
+    const durableKeyringDigest =
+      CommunitiesManagerService.digestTeamKeyring(teamKeys)
+    const committedKeyringDigest = community.teamKeyringDigest
+    const keyringsDiffer =
+      committedKeyringDigest != null &&
+      committedKeyringDigest !== durableKeyringDigest
+    if (keyringsDiffer) {
+      // Not fatal on its own: keyring-first ordering means a crash between the two writes leaves a
+      // stored keyring that is a superset of what the stored graph needs, and that still loads.
+      this.logger.warn(
+        `Stored graph for team ${teamId} was committed with team keyring digest ${committedKeyringDigest} but the durable keyring digests to ${durableKeyringDigest}`,
+      )
+    }
+
+    let sigChain: SigChain
+    try {
+      sigChain = SigChain.create(rawSigchain, localServerContext, teamKeys)
+    } catch (e) {
+      if (keyringsDiffer) {
+        const reason = `Durable state for team ${teamId} is an inconsistent pair: the graph was committed with team keyring digest ${committedKeyringDigest}, the stored keyring digests to ${durableKeyringDigest}, and it cannot load the graph`
+        this.logger.error(reason, e)
+        throw new CompoundError(reason, e as Error)
+      }
+      throw e
+    }
 
     const chainEventHandler = this.addSigchainListener(sigChain)
 
@@ -612,10 +637,76 @@ export class CommunitiesManagerService implements OnModuleDestroy {
    */
   private async persistTeamState(teamId: string, team: Team): Promise<void> {
     await this.enqueuePersist(teamId, async () => {
-      await this.persistTeamKeyringIfChanged(teamId, team)
-      await this.update(teamId, {
-        sigChain: uint8arrays.toString(team.save(), 'hex'),
-      })
+      // Take both halves at one instant, before the first await. The graph and the keyring written
+      // below are then the same moment of the same team. Sampling the keyring, awaiting the secrets
+      // write, and only then serializing the graph lets a rotation land in between and commit a
+      // graph whose links need a keyset that was never stored (audit finding M-3).
+      const snapshot = CommunitiesManagerService.snapshotTeamState(team)
+      await this.persistSnapshot(teamId, snapshot)
+    })
+  }
+
+  /**
+   * Capture a team's durable state at one instant.
+   *
+   * Every read here is synchronous, so nothing can mutate the team between them.
+   *
+   * @param team Team to snapshot
+   * @returns The graph, the keyring, that keyring's digest and the head, all from the same moment
+   */
+  private static snapshotTeamState(team: Team): TeamStateSnapshot {
+    const serializedGraph = team.save()
+    // the pinned auth package's generated declarations lose these concrete types
+    const teamKeyring = team.teamKeyring() as Keyring
+    const graph = team.graph as { head: Hash[] }
+
+    return {
+      serializedGraph: uint8arrays.toString(serializedGraph, 'hex'),
+      serializedKeyring: uint8arrays.fromString(
+        JSON.stringify(teamKeyring),
+        'utf8',
+      ),
+      keyringDigest: CommunitiesManagerService.digestTeamKeyring(teamKeyring),
+      head: [...graph.head],
+    }
+  }
+
+  /**
+   * Write one snapshot: the keyring it names first, then the graph it names.
+   *
+   * Keyring first means a crash between the two writes leaves a stored keyring that is a superset
+   * of what the stored graph needs, which still loads. The graph row also records the digest of the
+   * keyring it was committed with, so a later load can say when the two have drifted apart.
+   *
+   * @param teamId Team ID of the community we are persisting
+   * @param snapshot State to commit
+   */
+  private async persistSnapshot(
+    teamId: string,
+    snapshot: TeamStateSnapshot,
+  ): Promise<void> {
+    if (
+      snapshot.keyringDigest === this.persistedTeamKeyringDigests.get(teamId)
+    ) {
+      this.logger.verbose(
+        `Team keyring is unchanged since the last persist, skipping`,
+        teamId,
+      )
+    } else {
+      this.logger.log(`Storing updated team keyring`, teamId)
+      await this.serverKeyManager.storeKeyring(
+        teamId,
+        snapshot.serializedKeyring,
+        StoredKeyRingType.TEAM_KEYRING,
+        // the team keyring is rotatable, so re-storing it has to replace what is already there
+        true,
+      )
+      this.persistedTeamKeyringDigests.set(teamId, snapshot.keyringDigest)
+    }
+
+    await this.update(teamId, {
+      sigChain: snapshot.serializedGraph,
+      teamKeyringDigest: snapshot.keyringDigest,
     })
   }
 
@@ -666,54 +757,34 @@ export class CommunitiesManagerService implements OnModuleDestroy {
   }
 
   /**
-   * Write the team's current keyring to the secrets manager if it differs from the one we last
-   * stored for this team
+   * Canonical digest of a keyring's public half.
    *
-   * @param teamId Team ID of the community we are persisting
-   * @param team Team holding the keyring
+   * A keyring is a map of keysets indexed by their public encryption key. Hashing a canonical
+   * projection — sorted by key id, fixed field order, public keys only — changes exactly when the
+   * keyring gains or rotates a keyset, and gives a fixed-width value that can be written next to
+   * the graph in PostgreSQL. No secret material enters the digest.
+   *
+   * @param keyring Keyring to digest
+   * @returns Base64 SHA-256 of the canonical public projection
    */
-  private async persistTeamKeyringIfChanged(
-    teamId: string,
-    team: Team,
-  ): Promise<void> {
-    // the pinned auth package's generated declarations lose the concrete keyring type
-    const teamKeyring = team.teamKeyring() as Keyring
-    const fingerprint =
-      CommunitiesManagerService.fingerprintTeamKeyring(teamKeyring)
-    if (fingerprint === this.persistedTeamKeyringFingerprints.get(teamId)) {
-      this.logger.verbose(
-        `Team keyring is unchanged since the last persist, skipping`,
-        teamId,
-      )
-      return
-    }
-
-    this.logger.log(`Storing updated team keyring`, teamId)
-    await this.serverKeyManager.storeKeyring(
-      teamId,
-      uint8arrays.fromString(JSON.stringify(teamKeyring), 'utf8'),
-      StoredKeyRingType.TEAM_KEYRING,
-      // the team keyring is rotatable, so re-storing it has to replace what is already there
-      true,
-    )
-    this.persistedTeamKeyringFingerprints.set(teamId, fingerprint)
-  }
-
-  /**
-   * Identify a keyring by the public part of every keyset it holds.
-   *
-   * A keyring is a map of keysets indexed by their public encryption key, so the sorted set of
-   * those ids and the generation each belongs to changes exactly when the keyring gains or rotates
-   * a keyset. No secret material goes into the fingerprint.
-   *
-   * @param keyring Keyring to fingerprint
-   * @returns Stable string identifying the keyring's contents
-   */
-  private static fingerprintTeamKeyring(keyring: Keyring): string {
-    return Object.entries(keyring)
-      .map(([id, keys]) => `${id}:${keys.type}:${keys.name}:${keys.generation}`)
+  private static digestTeamKeyring(keyring: Keyring): string {
+    const canonical = Object.keys(keyring)
       .sort()
-      .join('|')
+      .map(id => {
+        const keys = keyring[id]
+        return [
+          id,
+          keys.type,
+          keys.name,
+          keys.generation,
+          keys.encryption.publicKey,
+          keys.signature.publicKey,
+        ]
+      })
+
+    return createHash('sha256')
+      .update(JSON.stringify(canonical))
+      .digest('base64')
   }
 
   /**
@@ -758,7 +829,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         )
         this.communities.delete(community.teamId)
         this.persistQueues.delete(community.teamId)
-        this.persistedTeamKeyringFingerprints.delete(community.teamId)
+        this.persistedTeamKeyringDigests.delete(community.teamId)
       }
     }
   }
