@@ -152,8 +152,12 @@ describe('Communities', () => {
         USER_NAME,
         DEVICE_NAME,
       )
-      // QSS admission requires the invitation to carry the member role grant.
+      // QSS cannot grant the member role itself. The founder's invitation must
+      // carry a current grant that the invitee can claim after server admission.
       invite = testTeam.team.inviteMember({ roleNames: ['member'] })
+      expect(
+        testTeam.team.hasCurrentInvitationRoleGrant(invite.id, 'member'),
+      ).toBe(true)
     })
 
     it('should validate that the context and team are defined', () => {
@@ -404,6 +408,12 @@ describe('Communities', () => {
           expect(
             testTeam.team.memberByDeviceId(secondClientContext.device.deviceId),
           ).toBeDefined()
+          expect(
+            testTeam.team.memberHasRole(
+              secondClientContext.user.userId,
+              'member',
+            ),
+          ).toBe(true)
         },
         { timeout: 15_000 },
       )
