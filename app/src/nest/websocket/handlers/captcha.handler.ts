@@ -16,6 +16,7 @@ import type {
 } from './types/captcha.types.js'
 import { DateTime } from 'luxon'
 import { registerAcknowledgedEvent } from './safe-event-handler.js'
+import { createHash } from 'node:crypto'
 
 const baseLogger = createLogger('Websocket:Event:Captcha')
 
@@ -38,7 +39,17 @@ export function registerCaptchaHandlers(config: CaptchaHandlerConfig): void {
     callback: (response: CaptchaVerifyResponse) => void,
   ): Promise<void> {
     try {
-      if (config.socket.data.verifiedCaptcha === true) {
+      const { token } = message.payload
+      if (typeof token !== 'string' || token.length === 0) {
+        throw new Error('Missing captcha token')
+      }
+      const tokenHash = createHash('sha256').update(token).digest('hex')
+      if (
+        config.socket.data.verifiedCaptcha === true &&
+        config.socket.data.verifiedCaptchaTokenHash === tokenHash
+      ) {
+        // Replaying the acknowledgement for an already verified token must never
+        // renew a consumed grant. A different token must pass real verification.
         const response: CaptchaVerifyResponse = {
           ts: DateTime.utc().toMillis(),
           status: CommunityOperationStatus.SUCCESS,
@@ -46,25 +57,51 @@ export function registerCaptchaHandlers(config: CaptchaHandlerConfig): void {
         callback(response)
         return
       }
-      const hcaptchaResponse = await config.captchaService.verifyToken(
-        message.payload.token,
-      )
-      if (hcaptchaResponse.success) {
-        config.socket.data.verifiedCaptcha = true
-        config.socket.data.usedCaptchaForKeys = false
-        config.socket.data.usedCaptchaForCreateCommunity = false
-        const response: CaptchaVerifyResponse = {
-          ts: DateTime.utc().toMillis(),
-          status: CommunityOperationStatus.SUCCESS,
+      const { captchaVerification: pending } = config.socket.data
+      if (pending != null) {
+        callback(
+          pending.tokenHash === tokenHash
+            ? await pending.response
+            : {
+                ts: DateTime.utc().toMillis(),
+                status: CommunityOperationStatus.ERROR,
+                reason: 'Captcha verification already in progress',
+              },
+        )
+        return
+      }
+      const verification = {
+        tokenHash,
+        response: Promise.resolve().then(
+          async (): Promise<CaptchaVerifyResponse> => {
+            const hcaptchaResponse =
+              await config.captchaService.verifyToken(token)
+            if (hcaptchaResponse.success) {
+              config.socket.data.verifiedCaptcha = true
+              config.socket.data.verifiedCaptchaTokenHash = tokenHash
+              config.socket.data.usedCaptchaForKeys = false
+              config.socket.data.captchaKeyGrant = undefined
+              config.socket.data.usedCaptchaForCreateCommunity = false
+              return {
+                ts: DateTime.utc().toMillis(),
+                status: CommunityOperationStatus.SUCCESS,
+              }
+            }
+            return {
+              ts: DateTime.utc().toMillis(),
+              status: CommunityOperationStatus.ERROR,
+              reason: hcaptchaResponse['error-codes']?.join(', '),
+            }
+          },
+        ),
+      }
+      config.socket.data.captchaVerification = verification
+      try {
+        callback(await verification.response)
+      } finally {
+        if (config.socket.data.captchaVerification === verification) {
+          config.socket.data.captchaVerification = undefined
         }
-        callback(response)
-      } else {
-        const response: CaptchaVerifyResponse = {
-          ts: DateTime.utc().toMillis(),
-          status: CommunityOperationStatus.ERROR,
-          reason: hcaptchaResponse['error-codes']?.join(', '),
-        }
-        callback(response)
       }
     } catch (error) {
       const response: CaptchaVerifyResponse = {
