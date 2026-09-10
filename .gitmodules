@@ -1,6 +1,6 @@
 [submodule "3rd-party/auth"]
 	path = 3rd-party/auth
-	url = ../private.git
+	url = https://github.com/TryQuiet/auth.git
 	branch = auth/main-baseline
 [submodule "3rd-party/qss"]
 	branch = main
