@@ -49,3 +49,54 @@ export class CommunityNotFoundError extends Error {
     super(`No community found for this community ID: ${communityId}`)
   }
 }
+
+/**
+ * Raised when the durable-admission gate is asked to persist a team that is no longer the one the
+ * manager holds for that community.
+ *
+ * An LFA connection appends ADMIT_* to the specific `Team` instance it was constructed over. If the
+ * cached sigchain for that community has since been replaced, persisting "the community" by id
+ * would commit a graph that does not contain the admission, and the connection would then release
+ * the acceptance anyway. Failing here keeps the gate closed (QSS-006 / private#203).
+ */
+/**
+ * Raised when a team's durable-write backlog is at its limit.
+ *
+ * Awaiting durability before releasing an acceptance turns repeated handshake traffic into
+ * repeated serialize-and-write work. One invitation holder must not be able to make that queue grow
+ * without bound, so past the limit the admission gate fails closed rather than queueing more
+ * (audit finding M-4).
+ */
+export class PersistenceBacklogError extends Error {
+  constructor(
+    public readonly communityId: string,
+    public readonly pending: number,
+  ) {
+    super(
+      `Community ${communityId} already has ${pending} durable writes pending, so this admission was not persisted`,
+    )
+  }
+}
+
+/**
+ * Raised when a queued durable write is discarded because its community was rolled back.
+ *
+ * A failed admission persist leaves an ADMIT link in memory that never reached disk. Every write
+ * still queued for that team would serialize that same tainted graph, so the queue is abandoned
+ * and its callers are told the write did not happen rather than being allowed to assume it did.
+ */
+export class PersistenceRolledBackError extends Error {
+  constructor(public readonly communityId: string) {
+    super(
+      `Community ${communityId} was rolled back to its last durable state, so this write was discarded`,
+    )
+  }
+}
+
+export class AdmittingSigChainReplacedError extends Error {
+  constructor(public readonly communityId: string) {
+    super(
+      `The in-memory sigchain for community ${communityId} was replaced while an admission was in flight, so the admitting graph was not persisted`,
+    )
+  }
+}

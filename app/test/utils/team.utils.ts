@@ -1,17 +1,21 @@
 import {
-  createDevice,
-  createKeyset,
+  createFirstUseDevice,
+  createServer,
   createTeam,
   createUser,
-  Keyset,
+  deriveUserId,
+  invitation,
+  MemberInvitationClaim,
+  redactDevice,
   redactKeys,
+  redactServer,
   Server,
+  ServerWithSecrets,
   UserWithSecrets,
   Team,
   LocalUserContext,
-  KeysetWithSecrets,
-  generateProof,
 } from '@localfirst/auth'
+import { randomKey, type Base58 } from '@localfirst/crypto'
 import { createLogger } from '../../src/nest/app/logger/logger.js'
 import { ServerKeyManagerService } from '../../src/nest/encryption/server-key-manager.service.js'
 import { SigChainWithTestTeam, TestTeam } from './types.js'
@@ -20,6 +24,44 @@ import { SigChain } from '../../src/nest/communities/auth/sigchain.js'
 
 const SERVER_HOSTNAME = 'test-server-hostname'
 const TEAM_NAME = 'test-team-name'
+
+/**
+ * Mint an identity the way local-first-auth requires: a user's id is derived from their founding
+ * device, so the device has to exist before the id is known. Mint the first-use device, derive the
+ * userId from it, create the user, then attach the userId to the device.
+ */
+function mintIdentity(userName: string, deviceName: string): LocalUserContext {
+  const foundingDevice = createFirstUseDevice({ deviceName })
+  const userId = deriveUserId(foundingDevice.deviceId)
+  const user = createUser(userName, userId) as UserWithSecrets
+  const device = { ...foundingDevice, userId }
+  return { user, device }
+}
+
+/**
+ * Build the material an invitee hands an admin to be admitted: a nonce-bound proof of invitation,
+ * the identity claim it was signed over, and a possession proof signed by the new device.
+ */
+function buildMemberAdmission(seed: string, context: LocalUserContext) {
+  const claim: MemberInvitationClaim = {
+    invitationKind: 'member',
+    userName: context.user.userName,
+    memberKeys: redactKeys(context.user.keys),
+    device: redactDevice(context.device),
+  }
+  const nonces = {
+    identityNonce: randomKey() as Base58,
+    inviteeNonce: randomKey() as Base58,
+  }
+  const proof = invitation.generateProof({ seed, claim, ...nonces })
+  const possessionProof = invitation.createPossessionProof({
+    invitationId: invitation.deriveId(seed),
+    claim,
+    device: context.device,
+  })
+  return { proof, claim, possessionProof }
+}
+
 export class TeamTestUtils {
   private readonly logger = createLogger(`Test:${TeamTestUtils.name}`)
 
@@ -39,36 +81,31 @@ export class TeamTestUtils {
       userName,
       deviceName,
     )
-    const user = createUser(userName) as UserWithSecrets
-    const device = createDevice({
-      userId: user.userId,
-      deviceName: deviceName,
-    })
-    const testUserContext: LocalUserContext = { user, device }
+    const testUserContext = mintIdentity(userName, deviceName)
+    const { user } = testUserContext
     const team = createTeam(teamName, testUserContext, undefined, {
       selfAssignableRoles: ['member'],
     }) as Team
     team.addRole('member')
     team.addMemberRole(user.userId, 'member')
 
-    let serverKeys: KeysetWithSecrets | undefined = undefined
+    let serverWithSecrets: ServerWithSecrets | undefined = undefined
     let server: Server | undefined = undefined
 
     if (withServer) {
-      serverKeys = createKeyset(
-        { type: 'SERVER', name: SERVER_HOSTNAME },
-        this.serverKeyManager.generateRandomBytes(32, 'base64'),
-      )
-      server = {
+      // A server has a self-certifying identity (identityKeys, fingerprinted as serverId) plus a
+      // rotatable member keyset; the public record we register is the redaction.
+      serverWithSecrets = createServer({
         host: SERVER_HOSTNAME,
-        keys: redactKeys(serverKeys) as Keyset,
-      }
+        seed: this.serverKeyManager.generateRandomBytes(32, 'base64'),
+      })
+      server = redactServer(serverWithSecrets)
       team.addServer(server)
     }
 
     return {
       team,
-      serverKeys,
+      serverWithSecrets,
       server,
       testUserContext,
       otherUsers: [],
@@ -85,17 +122,15 @@ export class TeamTestUtils {
       userName,
       testTeam.team.id,
     )
-    const user = createUser(userName) as UserWithSecrets
-    const device = createDevice({
-      userId: user.userId,
-      deviceName: deviceName,
-    })
-    const testUserContext: LocalUserContext = { user, device }
-    const invitation = testTeam.team.inviteMember()
+    const testUserContext = mintIdentity(userName, deviceName)
+    const invite = testTeam.team.inviteMember()
+    // Under key-bound invitations, admission takes the proof, the identity claim it was signed over,
+    // and a possession proof signed by the new device.
+    const admission = buildMemberAdmission(invite.seed, testUserContext)
     testTeam.team.admitMember(
-      generateProof(invitation.seed),
-      user.keys,
-      userName,
+      admission.proof,
+      admission.claim,
+      admission.possessionProof,
     )
     testTeam.otherUsers.push(testUserContext)
     return testTeam
@@ -119,7 +154,7 @@ export class TeamTestUtils {
     }
     const sigchain = SigChain.create(
       thisTestTeam.team.save(),
-      { server: thisTestTeam.server },
+      { server: thisTestTeam.serverWithSecrets! },
       thisTestTeam.team.teamKeyring(),
     )
     return {

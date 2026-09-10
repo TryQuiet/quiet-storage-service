@@ -12,70 +12,72 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
-import sodium from 'libsodium-wrappers-sumo'
-import { pack } from 'msgpackr'
+import {
+  signatures,
+  type Base58,
+  type ServerWithSecrets,
+} from '@localfirst/auth'
 import { randomBytes } from 'node:crypto'
 import { createLogger } from '../app/logger/logger.js'
 import { CommunitiesManagerService } from '../communities/communities-manager.service.js'
 
 const logger = createLogger('NseAuth:Service')
 
-const CHALLENGE_TTL_MS = 30_000
+export const NSE_AUTH_PROTOCOL_VERSION = 1
+export const NSE_AUTH_SIGNATURE_CONTEXT = 'quiet/qss-nse-auth/device-proof'
+export const NSE_AUTH_CHALLENGE_TTL_MS = 30_000
+export const NSE_AUTH_CLOCK_SKEW_MS = 5_000
+const MAX_OUTSTANDING_CHALLENGES_PER_DEVICE = 5
+const MAX_CHALLENGES_PER_IP_PER_MINUTE = 30
+const MAX_TOKEN_REQUESTS_PER_IP_PER_MINUTE = 60
+const MAX_TRACKED_RATE_LIMIT_IPS = 10_000
 
-// Bitcoin base58 alphabet (same as @localfirst/crypto and the NSE's Base58 encoder)
 const BASE58_ALPHABET =
   '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 
-function base58Encode(bytes: Uint8Array): string {
+const base58Encode = (bytes: Uint8Array): string => {
   let result = ''
-  let n = BigInt('0x' + Buffer.from(bytes).toString('hex'))
-  const base = BigInt(58)
-  while (n > 0n) {
-    result = BASE58_ALPHABET[Number(n % base)] + result
-    n /= base
+  const hexBytes = Buffer.from(bytes).toString('hex')
+  let value = BigInt(`0x${hexBytes === '' ? '0' : hexBytes}`)
+  while (value > 0n) {
+    result = BASE58_ALPHABET[Number(value % 58n)] + result
+    value /= 58n
   }
-  for (const b of bytes) {
-    if (b === 0) result = '1' + result
-    else break
+  for (const byte of bytes) {
+    if (byte !== 0) break
+    result = `1${result}`
   }
   return result
 }
 
-function base58Decode(s: string): Uint8Array {
-  const alphabet: Record<string, number> = {}
-  for (let i = 0; i < BASE58_ALPHABET.length; i++)
-    alphabet[BASE58_ALPHABET[i]] = i
-
-  let n = 0n
-  for (const c of s) {
-    const digit = alphabet[c]
-    if (digit === undefined) throw new Error(`Invalid base58 character: ${c}`)
-    n = n * 58n + BigInt(digit)
+const base58Decode = (encoded: string): Uint8Array => {
+  let value = 0n
+  for (const character of encoded) {
+    const digit = BASE58_ALPHABET.indexOf(character)
+    if (digit < 0) throw new Error('Invalid base58 character')
+    value = value * 58n + BigInt(digit)
   }
-
-  const hex = n.toString(16).padStart(2, '0')
-  const padded = hex.length % 2 === 0 ? hex : '0' + hex
-  const bytes = Buffer.from(padded, 'hex')
-
-  let leadingZeros = 0
-  for (const c of s) {
-    if (c === '1') leadingZeros++
-    else break
-  }
-  return new Uint8Array([...new Uint8Array(leadingZeros), ...bytes])
+  const hex = value === 0n ? '' : value.toString(16).padStart(2, '0')
+  const evenHex = hex.length % 2 === 0 ? hex : `0${hex}`
+  const decoded = evenHex === '' ? [] : [...Buffer.from(evenHex, 'hex')]
+  const leadingZeros = /^1*/.exec(encoded)?.[0].length ?? 0
+  return new Uint8Array([...new Uint8Array(leadingZeros), ...decoded])
 }
 
 export interface ChallengePayload {
+  protocolVersion: number
   type: string
-  name: string
+  deviceId: string
+  teamId: string
+  qssServerId: string
+  challengeId: string
   nonce: string
-  timestamp: number
+  issuedAtMs: number
+  expiresAtMs: number
 }
 
 interface StoredChallenge {
   challenge: ChallengePayload
-  teamId: string
-  expiry: number
 }
 
 export interface NseLogEntry {
@@ -95,7 +97,8 @@ export interface NseLogEntriesResponse {
 @Injectable()
 export class NseAuthService implements OnModuleInit, OnModuleDestroy {
   private readonly challenges = new Map<string, StoredChallenge>()
-  private sodiumReady = false
+  private readonly challengeRequestsByIp = new Map<string, number[]>()
+  private readonly tokenRequestsByIp = new Map<string, number[]>()
 
   // Periodic cleanup so stale challenges don't accumulate between requests.
   private readonly cleanupInterval: ReturnType<typeof setInterval> =
@@ -111,9 +114,7 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
     private readonly communitiesManager: CommunitiesManagerService,
   ) {}
 
-  async onModuleInit(): Promise<void> {
-    await sodium.ready
-    this.sodiumReady = true
+  onModuleInit(): void {
     logger.log('NseAuthService initialized (libsodium ready)')
   }
 
@@ -122,31 +123,61 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Issue a challenge for a device.  The challenge object mirrors the
-   * @localfirst/auth `Challenge` type so the NSE can sign it with
-   * msgpackr.pack + crypto_sign_detached (same as identity.prove()).
+   * Issue the exact v1, server-audience-bound challenge signed by native clients.
    */
-  issueChallenge(
+  async issueChallenge(
     deviceId: string,
     teamId: string,
-  ): { challengeId: string; challenge: ChallengePayload } {
+    sourceIp = 'unknown',
+  ): Promise<{ challengeId: string; challenge: ChallengePayload }> {
     this.evictExpiredChallenges()
-
-    const challengeId = randomBytes(16).toString('hex')
-    // nonce base58-encoded like @localfirst/crypto randomKey()
-    const nonce = base58Encode(randomBytes(32))
-    const challenge: ChallengePayload = {
-      type: 'DEVICE',
-      name: deviceId,
-      nonce,
-      timestamp: Date.now(),
+    this.enforceChallengeRateLimit(sourceIp)
+    if (
+      deviceId.length === 0 ||
+      deviceId.length > 256 ||
+      teamId.length === 0 ||
+      teamId.length > 256
+    ) {
+      throw new UnauthorizedException('Invalid device or team identifier')
     }
 
-    this.challenges.set(challengeId, {
-      challenge,
+    const community = await this.communitiesManager.get(teamId)
+    if (community == null) {
+      throw new UnauthorizedException('Unknown team')
+    }
+    const { team } = community.sigChain
+    if (team.deviceWasRemoved(deviceId) || !team.hasDevice(deviceId)) {
+      throw new UnauthorizedException('Unknown or removed device for team')
+    }
+    const outstanding = [...this.challenges.values()].filter(
+      ({ challenge }) =>
+        challenge.teamId === teamId && challenge.deviceId === deviceId,
+    ).length
+    if (outstanding >= MAX_OUTSTANDING_CHALLENGES_PER_DEVICE) {
+      throw new UnauthorizedException('Too many outstanding challenges')
+    }
+
+    const challengeId = randomBytes(16).toString('hex')
+    const issuedAtMs = Date.now()
+    // The pinned auth package's generated declarations lose this concrete type.
+    const qssServer = community.sigChain.context.server as ServerWithSecrets
+    const { serverId: qssServerId } = qssServer
+    if (team.serverWasRemoved(qssServerId) || !team.hasServer(qssServerId)) {
+      throw new UnauthorizedException('QSS server is not active for team')
+    }
+    const challenge: ChallengePayload = {
+      protocolVersion: NSE_AUTH_PROTOCOL_VERSION,
+      type: 'DEVICE',
+      deviceId,
       teamId,
-      expiry: Date.now() + CHALLENGE_TTL_MS,
-    })
+      qssServerId,
+      challengeId,
+      nonce: base58Encode(randomBytes(32)),
+      issuedAtMs,
+      expiresAtMs: issuedAtMs + NSE_AUTH_CHALLENGE_TTL_MS,
+    }
+
+    this.challenges.set(challengeId, { challenge })
 
     logger.debug(
       `Issued challenge ${challengeId} for device ${deviceId} team ${teamId}`,
@@ -157,30 +188,42 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
   /**
    * Verify the signed challenge proof and return a short-lived JWT.
    *
-   * Proof convention follows @localfirst/crypto signatures.sign():
-   *   message   = msgpackr.pack(challengePayload)
-   *   signature = base58-encoded 64-byte Ed25519 signature
-   *   publicKey = base58-encoded 32-byte Ed25519 public key
+   * Proof convention follows @localfirst/crypto signatures.sign(): the v1
+   * canonical tuple is packed with the NSE-specific context and signed by the
+   * registered device key. No claimant-selected key material is accepted.
    */
   async verifyAndIssueToken(
     challengeId: string,
     deviceId: string,
-    proof: { signature: string; publicKey: string },
+    signature: string,
+    sourceIp = 'unknown',
   ): Promise<{ token: string; expiresIn: number }> {
-    if (!this.sodiumReady) {
-      throw new UnauthorizedException('Crypto not ready')
+    this.enforceRateLimit(
+      this.tokenRequestsByIp,
+      sourceIp,
+      MAX_TOKEN_REQUESTS_PER_IP_PER_MINUTE,
+      'Token rate limit exceeded',
+    )
+    if (
+      challengeId.length !== 32 ||
+      !/^[0-9a-f]{32}$/.test(challengeId) ||
+      deviceId.length === 0 ||
+      deviceId.length > 256 ||
+      signature.length === 0 ||
+      signature.length > 128
+    ) {
+      throw new UnauthorizedException('Invalid token request')
     }
-
     const stored = this.challenges.get(challengeId)
-    if (stored == null || stored.expiry < Date.now()) {
+    if (stored == null || stored.challenge.expiresAtMs < Date.now()) {
       this.challenges.delete(challengeId)
       throw new UnauthorizedException('Challenge expired or not found')
     }
 
-    if (stored.challenge.name !== deviceId) {
+    if (stored.challenge.deviceId !== deviceId) {
       this.challenges.delete(challengeId)
       logger.warn(
-        `Challenge device mismatch for challengeId ${challengeId}: expected ${stored.challenge.name}, received ${deviceId}`,
+        `Challenge device mismatch for challengeId ${challengeId}: expected ${stored.challenge.deviceId}, received ${deviceId}`,
       )
       throw new UnauthorizedException('Challenge does not belong to device')
     }
@@ -188,48 +231,44 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
     // Consume immediately to prevent replay
     this.challenges.delete(challengeId)
 
-    // Decode base58 signature and public key
     let sigBytes: Uint8Array
-    let pubKeyBytes: Uint8Array
     try {
-      sigBytes = base58Decode(proof.signature)
-      pubKeyBytes = base58Decode(proof.publicKey)
+      sigBytes = base58Decode(signature)
+      if (sigBytes.length !== 64 || base58Encode(sigBytes) !== signature) {
+        throw new Error('Non-canonical or incorrectly sized signature')
+      }
     } catch {
-      throw new UnauthorizedException('Invalid base58 in proof')
+      throw new UnauthorizedException('Invalid signature encoding')
     }
 
     const expectedPubKey = await this.getRegisteredDeviceSignatureKey(
-      stored.teamId,
+      stored.challenge.teamId,
       deviceId,
+      stored.challenge.qssServerId,
     )
-
-    let expectedPubKeyBytes: Uint8Array
+    let valid = false
     try {
-      expectedPubKeyBytes = base58Decode(expectedPubKey)
-    } catch {
-      logger.error(
-        `Registered device key for ${deviceId} on team ${stored.teamId} was not valid base58`,
-      )
-      throw new UnauthorizedException('Registered device key is invalid')
-    }
-
-    if (!Buffer.from(pubKeyBytes).equals(Buffer.from(expectedPubKeyBytes))) {
+      const expectedKeyBytes = base58Decode(expectedPubKey)
+      if (
+        expectedKeyBytes.length !== 32 ||
+        base58Encode(expectedKeyBytes) !== expectedPubKey
+      ) {
+        throw new Error(
+          'Registered device key was non-canonical or incorrectly sized',
+        )
+      }
+      valid = signatures.verify({
+        payload: this.canonicalPayload(stored.challenge),
+        signature: signature as Base58,
+        publicKey: expectedPubKey,
+        context: NSE_AUTH_SIGNATURE_CONTEXT,
+      })
+    } catch (error) {
       logger.warn(
-        `Proof public key mismatch for device ${deviceId} team ${stored.teamId}`,
-      )
-      throw new UnauthorizedException(
-        'Proof key does not match registered device',
+        `Proof verification input was invalid for device ${deviceId}`,
+        error,
       )
     }
-
-    // Re-derive the message bytes the NSE signed: msgpackr.pack(challengePayload)
-    const messageBytes = pack(stored.challenge)
-
-    const valid = sodium.crypto_sign_verify_detached(
-      sigBytes,
-      messageBytes,
-      expectedPubKeyBytes,
-    )
     if (!valid) {
       logger.warn(
         `Signature verification failed for challengeId ${challengeId} device ${deviceId}`,
@@ -239,18 +278,21 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
 
     const expiresIn = 900 // 15 min
     const token = await this.jwtService.signAsync(
-      { deviceId, teamId: stored.teamId },
+      { deviceId, teamId: stored.challenge.teamId },
       { expiresIn },
     )
 
-    logger.log(`Issued JWT for device ${deviceId} team ${stored.teamId}`)
+    logger.log(
+      `Issued JWT for device ${deviceId} team ${stored.challenge.teamId}`,
+    )
     return { token, expiresIn }
   }
 
   private async getRegisteredDeviceSignatureKey(
     teamId: string,
     deviceId: string,
-  ): Promise<string> {
+    qssServerId: string,
+  ): Promise<Base58> {
     const community = await this.communitiesManager.get(teamId)
     if (community == null) {
       logger.warn(`No managed community found for team ${teamId}`)
@@ -258,6 +300,15 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
     }
 
     const { team } = community.sigChain
+    const currentQssServer = community.sigChain.context
+      .server as ServerWithSecrets
+    if (
+      currentQssServer.serverId !== qssServerId ||
+      team.serverWasRemoved(qssServerId) ||
+      !team.hasServer(qssServerId)
+    ) {
+      throw new UnauthorizedException('QSS server is not active for team')
+    }
     if (team.deviceWasRemoved(deviceId)) {
       logger.warn(
         `Removed device ${deviceId} attempted NSE auth for team ${teamId}`,
@@ -274,7 +325,7 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
 
     try {
       const device = team.device(deviceId) as { keys: { signature: string } }
-      return device.keys.signature
+      return device.keys.signature as Base58
     } catch (error) {
       logger.warn(
         `Failed to resolve registered device key for ${deviceId} on team ${teamId}`,
@@ -287,7 +338,58 @@ export class NseAuthService implements OnModuleInit, OnModuleDestroy {
   private evictExpiredChallenges(): void {
     const now = Date.now()
     for (const [id, stored] of this.challenges) {
-      if (stored.expiry < now) this.challenges.delete(id)
+      if (stored.challenge.expiresAtMs < now) this.challenges.delete(id)
     }
+  }
+
+  private canonicalPayload(challenge: ChallengePayload): unknown[] {
+    return [
+      challenge.protocolVersion,
+      challenge.type,
+      challenge.deviceId,
+      challenge.teamId,
+      challenge.qssServerId,
+      challenge.challengeId,
+      challenge.nonce,
+      challenge.issuedAtMs,
+      challenge.expiresAtMs,
+    ]
+  }
+
+  private enforceChallengeRateLimit(sourceIp: string): void {
+    this.enforceRateLimit(
+      this.challengeRequestsByIp,
+      sourceIp,
+      MAX_CHALLENGES_PER_IP_PER_MINUTE,
+      'Challenge rate limit exceeded',
+    )
+  }
+
+  private enforceRateLimit(
+    requestsByIp: Map<string, number[]>,
+    sourceIp: string,
+    maximum: number,
+    message: string,
+  ): void {
+    const now = Date.now()
+    for (const [ip, timestamps] of requestsByIp) {
+      if (timestamps.every(timestamp => now - timestamp >= 60_000)) {
+        requestsByIp.delete(ip)
+      }
+    }
+    if (
+      !requestsByIp.has(sourceIp) &&
+      requestsByIp.size >= MAX_TRACKED_RATE_LIMIT_IPS
+    ) {
+      throw new UnauthorizedException('Rate limiter capacity exceeded')
+    }
+    const recent = (requestsByIp.get(sourceIp) ?? []).filter(
+      timestamp => now - timestamp < 60_000,
+    )
+    if (recent.length >= maximum) {
+      throw new UnauthorizedException(message)
+    }
+    recent.push(now)
+    requestsByIp.set(sourceIp, recent)
   }
 }

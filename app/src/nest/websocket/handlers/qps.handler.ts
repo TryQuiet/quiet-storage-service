@@ -13,8 +13,44 @@ import type {
   SendPushMessage,
   SendPushResponse,
 } from './types/qps.types.js'
+import { registerAcknowledgedEvent } from './safe-event-handler.js'
 
 const baseLogger = createLogger('Websocket:Event:QPS')
+
+function hasExactKeys(
+  value: unknown,
+  expectedKeys: readonly string[],
+): value is Record<string, unknown> {
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+    return false
+  }
+
+  const keys = Object.keys(value)
+  return (
+    keys.length === expectedKeys.length &&
+    keys.every(key => expectedKeys.includes(key))
+  )
+}
+
+function isSendPushPayload(
+  value: unknown,
+): value is SendPushMessage['payload'] {
+  return (
+    hasExactKeys(value, ['ucan']) &&
+    typeof value.ucan === 'string' &&
+    value.ucan.length > 0
+  )
+}
+
+function isSendBatchPushPayload(
+  value: unknown,
+): value is SendBatchPushMessage['payload'] {
+  return (
+    hasExactKeys(value, ['ucans']) &&
+    Array.isArray(value.ucans) &&
+    value.ucans.every(ucan => typeof ucan === 'string' && ucan.length > 0)
+  )
+}
 
 export function registerQpsHandlers(config: QPSHandlerConfig): void {
   const _logger = baseLogger.extend(config.socket.id)
@@ -102,6 +138,16 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
     callback: (response: SendPushResponse) => void,
   ): Promise<void> {
     try {
+      if (!isSendPushPayload(message.payload)) {
+        const response: SendPushResponse = {
+          ts: DateTime.utc().toMillis(),
+          status: CommunityOperationStatus.ERROR,
+          reason: QpsErrorReason.InvalidPushPayload,
+        }
+        callback(response)
+        return
+      }
+
       const ucanInfo = await config.qpsService.validateUcan(
         message.payload.ucan,
       )
@@ -126,12 +172,7 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
         return
       }
 
-      const result = await config.qpsService.sendPush(
-        message.payload.ucan,
-        message.payload.title,
-        message.payload.body,
-        message.payload.data,
-      )
+      const result = await config.qpsService.sendPush(message.payload.ucan)
 
       if (!result.success) {
         if (result.tokenInvalid === true) {
@@ -174,8 +215,7 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
     callback: (response: SendBatchPushResponse) => void,
   ): Promise<void> {
     try {
-      const { ucans } = message.payload
-      if (!Array.isArray(ucans)) {
+      if (!isSendBatchPushPayload(message.payload)) {
         const response: SendBatchPushResponse = {
           ts: DateTime.utc().toMillis(),
           status: CommunityOperationStatus.ERROR,
@@ -185,6 +225,7 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
         callback(response)
         return
       }
+      const { ucans } = message.payload
       if (ucans.length > QPS_MAX_BATCH_UCANS) {
         const response: SendBatchPushResponse = {
           ts: DateTime.utc().toMillis(),
@@ -221,12 +262,7 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
         return
       }
 
-      const result = await config.qpsService.sendBatchPush(
-        authorizedUcans,
-        message.payload.title,
-        message.payload.body,
-        message.payload.data,
-      )
+      const result = await config.qpsService.sendBatchPush(authorizedUcans)
 
       if (!result.success) {
         const response: SendBatchPushResponse = {
@@ -257,7 +293,25 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
     }
   }
 
-  config.socket.on(WebsocketEvents.QPSRegisterDevice, handleRegisterDevice)
-  config.socket.on(WebsocketEvents.QPSSendPush, handleSendPush)
-  config.socket.on(WebsocketEvents.QPSSendBatchPush, handleSendBatchPush)
+  registerAcknowledgedEvent(
+    config.socket,
+    WebsocketEvents.QPSRegisterDevice,
+    handleRegisterDevice,
+    _logger,
+    { requiresPayload: true },
+  )
+  registerAcknowledgedEvent(
+    config.socket,
+    WebsocketEvents.QPSSendPush,
+    handleSendPush,
+    _logger,
+    { requiresPayload: true },
+  )
+  registerAcknowledgedEvent(
+    config.socket,
+    WebsocketEvents.QPSSendBatchPush,
+    handleSendBatchPush,
+    _logger,
+    { requiresPayload: true },
+  )
 }

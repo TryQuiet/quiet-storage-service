@@ -31,9 +31,6 @@ export interface RegisterDeviceResponse
 
 export interface SendPushPayload {
   ucan: string
-  title?: string
-  body?: string
-  data?: Record<string, string>
 }
 
 export interface SendPushMessage extends BaseWebsocketMessage<SendPushPayload> {
@@ -46,9 +43,6 @@ export interface SendPushResponse extends BaseWebsocketMessage<undefined> {
 
 export interface SendBatchPushPayload {
   ucans: string[]
-  title?: string
-  body?: string
-  data?: Record<string, string>
 }
 
 export interface SendBatchPushMessage

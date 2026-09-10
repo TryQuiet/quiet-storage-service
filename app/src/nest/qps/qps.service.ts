@@ -111,21 +111,17 @@ export class QPSService {
    * Send a push notification using a UCAN for authorization
    *
    * @param ucanToken The UCAN token containing device information
-   * @param title Optional notification title
-   * @param body Optional notification body
-   * @param data Optional custom data payload
    * @returns Result of the push operation
    */
-  async sendPush(
-    ucanToken: string,
-    title?: string,
-    body?: string,
-    data?: Record<string, string>,
-  ): Promise<SendPushResult> {
+  async sendPush(ucanToken: string): Promise<SendPushResult> {
     // Validate the UCAN and extract device information
     const validation = await this.ucanService.validateUcan(ucanToken)
 
-    if (!validation.valid || validation.deviceToken == null) {
+    if (
+      !validation.valid ||
+      validation.deviceToken == null ||
+      validation.teamId == null
+    ) {
       this.logger.warn(
         `Invalid UCAN token: ${validation.error ?? 'unknown error'}`,
       )
@@ -138,7 +134,7 @@ export class QPSService {
     const platform = validation.platform ?? 'ios'
     const result = await this.pushService.send(
       validation.deviceToken,
-      this.makePayload(platform, title, body, data),
+      this.makePayload(platform, validation.teamId),
       platform,
     )
 
@@ -163,12 +159,7 @@ export class QPSService {
    * @param ucans Array of UCAN tokens for target devices
    * @returns Batch result indicating overall success
    */
-  async sendBatchPush(
-    ucans: string[],
-    title?: string,
-    body?: string,
-    data?: Record<string, string>,
-  ): Promise<SendBatchPushResult> {
+  async sendBatchPush(ucans: string[]): Promise<SendBatchPushResult> {
     if (ucans.length === 0) {
       return { success: true }
     } else if (ucans.length > QPS_MAX_BATCH_UCANS) {
@@ -181,16 +172,31 @@ export class QPSService {
       }
     }
 
-    // Validate all UCANs and bucket by platform
-    const iosTokens: string[] = []
-    const androidTokens: string[] = []
+    // Validate all UCANs and bucket by their authenticated team and platform.
+    // The caller never controls presentation text or data: QPS derives the only
+    // client-visible field, teamId, from the signed UCAN itself.
+    const recipients = new Map<
+      string,
+      { platform: 'ios' | 'android'; teamId: string; deviceTokens: string[] }
+    >()
     for (const ucan of ucans) {
       const validation = await this.ucanService.validateUcan(ucan)
-      if (validation.valid && validation.deviceToken != null) {
-        if (validation.platform === 'android') {
-          androidTokens.push(validation.deviceToken)
+      if (
+        validation.valid &&
+        validation.deviceToken != null &&
+        validation.teamId != null
+      ) {
+        const platform = validation.platform ?? 'ios'
+        const key = `${platform}:${validation.teamId}`
+        const recipient = recipients.get(key)
+        if (recipient != null) {
+          recipient.deviceTokens.push(validation.deviceToken)
         } else {
-          iosTokens.push(validation.deviceToken)
+          recipients.set(key, {
+            platform,
+            teamId: validation.teamId,
+            deviceTokens: [validation.deviceToken],
+          })
         }
       } else {
         this.logger.debug(
@@ -199,36 +205,27 @@ export class QPSService {
       }
     }
 
-    const totalValid = iosTokens.length + androidTokens.length
+    const totalValid = Array.from(recipients.values()).reduce(
+      (total, recipient) => total + recipient.deviceTokens.length,
+      0,
+    )
     if (totalValid === 0) {
       this.logger.warn(`Batch push failed: no valid UCANs`)
       return { success: false, error: QpsErrorReason.NoValidDeviceTokens }
     }
 
-    const iosPayload = this.makePayload('ios', title, body, data)
-    const androidPayload = this.makePayload('android', title, body, data)
-
-    // Send multicast per platform so each uses the correct Firebase project
-    const results: MulticastPushResult[] = await Promise.all([
-      iosTokens.length > 0
-        ? this.pushService.sendMulticast(iosTokens, iosPayload, 'ios')
-        : Promise.resolve({
-            successCount: 0,
-            failureCount: 0,
-            invalidTokens: [],
-          }),
-      androidTokens.length > 0
-        ? this.pushService.sendMulticast(
-            androidTokens,
-            androidPayload,
-            'android',
-          )
-        : Promise.resolve({
-            successCount: 0,
-            failureCount: 0,
-            invalidTokens: [],
-          }),
-    ])
+    // Send each authenticated team/platform bucket separately. This prevents a
+    // sender from using one recipient's UCAN to choose data for another team.
+    const results: MulticastPushResult[] = await Promise.all(
+      Array.from(recipients.values()).map(
+        async recipient =>
+          await this.pushService.sendMulticast(
+            recipient.deviceTokens,
+            this.makePayload(recipient.platform, recipient.teamId),
+            recipient.platform,
+          ),
+      ),
+    )
 
     const successCount = results.reduce((n, r) => n + r.successCount, 0)
     const invalidTokens = results.flatMap(r => r.invalidTokens)
@@ -267,20 +264,21 @@ export class QPSService {
 
   private makePayload(
     platform: 'ios' | 'android',
-    title?: string,
-    body?: string,
-    data?: Record<string, string>,
+    teamId: string,
   ): PushPayload {
     if (platform === 'android') {
       // Android background delivery must be data-only so the app service can
       // fetch/decrypt the latest QSS entry instead of showing the fallback text.
-      return { data }
+      return { data: { teamId } }
     }
 
     return {
-      title: title ?? 'Quiet',
-      body: body ?? 'You have new activity',
-      data,
+      // These are deliberately not caller-controlled. The notification service
+      // extension replaces them only after it has fetched and authenticated a
+      // QSS entry.
+      title: 'Quiet',
+      body: 'You have new activity',
+      data: { teamId },
     }
   }
 }

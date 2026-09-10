@@ -15,6 +15,14 @@ export enum AllowedServerKeyState {
 export interface Community {
   teamId: string
   sigChain: string
+  /**
+   * Digest of the team keyring this graph was committed with.
+   *
+   * The graph lives in PostgreSQL and the keyring lives in the secrets manager, with no shared
+   * transaction. Recording which keyring a graph was written against lets a cold load say so when
+   * the two have drifted apart, instead of failing with an opaque "Can't decrypt link".
+   */
+  teamKeyringDigest?: string
 }
 
 export interface EncryptedCommunity {
@@ -32,6 +40,25 @@ export type EncryptedCommunityUpdate = Omit<
   Partial<EncryptedCommunity>,
   'teamId'
 >
+
+/**
+ * One instant of a team's durable state.
+ *
+ * Both halves are taken from the same `Team` with no await in between, so the keyring written to
+ * the secrets manager is exactly the keyring the graph written to PostgreSQL needs. Sampling them
+ * on either side of an await can commit a graph whose links require a keyset that was never stored
+ * (audit finding M-3).
+ */
+export interface TeamStateSnapshot {
+  /** Hex-encoded serialized graph */
+  serializedGraph: string
+  /** UTF-8 JSON of the team keyring */
+  serializedKeyring: Uint8Array
+  /** Canonical digest of the keyring's public half */
+  keyringDigest: string
+  /** Graph head at the moment of the snapshot */
+  head: string[]
+}
 
 export type DeviceId = string
 export type AuthConnectionMap = Map<DeviceId, AuthConnection>

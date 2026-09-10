@@ -1,9 +1,9 @@
 import type { Socket as ClientSocket } from 'socket.io-client'
 import type { Socket as ServerSocket } from 'socket.io'
 import {
-  KeysetWithSecrets,
   LocalUserContext,
   Server,
+  ServerWithSecrets,
   Team,
 } from '@localfirst/auth'
 import { SigChain } from '../../src/nest/communities/auth/sigchain.js'
@@ -18,7 +18,7 @@ export interface TestSockets {
 export interface TestTeam {
   team: Team
   server?: Server
-  serverKeys?: KeysetWithSecrets
+  serverWithSecrets?: ServerWithSecrets
   testUserContext: LocalUserContext
   otherUsers: LocalUserContext[]
 }

@@ -21,7 +21,7 @@ import type { LogEntrySyncPayload } from '../../websocket/handlers/types/log-ent
 import type { TestTeam } from '../../../../test/utils/types.js'
 import { DateTime } from 'luxon'
 import { SodiumHelper } from '../../encryption/sodium.helper.js'
-import { type AuthConnectionConfig, AuthStatus } from '../auth/types.js'
+import { type AuthConnectionParams, AuthStatus } from '../auth/types.js'
 import { AuthConnection } from '../auth/auth.connection.js'
 import { UtilsModule } from '../../utils/utils.module.js'
 import type { Serializer } from '../../utils/serialization/serializer.service.js'
@@ -32,6 +32,15 @@ import { LogEntrySyncManager } from './log-entry-sync.service.js'
 import { getDeviceId } from '../auth/device-id.js'
 
 const logger = createLogger('Test:LogEntrySyncManager')
+/**
+ * These connections are fixtures for log-entry sync; none of them admits anyone, so the
+ * durable-admission gate has nothing to wait for. It is required at the type level so that a real
+ * connection can never be built without one (QSS-006 / private#203).
+ */
+const noopPersistAdmission = async (): Promise<void> => {
+  await Promise.resolve()
+}
+
 describe('LogEntrySyncManager', () => {
   let module: TestingModule | undefined = undefined
   let communitiesManager: CommunitiesManagerService | undefined = undefined
@@ -164,6 +173,7 @@ describe('LogEntrySyncManager', () => {
       {
         communitiesManager: communitiesManager!,
         socket: wsConfig!.socket,
+        persistAdmission: noopPersistAdmission,
       },
     )
 
@@ -260,7 +270,8 @@ describe('LogEntrySyncManager', () => {
         {
           communitiesManager: communitiesManager!,
           socket: wsConfig!.socket,
-        } satisfies AuthConnectionConfig,
+          persistAdmission: noopPersistAdmission,
+        } satisfies AuthConnectionParams,
       )
 
       Object.defineProperty(authConnection, '_status', {
@@ -353,6 +364,7 @@ describe('LogEntrySyncManager', () => {
         {
           communitiesManager: communitiesManager!,
           socket: wsConfig!.socket,
+          persistAdmission: noopPersistAdmission,
         },
       )
 
@@ -422,6 +434,7 @@ describe('LogEntrySyncManager', () => {
         {
           communitiesManager: communitiesManager!,
           socket: wsConfig!.socket,
+          persistAdmission: noopPersistAdmission,
         },
       )
 
@@ -491,6 +504,7 @@ describe('LogEntrySyncManager', () => {
         {
           communitiesManager: communitiesManager!,
           socket: wsConfig!.socket,
+          persistAdmission: noopPersistAdmission,
         },
       )
 
@@ -600,6 +614,7 @@ describe('LogEntrySyncManager', () => {
         {
           communitiesManager: communitiesManager!,
           socket: wsConfig!.socket,
+          persistAdmission: noopPersistAdmission,
         },
       )
 

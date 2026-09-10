@@ -16,9 +16,10 @@ import type { WebsocketClient } from '../../ws.client.js'
 import type { Community } from '../../../nest/communities/types.js'
 import * as uint8arrays from 'uint8arrays'
 import {
-  createDevice,
+  createFirstUseDevice,
   createTeam,
   createUser,
+  deriveUserId,
   type DeviceWithSecrets,
   type Keyring,
   loadTeam,
@@ -57,11 +58,10 @@ const createCommunity = async (
       default: undefined,
       validate: (value: string | undefined) => value != null && value !== '',
     })
-    const user: UserWithSecrets = createUser(username) as UserWithSecrets
-    const device: DeviceWithSecrets = createDevice({
-      userId: user.userId,
-      deviceName: randomUUID(),
-    })
+    const foundingDevice = createFirstUseDevice({ deviceName: randomUUID() })
+    const userId = deriveUserId(foundingDevice.deviceId)
+    const user = createUser(username, userId) as UserWithSecrets
+    const device: DeviceWithSecrets = { ...foundingDevice, userId }
     context = {
       user,
       device,
@@ -91,6 +91,8 @@ const createCommunity = async (
 
     const server: Server = {
       host: ConfigService.getString(EnvVars.QSS_HOSTNAME)!,
+      serverId: genKeysResponse!.payload!.serverId!,
+      identityKeys: genKeysResponse!.payload!.identityKeys!,
       keys: genKeysResponse!.payload!.keys!,
     }
     serializedSigchain.addServer(server)
