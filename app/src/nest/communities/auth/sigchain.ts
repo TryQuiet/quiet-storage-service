@@ -49,6 +49,19 @@ export class SigChain extends EventEmitter {
     return uint8arrays.toString(bytes, 'hex')
   }
 
+  /**
+   * Announce that a chain update could not be persisted.
+   *
+   * @param error Failure that stopped the write
+   */
+  public notifyPersistFailed(error: unknown): void {
+    logger.error(
+      `Failed to persist chain update for team ${this.team.id}`,
+      error,
+    )
+    this.emit(SigchainEvents.PERSIST_FAILED, { teamId: this.team.id, error })
+  }
+
   public clearListeners(): void {
     this.team.removeListener(LFAEvents.UPDATED, this._handleTeamUpdate)
   }

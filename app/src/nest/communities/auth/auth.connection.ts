@@ -5,12 +5,10 @@
 import type { SigChain } from './sigchain.js'
 import {
   castServer,
-  type DeviceWithSecrets,
   Connection as LFAConnection,
+  type ServerContext,
+  type ServerWithSecrets,
   type UserWithSecrets,
-  type LocalUserContext,
-  type MemberContext,
-  type Team,
 } from '@localfirst/auth'
 import { WebsocketEvents } from '../../websocket/ws.types.js'
 import { createLogger } from '../../app/logger/logger.js'
@@ -23,7 +21,7 @@ import {
   CommunityOperationStatus,
 } from '../../websocket/handlers/types/index.js'
 import type { QuietLogger } from '../../app/logger/types.js'
-import { type AuthConnectionConfig, AuthStatus, LFAEvents } from './types.js'
+import { type AuthConnectionParams, AuthStatus, LFAEvents } from './types.js'
 import EventEmitter from 'events'
 import { type AuthDisconnectedPayload, AuthEvents } from './auth.events.js'
 
@@ -38,13 +36,13 @@ export class AuthConnection extends EventEmitter {
    */
   public readonly lfaConnection: LFAConnection
   /**
-   * Member context cast from Server
+   * Connection context — this server participating as a first-class server on the team.
    */
-  public userContext: MemberContext
+  public serverContext: ServerContext
   /**
-   * User context cast from Server
+   * The server cast to a user, for the sync-event payload and outbound-message routing id.
    */
-  public localUserContext: LocalUserContext
+  private readonly localUser: UserWithSecrets
   /**
    * Current status of this auth connection (e.g. has the user been authenticated)
    */
@@ -64,41 +62,44 @@ export class AuthConnection extends EventEmitter {
   constructor(
     private readonly userId: string,
     private readonly sigChain: SigChain,
-    private readonly config: AuthConnectionConfig,
+    private readonly config: AuthConnectionParams,
   ) {
     super()
 
-    // convert the Server data on the chain to a User object
-    const user: UserWithSecrets = castServer.toUser(
-      this.sigChain.context.server,
-    ) as UserWithSecrets
-    // convert the Server data on the chain to a Device object
-    const device: DeviceWithSecrets = castServer.toDevice(
-      this.sigChain.context.server,
-    ) as DeviceWithSecrets
-    this.userContext = {
-      user,
-      device,
+    // The pinned auth package's generated declarations lose this concrete type.
+    const server = this.sigChain.context.server as ServerWithSecrets
+    // This server participates as a first-class server on the team: its identity is its serverId,
+    // and localfirst/auth derives whatever user-shaped view it needs internally (extendServerContext
+    // casts the server to a user for the handshake). We no longer fake a device — servers don't have
+    // one.
+    this.serverContext = {
+      server,
       team: this.sigChain.team,
     }
-    this.localUserContext = {
-      user,
-      device,
-    }
+    // The server cast to a user, used for the sync-event payload and as the routing id on outbound
+    // auth-sync messages (stable across calls for the same server).
+    this.localUser = castServer.toUser(server)
     // create a new LFA auth sync connection that routes auth sync messages through an existing websocket connection
     this.lfaConnection = new LFAConnection({
-      context: this.userContext,
+      context: this.serverContext,
+      // The durable-admission gate: membership is bound to its record, so the ADMIT_* link must be
+      // on disk before the acceptance carrying the graph and keyring goes out. The adversary is the
+      // joiner, who may hold a valid invitation and still want to join unrecorded. localfirst/auth
+      // appends the link, then waits on this before it queues ACCEPT_INVITATION; if it rejects, the
+      // connection fails closed with ADMISSION_NOT_PERSISTED and the invitee is sent nothing
+      // (QSS-006 / private#203).
+      persistAdmission: this.config.persistAdmission,
       sendMessage: (message: Uint8Array) => {
         if (message.byteLength >= AUTH_SYNC_LARGE_MESSAGE_BYTES) {
           this.logger.warn(
-            `Outbound auth-sync message is large: ${message.byteLength} bytes (user=${user.userId}, team=${this.sigChain.team.id})`,
+            `Outbound auth-sync message is large: ${message.byteLength} bytes (user=${this.localUser.userId}, team=${this.sigChain.team.id})`,
           )
         }
         const socketMessage: AuthSyncMessage = {
           ts: DateTime.utc().toMillis(),
           status: CommunityOperationStatus.SUCCESS,
           payload: {
-            userId: user.userId,
+            userId: this.localUser.userId,
             teamId: this.sigChain.team.id,
             message: uint8arrays.toString(message, 'base64'),
           },
@@ -132,11 +133,9 @@ export class AuthConnection extends EventEmitter {
         this.logger.debug(
           `Sending sync message because our chain is initialized`,
         )
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- this is valid
-        const { team, user } = this.userContext
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- this is valid
-        this.lfaConnection.emit('sync', { team, user })
-        const teamId = (team as Team).id
+        const team = this.sigChain.team
+        this.lfaConnection.emit('sync', { team, user: this.localUser })
+        const teamId = team.id
         this._status = AuthStatus.JOINED
         this.logger.debug(
           'Joining new socket to room on sign-in',
@@ -181,7 +180,7 @@ export class AuthConnection extends EventEmitter {
     })
 
     this.logger.log(
-      `Auth connection established with Peer for ${(this.userContext.team as Team).id}`,
+      `Auth connection established with Peer for ${this.sigChain.team.id}`,
     )
     this._status = AuthStatus.JOINING
     this.lfaConnection.start()

@@ -18,7 +18,7 @@ import type { CommunitiesHandlerConfig } from '../websocket/handlers/types/commo
 import _ from 'lodash'
 import { StoredKeyRingType } from '../encryption/types.js'
 import { CommunitiesStorageService } from './storage/communities.storage.service.js'
-import type { KeysetWithSecrets } from '@localfirst/crdx'
+import type { ServerWithSecrets } from '@localfirst/auth'
 import type { CompoundError } from '../utils/errors.js'
 import { RedisClient } from '../storage/redis/redis.client.js'
 import { LogEntrySyncStorageService } from './storage/log-entry-sync.storage.service.js'
@@ -99,7 +99,7 @@ describe('CommunitiesManagerService', () => {
         'utf8',
       )
       const serializedServerKeyring = uint8arrays.fromString(
-        JSON.stringify(testTeam.serverKeys),
+        JSON.stringify(testTeam.serverWithSecrets),
         'utf8',
       )
       await serverKeyManager!.storeKeyring(
@@ -163,7 +163,7 @@ describe('CommunitiesManagerService', () => {
         'utf8',
       )
       const serializedServerKeyring = uint8arrays.fromString(
-        JSON.stringify(testTeam.serverKeys),
+        JSON.stringify(testTeam.serverWithSecrets),
         'utf8',
       )
       await serverKeyManager!.storeKeyring(
@@ -203,7 +203,7 @@ describe('CommunitiesManagerService', () => {
         'utf8',
       )
       const serializedServerKeyring = uint8arrays.fromString(
-        JSON.stringify(testTeam.serverKeys),
+        JSON.stringify(testTeam.serverWithSecrets),
         'utf8',
       )
       await serverKeyManager!.storeKeyring(
@@ -246,7 +246,7 @@ describe('CommunitiesManagerService', () => {
         'utf8',
       )
       const serializedServerKeyring = uint8arrays.fromString(
-        JSON.stringify(testTeam.serverKeys),
+        JSON.stringify(testTeam.serverWithSecrets),
         'utf8',
       )
 
@@ -307,7 +307,7 @@ describe('CommunitiesManagerService', () => {
     })
 
     it('should throw an error when fetching stored server keys when no keys are stored', async () => {
-      let fetchedKeys: KeysetWithSecrets | undefined = undefined
+      let fetchedKeys: ServerWithSecrets | undefined = undefined
       let error: Error | undefined = undefined
       try {
         fetchedKeys = await manager!.getServerKeys(
@@ -331,7 +331,7 @@ describe('CommunitiesManagerService', () => {
         AllowedServerKeyState.NOT_STORED,
       )
       expect(newKeys).toBeDefined()
-      let fetchedKeys: KeysetWithSecrets | undefined = undefined
+      let fetchedKeys: ServerWithSecrets | undefined = undefined
       let error: Error | undefined = undefined
       try {
         fetchedKeys = await manager!.getServerKeys(

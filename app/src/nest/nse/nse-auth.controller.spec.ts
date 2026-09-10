@@ -15,10 +15,20 @@ const DEVICE_ID = 'test-device-id'
 
 const CHALLENGE_RESPONSE = {
   challengeId: 'challenge-abc',
-  challenge: { type: 'DEVICE', name: DEVICE_ID, nonce: 'abc', timestamp: 1 },
+  challenge: {
+    protocolVersion: 1,
+    type: 'DEVICE',
+    deviceId: DEVICE_ID,
+    teamId: TEAM_ID,
+    qssServerId: 'server-id',
+    challengeId: 'challenge-abc',
+    nonce: 'abc',
+    issuedAtMs: 1,
+    expiresAtMs: 2,
+  },
 }
 
-const PROOF = { signature: 'sig', publicKey: 'pub' }
+const SIGNATURE = 'sig'
 
 describe('NseAuthController', () => {
   let module: TestingModule | undefined
@@ -77,30 +87,49 @@ describe('NseAuthController', () => {
   })
 
   describe('issueChallenge', () => {
-    it('delegates to service and returns result', () => {
-      mockService.issueChallenge.mockReturnValue(CHALLENGE_RESPONSE)
+    it('delegates to service and returns result', async () => {
+      mockService.issueChallenge.mockResolvedValue(CHALLENGE_RESPONSE)
 
-      const result = controller.issueChallenge({
-        deviceId: DEVICE_ID,
-        teamId: TEAM_ID,
-      })
+      const result = await controller.issueChallenge(
+        { deviceId: DEVICE_ID, teamId: TEAM_ID },
+        { ip: '192.0.2.1' },
+      )
 
       // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock; method ref is safe
       expect(mockService.issueChallenge).toHaveBeenCalledWith(
         DEVICE_ID,
         TEAM_ID,
+        '192.0.2.1',
       )
-      expect(result).toBe(CHALLENGE_RESPONSE)
+      expect(result).toEqual(CHALLENGE_RESPONSE)
     })
 
-    it('propagates exceptions from service', () => {
-      mockService.issueChallenge.mockImplementation(() => {
-        throw new UnauthorizedException('Unknown team')
-      })
+    it('propagates exceptions from service', async () => {
+      mockService.issueChallenge.mockRejectedValue(
+        new UnauthorizedException('Unknown team'),
+      )
 
-      expect(() =>
-        controller.issueChallenge({ deviceId: DEVICE_ID, teamId: TEAM_ID }),
-      ).toThrow(UnauthorizedException)
+      await expect(
+        controller.issueChallenge(
+          { deviceId: DEVICE_ID, teamId: TEAM_ID },
+          { ip: '192.0.2.2' },
+        ),
+      ).rejects.toThrow(UnauthorizedException)
+    })
+
+    it.each([
+      ['missing deviceId', { teamId: TEAM_ID }],
+      ['missing teamId', { deviceId: DEVICE_ID }],
+      [
+        'extra field',
+        { deviceId: DEVICE_ID, teamId: TEAM_ID, publicKey: 'claimant-key' },
+      ],
+      ['null', null],
+    ])('rejects an exact-schema violation: %s', async (_label, body) => {
+      await expect(
+        controller.issueChallenge(body, { ip: '192.0.2.5' }),
+      ).rejects.toThrow('Unexpected request schema')
+      expect(mockService.issueChallenge).not.toHaveBeenCalled()
     })
   })
 
@@ -109,17 +138,21 @@ describe('NseAuthController', () => {
       const expected = { token: 'tok.sig', expiresIn: 900 }
       mockService.verifyAndIssueToken.mockResolvedValue(expected)
 
-      const result = await controller.verifyAndIssueToken({
-        challengeId: 'chal-id',
-        deviceId: DEVICE_ID,
-        proof: PROOF,
-      })
+      const result = await controller.verifyAndIssueToken(
+        {
+          challengeId: 'chal-id',
+          deviceId: DEVICE_ID,
+          signature: SIGNATURE,
+        },
+        { ip: '192.0.2.3' },
+      )
 
       // eslint-disable-next-line @typescript-eslint/unbound-method -- jest mock; method ref is safe
       expect(mockService.verifyAndIssueToken).toHaveBeenCalledWith(
         'chal-id',
         DEVICE_ID,
-        PROOF,
+        SIGNATURE,
+        '192.0.2.3',
       )
       expect(result).toBe(expected)
     })
@@ -130,12 +163,36 @@ describe('NseAuthController', () => {
       )
 
       await expect(
-        controller.verifyAndIssueToken({
-          challengeId: 'expired-id',
-          deviceId: DEVICE_ID,
-          proof: PROOF,
-        }),
+        controller.verifyAndIssueToken(
+          {
+            challengeId: 'expired-id',
+            deviceId: DEVICE_ID,
+            signature: SIGNATURE,
+          },
+          { ip: '192.0.2.4' },
+        ),
       ).rejects.toThrow(UnauthorizedException)
+    })
+
+    it.each([
+      ['missing challengeId', { deviceId: DEVICE_ID, signature: SIGNATURE }],
+      ['missing deviceId', { challengeId: 'chal-id', signature: SIGNATURE }],
+      ['missing signature', { challengeId: 'chal-id', deviceId: DEVICE_ID }],
+      [
+        'extra claimant key',
+        {
+          challengeId: 'chal-id',
+          deviceId: DEVICE_ID,
+          signature: SIGNATURE,
+          publicKey: 'claimant-key',
+        },
+      ],
+      ['null', null],
+    ])('rejects an exact-schema violation: %s', async (_label, body) => {
+      await expect(
+        controller.verifyAndIssueToken(body, { ip: '192.0.2.6' }),
+      ).rejects.toThrow('Unexpected request schema')
+      expect(mockService.verifyAndIssueToken).not.toHaveBeenCalled()
     })
   })
 

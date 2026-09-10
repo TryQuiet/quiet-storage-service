@@ -7,6 +7,8 @@ import type {
   CreateSecretCommandOutput,
   GetSecretValueCommand,
   GetSecretValueCommandOutput,
+  PutSecretValueCommand,
+  PutSecretValueCommandOutput,
 } from '@aws-sdk/client-secrets-manager'
 import { AWSSecretsService } from './aws-secrets.service.js'
 import { EnvVars } from '../config/env_vars.js'
@@ -19,6 +21,9 @@ interface AWSSecretsServiceInternals {
   executeCreateSecretCommandAws: (
     command: CreateSecretCommand,
   ) => Promise<CreateSecretCommandOutput>
+  executePutSecretValueCommandAws: (
+    command: PutSecretValueCommand,
+  ) => Promise<PutSecretValueCommandOutput>
 }
 
 interface AwsTestError extends Error {
@@ -193,6 +198,65 @@ describe('AWSSecretsService', () => {
       ).resolves.toBe('new-secret')
       expect(getSecretSpy).toHaveBeenCalledTimes(1)
       expect(createSecretSpy).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  /**
+   * `create` is a strict insert, so re-storing rotated key material under an existing secret name
+   * has to add a version instead (GLOBAL-QSS-002 / private#192).
+   */
+  describe('upsert', () => {
+    it('replaces the value of a secret that already exists', async () => {
+      const service = createService()
+      const putSecretSpy = jest
+        .spyOn(getInternals(service), 'executePutSecretValueCommandAws')
+        .mockResolvedValueOnce({ $metadata: {} })
+      const createSecretSpy = jest.spyOn(
+        getInternals(service),
+        'executeCreateSecretCommandAws',
+      )
+
+      await expect(
+        service.upsert('rotating-secret', 'new-value'),
+      ).resolves.toBeUndefined()
+
+      expect(putSecretSpy).toHaveBeenCalledTimes(1)
+      expect(createSecretSpy).not.toHaveBeenCalled()
+    })
+
+    it('creates the secret when nothing has been stored under that name yet', async () => {
+      const service = createService()
+      const putSecretSpy = jest
+        .spyOn(getInternals(service), 'executePutSecretValueCommandAws')
+        .mockRejectedValueOnce(makeAwsError('ResourceNotFoundException'))
+      const createSecretSpy = jest
+        .spyOn(getInternals(service), 'executeCreateSecretCommandAws')
+        .mockResolvedValueOnce({ $metadata: {} })
+
+      await expect(
+        service.upsert('brand-new-secret', 'first-value'),
+      ).resolves.toBeUndefined()
+
+      expect(putSecretSpy).toHaveBeenCalledTimes(1)
+      expect(createSecretSpy).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not fall back to creating the secret on an unrelated failure', async () => {
+      const service = createService()
+      jest
+        .spyOn(getInternals(service), 'executePutSecretValueCommandAws')
+        .mockRejectedValueOnce(
+          makeAwsError('AccessDeniedException', { httpStatusCode: 403 }),
+        )
+      const createSecretSpy = jest.spyOn(
+        getInternals(service),
+        'executeCreateSecretCommandAws',
+      )
+
+      await expect(service.upsert('forbidden-secret', 'value')).rejects.toThrow(
+        'Error upserting secret into AWS',
+      )
+      expect(createSecretSpy).not.toHaveBeenCalled()
     })
   })
 })

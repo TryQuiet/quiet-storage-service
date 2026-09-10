@@ -2,34 +2,116 @@ import { jest } from '@jest/globals'
 import { Test, type TestingModule } from '@nestjs/testing'
 import { UnauthorizedException } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
-import { NseAuthService } from './nse-auth.service.js'
+import { signatures } from '@localfirst/auth'
+import sodium from 'libsodium-wrappers-sumo'
+import { pack } from 'msgpackr'
+import {
+  NseAuthService,
+  NSE_AUTH_CHALLENGE_TTL_MS,
+  NSE_AUTH_PROTOCOL_VERSION,
+  NSE_AUTH_SIGNATURE_CONTEXT,
+  type ChallengePayload,
+} from './nse-auth.service.js'
 import { CommunitiesManagerService } from '../communities/communities-manager.service.js'
-import { signatures } from '@localfirst/crypto'
 
 const TEAM_ID = 'test-team-id'
 const DEVICE_ID = 'test-device-id'
-const PROOF = { signature: 'sig', publicKey: 'pub' }
+const QSS_SERVER_ID = 'qss-server-a'
+const BASE58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+const decodeBase58 = (encoded: string): Uint8Array => {
+  let value = 0n
+  for (const character of encoded)
+    value = value * 58n + BigInt(BASE58.indexOf(character))
+  const hex = value.toString(16)
+  const bytes =
+    value === 0n
+      ? []
+      : [...Buffer.from(hex.length % 2 === 0 ? hex : `0${hex}`, 'hex')]
+  return new Uint8Array([
+    ...new Uint8Array(/^1*/.exec(encoded)?.[0].length ?? 0),
+    ...bytes,
+  ])
+}
+const encodeBase58 = (bytes: Uint8Array): string => {
+  const hexBytes = Buffer.from(bytes).toString('hex')
+  let value = BigInt(`0x${hexBytes === '' ? '0' : hexBytes}`)
+  let encoded = ''
+  while (value > 0n) {
+    encoded = BASE58[Number(value % 58n)] + encoded
+    value /= 58n
+  }
+  for (const byte of bytes) {
+    if (byte !== 0) break
+    encoded = `1${encoded}`
+  }
+  return encoded
+}
 
-describe('NseAuthService', () => {
+const canonicalPayload = (challenge: ChallengePayload): unknown[] => [
+  challenge.protocolVersion,
+  challenge.type,
+  challenge.deviceId,
+  challenge.teamId,
+  challenge.qssServerId,
+  challenge.challengeId,
+  challenge.nonce,
+  challenge.issuedAtMs,
+  challenge.expiresAtMs,
+]
+
+describe('NseAuthService v1 device proof', () => {
   let module: TestingModule | undefined
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- assigned in beforeEach
-  let service!: NseAuthService
+  let service: NseAuthService
   let mockCommunitiesManager: jest.Mocked<
     Pick<CommunitiesManagerService, 'get'>
   >
+  const registeredKeys = signatures.keyPair('nse-auth-v1-fixture')
+
+  const setCommunity = (
+    qssServerId = QSS_SERVER_ID,
+    options: {
+      hasDevice?: boolean
+      removed?: boolean
+      hasServer?: boolean
+      serverRemoved?: boolean
+    } = {},
+  ): void => {
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- minimal LFA fixture
+    mockCommunitiesManager.get.mockResolvedValue({
+      teamId: TEAM_ID,
+      sigChain: {
+        context: { server: { serverId: qssServerId } },
+        team: {
+          deviceWasRemoved: jest.fn().mockReturnValue(options.removed ?? false),
+          hasDevice: jest.fn().mockReturnValue(options.hasDevice ?? true),
+          serverWasRemoved: jest
+            .fn()
+            .mockReturnValue(options.serverRemoved ?? false),
+          hasServer: jest.fn().mockReturnValue(options.hasServer ?? true),
+          device: jest
+            .fn()
+            .mockReturnValue({ keys: { signature: registeredKeys.publicKey } }),
+        },
+      },
+    } as never)
+  }
+
+  const sign = (
+    challenge: ChallengePayload,
+    context = NSE_AUTH_SIGNATURE_CONTEXT,
+  ): ReturnType<typeof signatures.sign> =>
+    signatures.sign(
+      canonicalPayload(challenge),
+      registeredKeys.secretKey,
+      context,
+    )
 
   beforeEach(async () => {
     mockCommunitiesManager = {
       get: jest.fn<CommunitiesManagerService['get']>(),
     }
-
     module = await Test.createTestingModule({
-      imports: [
-        JwtModule.register({
-          secret: 'test-secret',
-          signOptions: { expiresIn: 900 },
-        }),
-      ],
+      imports: [JwtModule.register({ secret: 'test-secret' })],
       providers: [
         NseAuthService,
         {
@@ -38,186 +120,356 @@ describe('NseAuthService', () => {
         },
       ],
     }).compile()
-
-    service = module.get<NseAuthService>(NseAuthService)
-    await service.onModuleInit()
+    service = module.get(NseAuthService)
+    service.onModuleInit()
+    setCommunity()
   })
 
   afterEach(async () => {
     service.onModuleDestroy()
     await module?.close()
-    jest.clearAllMocks()
+    jest.restoreAllMocks()
   })
 
-  it('should be defined', () => {
-    expect(service).toBeDefined()
+  it('issues the exact bounded v1 schema only for a registered active device', async () => {
+    const before = Date.now()
+    const { challengeId, challenge } = await service.issueChallenge(
+      DEVICE_ID,
+      TEAM_ID,
+      '192.0.2.1',
+    )
+    expect(Object.keys(challenge)).toEqual([
+      'protocolVersion',
+      'type',
+      'deviceId',
+      'teamId',
+      'qssServerId',
+      'challengeId',
+      'nonce',
+      'issuedAtMs',
+      'expiresAtMs',
+    ])
+    expect(challenge).toMatchObject({
+      protocolVersion: NSE_AUTH_PROTOCOL_VERSION,
+      type: 'DEVICE',
+      deviceId: DEVICE_ID,
+      teamId: TEAM_ID,
+      qssServerId: QSS_SERVER_ID,
+      challengeId,
+    })
+    expect(challenge.issuedAtMs).toBeGreaterThanOrEqual(before)
+    expect(challenge.expiresAtMs - challenge.issuedAtMs).toBe(
+      NSE_AUTH_CHALLENGE_TTL_MS,
+    )
+    expect(challenge.nonce).toMatch(/^[1-9A-HJ-NP-Za-km-z]+$/)
   })
 
-  describe('issueChallenge', () => {
-    it('returns challengeId and correctly shaped challenge', () => {
-      const result = service.issueChallenge(DEVICE_ID, TEAM_ID)
+  it.each([
+    ['unknown', { hasDevice: false }],
+    ['removed', { removed: true }],
+  ])(
+    'rejects an %s device before allocating a challenge',
+    async (_label, options) => {
+      setCommunity(QSS_SERVER_ID, options)
+      await expect(
+        service.issueChallenge(DEVICE_ID, TEAM_ID, '192.0.2.2'),
+      ).rejects.toThrow(UnauthorizedException)
+    },
+  )
 
-      expect(typeof result.challengeId).toBe('string')
-      expect(result.challengeId.length).toBeGreaterThan(0)
-      expect(result.challenge.type).toBe('DEVICE')
-      expect(result.challenge.name).toBe(DEVICE_ID)
-      expect(typeof result.challenge.nonce).toBe('string')
-      expect(result.challenge.nonce.length).toBeGreaterThan(0)
-      expect(typeof result.challenge.timestamp).toBe('number')
-    })
-
-    it('timestamp is within 1s of Date.now()', () => {
-      const before = Date.now()
-      const result = service.issueChallenge(DEVICE_ID, TEAM_ID)
-      const after = Date.now()
-
-      expect(result.challenge.timestamp).toBeGreaterThanOrEqual(before)
-      expect(result.challenge.timestamp).toBeLessThanOrEqual(after)
-    })
-
-    it('each call produces a unique challengeId', () => {
-      const a = service.issueChallenge(DEVICE_ID, TEAM_ID)
-      const b = service.issueChallenge(DEVICE_ID, TEAM_ID)
-      expect(a.challengeId).not.toBe(b.challengeId)
-    })
-
-    it('evicts expired challenges on next issue', () => {
-      const first = service.issueChallenge(DEVICE_ID, TEAM_ID)
-      jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 70_000)
-      try {
-        const second = service.issueChallenge(DEVICE_ID, TEAM_ID)
-        expect(second.challengeId).not.toBe(first.challengeId)
-      } finally {
-        jest.restoreAllMocks()
-      }
-    })
+  it('rejects an unknown team before allocating a challenge', async () => {
+    mockCommunitiesManager.get.mockResolvedValue(undefined)
+    await expect(
+      service.issueChallenge(DEVICE_ID, TEAM_ID, '192.0.2.3'),
+    ).rejects.toThrow('Unknown team')
   })
 
-  describe('verifyAndIssueToken', () => {
-    const registeredKeys = signatures.keyPair()
+  it.each([
+    ['missing', { hasServer: false }],
+    ['removed', { serverRemoved: true }],
+  ])(
+    'rejects a challenge when this QSS is %s from the team',
+    async (_label, options) => {
+      setCommunity(QSS_SERVER_ID, options)
+      await expect(
+        service.issueChallenge(DEVICE_ID, TEAM_ID, '192.0.2.4'),
+      ).rejects.toThrow('QSS server is not active for team')
+    },
+  )
 
-    const setRegisteredDevice = (): void => {
-      const mockCommunity = {
-        teamId: TEAM_ID,
-        sigChain: {
-          team: {
-            deviceWasRemoved: jest.fn().mockReturnValue(false),
-            hasDevice: jest.fn().mockReturnValue(true),
-            device: jest.fn().mockReturnValue({
-              keys: { signature: registeredKeys.publicKey },
-            }),
-          },
-        },
-      }
-      mockCommunitiesManager.get.mockResolvedValue(mockCommunity as never)
+  it('issues a JWT for the registered device without accepting claimant key material', async () => {
+    const { challengeId, challenge } = await service.issueChallenge(
+      DEVICE_ID,
+      TEAM_ID,
+    )
+    const result = await service.verifyAndIssueToken(
+      challengeId,
+      DEVICE_ID,
+      sign(challenge),
+    )
+    expect(result.expiresIn).toBe(900)
+    expect(result.token).toEqual(expect.any(String))
+  })
+
+  it('accepts the fixed signature fixture emitted by native implementations', async () => {
+    const challenge: ChallengePayload = {
+      protocolVersion: 1,
+      type: 'DEVICE',
+      deviceId: 'device-test-1',
+      teamId: 'team-test-1',
+      qssServerId: 'qss-test-1',
+      challengeId: '00112233445566778899aabbccddeeff',
+      nonce: '11111111111111111111111111111111',
+      issuedAtMs: 1_700_000_000_000,
+      expiresAtMs: 1_700_000_030_000,
+    }
+    expect(registeredKeys.publicKey).toBe(
+      '3J7vYeD99DJiP2mjAkCgtxBk6Pkx4CXEDNsgz3Vc7Ted',
+    )
+    setCommunity('qss-test-1')
+    const challengeStore = service as unknown as {
+      challenges: Map<string, { challenge: ChallengePayload }>
+    }
+    challengeStore.challenges.set(challenge.challengeId, { challenge })
+    jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000)
+
+    await expect(
+      service.verifyAndIssueToken(
+        challenge.challengeId,
+        challenge.deviceId,
+        '62XsfcCvq4SeRxmVK6LNyjuPpLyUSaCxPD315LRtfet9GnHQ6zu5sg8muz1eh4ZvvnZ6m3SH88KRztu4gm8W5YQk',
+      ),
+    ).resolves.toMatchObject({ expiresIn: 900 })
+  })
+
+  it.each([
+    [
+      'protocolVersion',
+      (challenge: ChallengePayload) => ({ ...challenge, protocolVersion: 2 }),
+    ],
+    [
+      'type',
+      (challenge: ChallengePayload) => ({ ...challenge, type: 'SERVER' }),
+    ],
+    [
+      'deviceId',
+      (challenge: ChallengePayload) => ({
+        ...challenge,
+        deviceId: 'other-device',
+      }),
+    ],
+    [
+      'teamId',
+      (challenge: ChallengePayload) => ({ ...challenge, teamId: 'other-team' }),
+    ],
+    [
+      'qssServerId',
+      (challenge: ChallengePayload) => ({
+        ...challenge,
+        qssServerId: 'qss-server-b',
+      }),
+    ],
+    [
+      'challengeId',
+      (challenge: ChallengePayload) => ({
+        ...challenge,
+        challengeId: 'ffffffffffffffffffffffffffffffff',
+      }),
+    ],
+    [
+      'nonce',
+      (challenge: ChallengePayload) => ({
+        ...challenge,
+        nonce: encodeBase58(new Uint8Array(32).fill(7)),
+      }),
+    ],
+    [
+      'issuedAtMs',
+      (challenge: ChallengePayload) => ({
+        ...challenge,
+        issuedAtMs: challenge.issuedAtMs + 1,
+      }),
+    ],
+    [
+      'expiresAtMs',
+      (challenge: ChallengePayload) => ({
+        ...challenge,
+        expiresAtMs: challenge.expiresAtMs + 1,
+      }),
+    ],
+  ] satisfies Array<
+    [string, (challenge: ChallengePayload) => ChallengePayload]
+  >)('binds the signature to canonical %s', async (_field, mutate) => {
+    const { challengeId, challenge } = await service.issueChallenge(
+      DEVICE_ID,
+      TEAM_ID,
+    )
+
+    await expect(
+      service.verifyAndIssueToken(
+        challengeId,
+        DEVICE_ID,
+        sign(mutate(challenge)),
+      ),
+    ).rejects.toThrow('Invalid signature')
+  })
+
+  it('enforces bidirectional separation from raw and every relevant LFA domain', async () => {
+    const lfaContexts = [
+      'lf/auth/identity-challenge',
+      'lf/auth/invitation-proof',
+      'lf/crdx/link-authorship',
+      'lf/auth/team-message',
+      'lf/auth/device-possession',
+    ]
+    for (const context of lfaContexts) {
+      const { challengeId, challenge } = await service.issueChallenge(
+        DEVICE_ID,
+        TEAM_ID,
+      )
+      await expect(
+        service.verifyAndIssueToken(
+          challengeId,
+          DEVICE_ID,
+          sign(challenge, context),
+        ),
+      ).rejects.toThrow('Invalid signature')
     }
 
-    it('throws UnauthorizedException if challengeId not found', async () => {
-      await expect(
-        service.verifyAndIssueToken('nonexistent', DEVICE_ID, PROOF),
-      ).rejects.toThrow(UnauthorizedException)
-    })
+    const { challengeId, challenge } = await service.issueChallenge(
+      DEVICE_ID,
+      TEAM_ID,
+    )
+    const raw = encodeBase58(
+      sodium.crypto_sign_detached(
+        pack(canonicalPayload(challenge)),
+        decodeBase58(registeredKeys.secretKey),
+      ),
+    )
+    await expect(
+      service.verifyAndIssueToken(challengeId, DEVICE_ID, raw),
+    ).rejects.toThrow('Invalid signature')
 
-    it('throws UnauthorizedException if challenge is expired', async () => {
-      const { challengeId } = service.issueChallenge(DEVICE_ID, TEAM_ID)
-      jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 70_000)
-      try {
-        await expect(
-          service.verifyAndIssueToken(challengeId, DEVICE_ID, PROOF),
-        ).rejects.toThrow(UnauthorizedException)
-      } finally {
-        jest.restoreAllMocks()
-      }
-    })
-
-    it('throws UnauthorizedException for invalid base58 in proof', async () => {
-      const { challengeId } = service.issueChallenge(DEVICE_ID, TEAM_ID)
-      setRegisteredDevice()
-      await expect(
-        service.verifyAndIssueToken(challengeId, DEVICE_ID, {
-          signature: '0OIl', // invalid base58 chars
-          publicKey: 'pub',
+    const nseProof = sign(challenge)
+    for (const context of lfaContexts) {
+      expect(
+        signatures.verify({
+          payload: canonicalPayload(challenge),
+          signature: nseProof,
+          publicKey: registeredKeys.publicKey,
+          context,
         }),
-      ).rejects.toThrow(UnauthorizedException)
-    })
+      ).toBe(false)
+    }
+    expect(
+      sodium.crypto_sign_verify_detached(
+        decodeBase58(nseProof),
+        pack(canonicalPayload(challenge)),
+        decodeBase58(registeredKeys.publicKey),
+      ),
+    ).toBe(false)
+  })
 
-    it('throws UnauthorizedException if token request device does not match challenged device', async () => {
-      const { challengeId } = service.issueChallenge(DEVICE_ID, TEAM_ID)
+  it('prevents a live relay between QSS identities', async () => {
+    const { challengeId, challenge } = await service.issueChallenge(
+      DEVICE_ID,
+      TEAM_ID,
+    )
+    const relayedPayload = [...canonicalPayload(challenge)]
+    relayedPayload[4] = 'qss-server-b'
+    const signatureForB = signatures.sign(
+      relayedPayload,
+      registeredKeys.secretKey,
+      NSE_AUTH_SIGNATURE_CONTEXT,
+    )
+    await expect(
+      service.verifyAndIssueToken(challengeId, DEVICE_ID, signatureForB),
+    ).rejects.toThrow('Invalid signature')
+  })
 
+  it('rejects redemption if this QSS was removed after issuing the challenge', async () => {
+    const { challengeId, challenge } = await service.issueChallenge(
+      DEVICE_ID,
+      TEAM_ID,
+    )
+    setCommunity(QSS_SERVER_ID, { serverRemoved: true })
+    await expect(
+      service.verifyAndIssueToken(challengeId, DEVICE_ID, sign(challenge)),
+    ).rejects.toThrow('QSS server is not active for team')
+  })
+
+  it('requires a canonical 64-byte Base58 signature', async () => {
+    const { challengeId } = await service.issueChallenge(DEVICE_ID, TEAM_ID)
+    await expect(
+      service.verifyAndIssueToken(challengeId, DEVICE_ID, '111'),
+    ).rejects.toThrow('Invalid signature encoding')
+  })
+
+  it('consumes a challenge atomically so only one concurrent redemption succeeds', async () => {
+    const { challengeId, challenge } = await service.issueChallenge(
+      DEVICE_ID,
+      TEAM_ID,
+    )
+    const proof = sign(challenge)
+    const results = await Promise.allSettled([
+      service.verifyAndIssueToken(challengeId, DEVICE_ID, proof),
+      service.verifyAndIssueToken(challengeId, DEVICE_ID, proof),
+    ])
+    expect(
+      results.filter(result => result.status === 'fulfilled'),
+    ).toHaveLength(1)
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(
+      1,
+    )
+  })
+
+  it('expires challenges and bounds outstanding challenges per device', async () => {
+    for (let index = 0; index < 5; index += 1)
+      await service.issueChallenge(DEVICE_ID, TEAM_ID)
+    await expect(service.issueChallenge(DEVICE_ID, TEAM_ID)).rejects.toThrow(
+      'Too many outstanding challenges',
+    )
+    const now = Date.now()
+    jest.spyOn(Date, 'now').mockReturnValue(now + NSE_AUTH_CHALLENGE_TTL_MS + 1)
+    await expect(
+      service.issueChallenge(DEVICE_ID, TEAM_ID),
+    ).resolves.toBeDefined()
+  })
+
+  it('rate limits token attempts per source IP', async () => {
+    for (let index = 0; index < 60; index += 1) {
       await expect(
-        service.verifyAndIssueToken(challengeId, 'other-device-id', PROOF),
-      ).rejects.toThrow(UnauthorizedException)
-    })
-
-    it('throws UnauthorizedException if the device is not registered on the team', async () => {
-      const { challengeId, challenge } = service.issueChallenge(
+        service.verifyAndIssueToken(
+          '00000000000000000000000000000000',
+          DEVICE_ID,
+          'invalid',
+          '192.0.2.9',
+        ),
+      ).rejects.toThrow('Challenge expired or not found')
+    }
+    await expect(
+      service.verifyAndIssueToken(
+        '00000000000000000000000000000000',
         DEVICE_ID,
-        TEAM_ID,
-      )
-      const otherKeys = signatures.keyPair()
-      const mockCommunity = {
-        teamId: TEAM_ID,
-        sigChain: {
-          team: {
-            deviceWasRemoved: jest.fn().mockReturnValue(false),
-            hasDevice: jest.fn().mockReturnValue(false),
-          },
-        },
-      }
-      mockCommunitiesManager.get.mockResolvedValue(mockCommunity as never)
+        'invalid',
+        '192.0.2.9',
+      ),
+    ).rejects.toThrow('Token rate limit exceeded')
+  })
 
-      await expect(
-        service.verifyAndIssueToken(challengeId, DEVICE_ID, {
-          signature: signatures.sign(challenge, otherKeys.secretKey),
-          publicKey: otherKeys.publicKey,
-        }),
-      ).rejects.toThrow(UnauthorizedException)
-    })
+  it('rate limits challenge attempts and prunes an expired IP window', async () => {
+    const now = Date.now()
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now)
+    for (let index = 0; index < 30; index += 1) {
+      await service.issueChallenge(`device-${index}`, TEAM_ID, '192.0.2.10')
+    }
+    await expect(
+      service.issueChallenge('device-over-limit', TEAM_ID, '192.0.2.10'),
+    ).rejects.toThrow('Challenge rate limit exceeded')
 
-    it('throws UnauthorizedException if proof public key does not match the registered device key', async () => {
-      const { challengeId, challenge } = service.issueChallenge(
-        DEVICE_ID,
-        TEAM_ID,
-      )
-      const otherKeys = signatures.keyPair()
-      setRegisteredDevice()
-
-      await expect(
-        service.verifyAndIssueToken(challengeId, DEVICE_ID, {
-          signature: signatures.sign(challenge, otherKeys.secretKey),
-          publicKey: otherKeys.publicKey,
-        }),
-      ).rejects.toThrow(UnauthorizedException)
-    })
-
-    it('issues a JWT when the proof matches the registered device key for the team', async () => {
-      const { challengeId, challenge } = service.issueChallenge(
-        DEVICE_ID,
-        TEAM_ID,
-      )
-      setRegisteredDevice()
-
-      const result = await service.verifyAndIssueToken(challengeId, DEVICE_ID, {
-        signature: signatures.sign(challenge, registeredKeys.secretKey),
-        publicKey: registeredKeys.publicKey,
-      })
-
-      expect(result.expiresIn).toBe(900)
-      expect(typeof result.token).toBe('string')
-      expect(result.token.length).toBeGreaterThan(0)
-    })
-
-    it('consumes the challenge (second call fails)', async () => {
-      const { challengeId } = service.issueChallenge(DEVICE_ID, TEAM_ID)
-      // First attempt — will throw (invalid sig) but consumes the challenge
-      setRegisteredDevice()
-      await expect(
-        service.verifyAndIssueToken(challengeId, DEVICE_ID, PROOF),
-      ).rejects.toThrow(UnauthorizedException)
-      // Second attempt — challenge already gone
-      await expect(
-        service.verifyAndIssueToken(challengeId, DEVICE_ID, PROOF),
-      ).rejects.toThrow(UnauthorizedException)
-    })
+    nowSpy.mockReturnValue(now + 60_001)
+    await expect(
+      service.issueChallenge('device-after-window', TEAM_ID, '192.0.2.10'),
+    ).resolves.toBeDefined()
   })
 })

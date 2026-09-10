@@ -20,6 +20,7 @@ import {
   CommunityNotFoundError,
   SignatureMismatchError,
 } from '../../utils/errors.js'
+import { registerAcknowledgedEvent } from './safe-event-handler.js'
 
 const baseLogger = createLogger('Websocket:Event:Communities:LogEntrySync')
 
@@ -160,6 +161,18 @@ export function registerLogEntrySyncHandlers(
   }
 
   // register event handlers on this socket
-  config.socket.on(WebsocketEvents.LogEntrySync, handleLogEntrySync)
-  config.socket.on(WebsocketEvents.LogEntryPull, handleLogEntryPull)
+  registerAcknowledgedEvent(
+    config.socket,
+    WebsocketEvents.LogEntrySync,
+    handleLogEntrySync,
+    _logger,
+    { requiresPayload: true },
+  )
+  registerAcknowledgedEvent(
+    config.socket,
+    WebsocketEvents.LogEntryPull,
+    handleLogEntryPull,
+    _logger,
+    { requiresPayload: true },
+  )
 }
