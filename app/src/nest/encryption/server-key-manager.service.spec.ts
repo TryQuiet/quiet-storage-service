@@ -19,10 +19,25 @@ describe('ServerKeyManagerService - server encryption key retrieval failure hand
   const createMockSecrets = (): {
     get: jest.Mock<(name: string) => Promise<string | Uint8Array | undefined>>
     create: jest.Mock<(name: string, secret: string) => Promise<void>>
+    update: jest.Mock<
+      (
+        name: string,
+        secret: string,
+        clientRequestToken: string,
+      ) => Promise<void>
+    >
     upsert: jest.Mock<(name: string, secret: string) => Promise<void>>
   } => ({
     get: jest.fn<(name: string) => Promise<string | Uint8Array | undefined>>(),
     create: jest.fn<(name: string, secret: string) => Promise<void>>(),
+    update:
+      jest.fn<
+        (
+          name: string,
+          secret: string,
+          clientRequestToken: string,
+        ) => Promise<void>
+      >(),
     upsert: jest.fn<(name: string, secret: string) => Promise<void>>(),
   })
 
@@ -77,6 +92,92 @@ describe('ServerKeyManagerService - server encryption key retrieval failure hand
     expect(mockSecrets.create).not.toHaveBeenCalled()
     expect(encrypted.payload).toBeDefined()
     expect(encrypted.nonce).toBeDefined()
+  })
+
+  it('updates an existing keyring without invoking secret creation', async () => {
+    const existingKey = sodiumHelper.toBase64(
+      sodiumHelper.sodium.crypto_secretbox_keygen(),
+    )
+    const mockSecrets = createMockSecrets()
+    mockSecrets.get.mockResolvedValueOnce(existingKey)
+    mockSecrets.update.mockResolvedValueOnce(undefined)
+
+    const service = makeService(mockSecrets)
+    const keyring = sodiumHelper.sodium.randombytes_buf(32)
+    await service.updateKeyring(
+      'team-id',
+      keyring,
+      StoredKeyRingType.TEAM_KEYRING,
+    )
+
+    expect(mockSecrets.update).toHaveBeenCalledTimes(1)
+    expect(mockSecrets.update.mock.calls[0][2]).toHaveLength(64)
+    expect(mockSecrets.create).not.toHaveBeenCalled()
+  })
+
+  it('reuses ciphertext and the request token after an ambiguous update failure', async () => {
+    const existingKey = sodiumHelper.toBase64(
+      sodiumHelper.sodium.crypto_secretbox_keygen(),
+    )
+    const mockSecrets = createMockSecrets()
+    mockSecrets.get.mockResolvedValueOnce(existingKey)
+    mockSecrets.update
+      .mockRejectedValueOnce(new Error('response lost after commit'))
+      .mockResolvedValueOnce(undefined)
+
+    const service = makeService(mockSecrets)
+    const encryptSpy = jest.spyOn(service, 'encrypt')
+    const keyring = sodiumHelper.sodium.randombytes_buf(32)
+
+    await expect(
+      service.updateKeyring('team-id', keyring, StoredKeyRingType.TEAM_KEYRING),
+    ).rejects.toThrow('Error while encrypting and updating keyring in AWS!')
+    await service.updateKeyring(
+      'team-id',
+      keyring,
+      StoredKeyRingType.TEAM_KEYRING,
+    )
+
+    expect(mockSecrets.update).toHaveBeenCalledTimes(2)
+    expect(mockSecrets.update.mock.calls[1]).toEqual(
+      mockSecrets.update.mock.calls[0],
+    )
+    expect(encryptSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses a new ciphertext-bound request token after service recreation', async () => {
+    const existingKey = sodiumHelper.toBase64(
+      sodiumHelper.sodium.crypto_secretbox_keygen(),
+    )
+    const mockSecrets = createMockSecrets()
+    mockSecrets.get.mockResolvedValue(existingKey)
+    mockSecrets.update
+      .mockRejectedValueOnce(new Error('response lost after commit'))
+      .mockResolvedValueOnce(undefined)
+    const keyring = sodiumHelper.sodium.randombytes_buf(32)
+
+    const firstService = makeService(mockSecrets)
+    await expect(
+      firstService.updateKeyring(
+        'team-id',
+        keyring,
+        StoredKeyRingType.TEAM_KEYRING,
+      ),
+    ).rejects.toThrow('Error while encrypting and updating keyring in AWS!')
+
+    const recreatedService = makeService(mockSecrets)
+    await recreatedService.updateKeyring(
+      'team-id',
+      keyring,
+      StoredKeyRingType.TEAM_KEYRING,
+    )
+
+    expect(mockSecrets.update).toHaveBeenCalledTimes(2)
+    const [firstCall, recreatedCall] = mockSecrets.update.mock.calls
+    const [, firstCiphertext, firstToken] = firstCall
+    const [, recreatedCiphertext, recreatedToken] = recreatedCall
+    expect(recreatedCiphertext).not.toBe(firstCiphertext)
+    expect(recreatedToken).not.toBe(firstToken)
   })
 })
 

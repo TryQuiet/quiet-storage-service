@@ -11,6 +11,7 @@ import {
   CreateSecretCommand,
   CreateSecretCommandOutput,
   PutSecretValueCommand,
+  PutSecretValueCommandInput,
   PutSecretValueCommandOutput,
 } from '@aws-sdk/client-secrets-manager'
 import { Injectable } from '@nestjs/common'
@@ -212,12 +213,56 @@ export class AWSSecretsService {
   }
 
   /**
-   * Write a secret by name, replacing the value if the secret already exists.
+   * Add a new value version to an existing secret.
    *
-   * `create` is a strict insert — AWS rejects a name that is already taken — which is what we want
-   * for identity material that must never be replaced. Rotatable material has to be re-written:
-   * the team keyring gains a keyset every time team keys rotate, and the newest generation has to
-   * reach durable storage or a cold reload can no longer decrypt the graph it is stored alongside.
+   * This is intentionally separate from create so a missing secret remains an
+   * error instead of silently changing a create operation into an upsert.
+   *
+   * @param secretName Existing secret name we are updating
+   * @param secret Encrypted secret value to store
+   * @param clientRequestToken Stable idempotency token for this secret value
+   */
+  public async update(
+    secretName: string,
+    secret: string | Uint8Array,
+    clientRequestToken: string,
+  ): Promise<void> {
+    try {
+      if (this.local) {
+        const existingSecret = await this.redisClient.get(secretName)
+        if (existingSecret == null) {
+          throw new Error(`Cannot update missing secret ${secretName}`)
+        }
+        await this.redisClient.set(secretName, secret)
+        this.updateCachedSecretEnvVar(secretName, secret)
+        return
+      }
+
+      const commandInput: PutSecretValueCommandInput = {
+        SecretId: secretName,
+        ClientRequestToken: clientRequestToken,
+      }
+      if (typeof secret === 'string') {
+        commandInput.SecretString = secret
+      } else if (isUint8Array(secret)) {
+        commandInput.SecretBinary = secret
+      } else {
+        throw new Error(`Secret must be a string or Uint8Array!`)
+      }
+
+      const command = new PutSecretValueCommand(commandInput)
+      await this.executePutSecretValueCommandAws(command)
+      this.updateCachedSecretEnvVar(secretName, secret)
+    } catch (e) {
+      this.logger.error('Error updating secret:', e)
+      throw new CompoundError(
+        'Error updating secret in AWS',
+        AWSSecretsService.normalizeError(e),
+      )
+    }
+  }
+  /**
+   * Write a secret by name, replacing the value if it exists or creating it otherwise.
    *
    * @param secretName Secret name we are writing
    * @param secret Encrypted secret to write

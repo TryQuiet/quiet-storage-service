@@ -24,6 +24,7 @@ import { ClientEvents } from './ws.client.events.js'
 import { QuietLogger } from '../nest/app/logger/types.js'
 import { ConfigService } from '../nest/utils/config/config.service.js'
 import { EnvVars } from '../nest/utils/config/env_vars.js'
+import { getDeviceId } from '../nest/communities/auth/device-id.js'
 
 @Injectable()
 export class QSSClientAuthConnection extends EventEmitter {
@@ -109,6 +110,7 @@ export class QSSClientAuthConnection extends EventEmitter {
             status: CommunityOperationStatus.SENDING,
             payload: {
               userId: this.context.user.userId,
+              deviceId: getDeviceId(this.context.device),
               teamId: this.teamId,
               message: uint8arrays.toString(message, 'base64'),
             },

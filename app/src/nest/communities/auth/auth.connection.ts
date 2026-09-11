@@ -30,6 +30,11 @@ import { type AuthDisconnectedPayload, AuthEvents } from './auth.events.js'
 // is worth flagging so we notice graph growth before it bites.
 const AUTH_SYNC_LARGE_MESSAGE_BYTES = 512 * 1024
 
+interface AuthenticatedPeerIdentity {
+  peer?: { userId: string }
+  theirDevice?: { deviceId: string }
+}
+
 export class AuthConnection extends EventEmitter {
   /**
    * Auth sync connection
@@ -60,7 +65,8 @@ export class AuthConnection extends EventEmitter {
   private readonly logger = createLogger(`Communities:Auth:Connection`)
 
   constructor(
-    private readonly userId: string,
+    public readonly userId: string,
+    public readonly deviceId: string,
     private readonly sigChain: SigChain,
     private readonly config: AuthConnectionParams,
   ) {
@@ -92,14 +98,18 @@ export class AuthConnection extends EventEmitter {
       sendMessage: (message: Uint8Array) => {
         if (message.byteLength >= AUTH_SYNC_LARGE_MESSAGE_BYTES) {
           this.logger.warn(
-            `Outbound auth-sync message is large: ${message.byteLength} bytes (user=${this.localUser.userId}, team=${this.sigChain.team.id})`,
+            `Outbound auth-sync message is large: ${this.logContext} status=${this._status} bytes=${message.byteLength}`,
           )
         }
+        this.logger.debug(
+          `Routing outbound auth-sync through mapped connection: ${this.logContext} status=${this._status} bytes=${message.byteLength}`,
+        )
         const socketMessage: AuthSyncMessage = {
           ts: DateTime.utc().toMillis(),
           status: CommunityOperationStatus.SUCCESS,
           payload: {
-            userId: this.localUser.userId,
+            userId: this.userId,
+            deviceId: this.deviceId,
             teamId: this.sigChain.team.id,
             message: uint8arrays.toString(message, 'base64'),
           },
@@ -123,6 +133,10 @@ export class AuthConnection extends EventEmitter {
     return this.config.socket.id
   }
 
+  private get logContext(): string {
+    return `teamId=${this.sigChain.team.id} userId=${this.userId} deviceId=${this.deviceId} socketId=${this.socketId}`
+  }
+
   /**
    * Start the auth sync connection and handle connection events
    */
@@ -130,30 +144,54 @@ export class AuthConnection extends EventEmitter {
     // Set up auth connection event handlers.
     this.lfaConnection.on(LFAEvents.CONNECTED, async () => {
       try {
+        const { peer, theirDevice } = this.lfaConnection
+          ._context as AuthenticatedPeerIdentity
         this.logger.debug(
-          `Sending sync message because our chain is initialized`,
+          `LFA authenticated peer identity: ${this.logContext} authenticatedUserId=${peer?.userId ?? 'unknown'} authenticatedDeviceId=${theirDevice?.deviceId ?? 'unknown'}`,
+        )
+        if (
+          peer?.userId !== this.userId ||
+          theirDevice?.deviceId !== this.deviceId
+        ) {
+          this.logger.warn(
+            `Rejecting auth connection because authenticated identity did not match requested session: ${this.logContext} authenticatedUserId=${peer?.userId ?? 'unknown'} authenticatedDeviceId=${theirDevice?.deviceId ?? 'unknown'}`,
+          )
+          this.stop()
+          return
+        }
+
+        this.logger.debug(
+          `LFA authentication completed; sending initial sync: ${this.logContext} previousStatus=${this._status}`,
         )
         const team = this.sigChain.team
         this.lfaConnection.emit('sync', { team, user: this.localUser })
         const teamId = team.id
         this._status = AuthStatus.JOINED
         this.logger.debug(
-          'Joining new socket to room on sign-in',
-          this.config.socket.id,
-          teamId,
+          `Auth connection joined; adding socket to team room: ${this.logContext} status=${this._status}`,
         )
         await this.config.socket.join(teamId)
+        this.logger.debug(
+          `Socket joined team room for auth connection: ${this.logContext}`,
+        )
       } catch (e) {
-        this.logger.error('Error while sending auth sync message', e)
+        this.logger.error(
+          `Error while completing auth connection: ${this.logContext}`,
+          e,
+        )
       }
     })
 
     // handle disconnects
     this.lfaConnection.on(LFAEvents.DISCONNECTED, () => {
-      this.logger.debug(`LFA disconnected`)
+      const previousStatus = this._status
       this._status = AuthStatus.REJECTED_OR_CLOSED
+      this.logger.debug(
+        `LFA auth connection disconnected: ${this.logContext} previousStatus=${previousStatus} status=${this._status}`,
+      )
       const payload: AuthDisconnectedPayload = {
         userId: this.userId,
+        deviceId: this.deviceId,
         teamId: this.sigChain.team.id,
       }
       this.emit(AuthEvents.AuthDisconnected, payload)
@@ -162,10 +200,13 @@ export class AuthConnection extends EventEmitter {
     // handle chain updates
     this.lfaConnection.on(LFAEvents.UPDATED, head => {
       try {
-        this.logger.debug('Received sync message, team graph updated', head)
+        this.logger.debug(
+          `Auth connection updated team graph: ${this.logContext}`,
+          head,
+        )
       } catch (e) {
         this.logger.error(
-          'Error while processing received auth sync message',
+          `Error while processing received auth sync message: ${this.logContext}`,
           e,
         )
       }
@@ -173,27 +214,36 @@ export class AuthConnection extends EventEmitter {
 
     // Handle errors from local or remote sources.
     this.lfaConnection.on(LFAEvents.LOCAL_ERROR, error => {
-      this.logger.error(`Local LFA error`, error)
+      this.logger.error(`Local LFA error: ${this.logContext}`, error)
     })
     this.lfaConnection.on(LFAEvents.REMOTE_ERROR, error => {
-      this.logger.error(`Remote LFA error`, error)
+      this.logger.error(`Remote LFA error: ${this.logContext}`, error)
     })
 
-    this.logger.log(
-      `Auth connection established with Peer for ${this.sigChain.team.id}`,
+    this.logger.debug(
+      `Starting LFA auth connection: ${this.logContext} previousStatus=${this._status}`,
     )
     this._status = AuthStatus.JOINING
     this.lfaConnection.start()
+    this.logger.debug(
+      `LFA auth connection start invoked: ${this.logContext} status=${this._status}`,
+    )
   }
 
   /**
    * Stop the auth sync connection
    */
   public stop(): void {
-    this.logger.debug('Closing connection with user')
+    this.logger.debug(
+      `Stopping LFA auth connection: ${this.logContext} status=${this._status}`,
+    )
     this.lfaConnection.stop(true)
+    this.logger.debug(
+      `LFA auth connection stop invoked: ${this.logContext} status=${this._status}`,
+    )
     const payload: AuthDisconnectedPayload = {
       userId: this.userId,
+      deviceId: this.deviceId,
       teamId: this.sigChain.team.id,
     }
     this.emit(AuthEvents.AuthDisconnected, payload)
