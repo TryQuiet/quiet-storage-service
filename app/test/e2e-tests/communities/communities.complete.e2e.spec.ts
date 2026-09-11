@@ -152,8 +152,12 @@ describe('Communities', () => {
         USER_NAME,
         DEVICE_NAME,
       )
-      // QSS admission requires the invitation to carry the member role grant.
+      // QSS cannot grant the member role itself. The founder's invitation must
+      // carry a current grant that the invitee can claim after server admission.
       invite = testTeam.team.inviteMember({ roleNames: ['member'] })
+      expect(
+        testTeam.team.hasCurrentInvitationRoleGrant(invite.id, 'member'),
+      ).toBe(true)
     })
 
     it('should validate that the context and team are defined', () => {
@@ -404,6 +408,12 @@ describe('Communities', () => {
           expect(
             testTeam.team.memberByDeviceId(secondClientContext.device.deviceId),
           ).toBeDefined()
+          expect(
+            testTeam.team.memberHasRole(
+              secondClientContext.user.userId,
+              'member',
+            ),
+          ).toBe(true)
         },
         { timeout: 15_000 },
       )
@@ -462,14 +472,19 @@ describe('Communities', () => {
       )
     })
 
-    it('should have both users in the teams socketio room', () => {
-      // eslint-disable-next-line @typescript-eslint/prefer-destructuring -- false positive?
-      const { rooms } = websocketGateway.io.sockets.adapter
-      const room = rooms.get(testTeam.team.id)
-      expect(room).toBeDefined()
-      expect(room!.size).toBe(2)
+    it('should have both users in the teams socketio room', async () => {
+      await waitFor(() => {
+        // eslint-disable-next-line @typescript-eslint/prefer-destructuring -- false positive?
+        const { rooms } = websocketGateway.io.sockets.adapter
+        const room = rooms.get(testTeam.team.id)
+        expect(room).toBeDefined()
+        expect(room!.size).toBe(2)
+      })
 
-      logger.info('Room members:', Array.from(room!))
+      const room = websocketGateway.io.sockets.adapter.rooms.get(
+        testTeam.team.id,
+      )!
+      logger.info('Room members:', Array.from(room))
       logger.info('Test client socket id:', testClient.sockets.client.id)
       logger.info(
         'Second test client socket id:',
