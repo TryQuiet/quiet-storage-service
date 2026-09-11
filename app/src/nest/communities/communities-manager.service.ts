@@ -42,13 +42,15 @@ import {
 import { HOSTNAME, SERIALIZER } from '../app/const.js'
 import { SigChain } from './auth/sigchain.js'
 import { AuthConnection } from './auth/auth.connection.js'
-import { NativeServerWebsocketEvents } from '../websocket/ws.types.js'
+import {
+  NativeServerWebsocketEvents,
+  type QuietSocket,
+} from '../websocket/ws.types.js'
 import {
   AuthConnectionConfig,
   AuthStatus,
   SigchainEvents,
 } from './auth/types.js'
-import { Socket } from 'socket.io'
 import { AuthDisconnectedPayload, AuthEvents } from './auth/auth.events.js'
 import { DateTime } from 'luxon'
 import { LogEntrySyncStorageService } from './storage/log-entry-sync.storage.service.js'
@@ -96,6 +98,13 @@ export class CommunitiesManagerService implements OnModuleDestroy {
    * Map of team IDs to sigchains and associated LFA auth sync connections
    */
   private readonly communities = new Map<string, ManagedCommunity>()
+
+  /**
+   * Creates accepted before shutdown are allowed to finish before teardown.
+   */
+  private readonly communityCreates = new Set<Promise<CreatedCommunity>>()
+
+  private shuttingDown = false
 
   /**
    * Interval for checking for clearable locally stored communities
@@ -163,13 +172,27 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     }, 60_000)
   }
 
-  public onModuleDestroy(): void {
+  public async onModuleDestroy(): Promise<void> {
     this.logger.info('Clearing CommunitesManagerService')
+    this.shuttingDown = true
     clearTimeout(this._communityExpiryHandler)
+    this._clearAllSigchainListeners()
+    await Promise.allSettled([
+      ...this.communityLoads.values(),
+      ...this.communityCreates,
+    ])
+    // A load already in progress can attach a listener after the first pass.
+    this._clearAllSigchainListeners()
+    await Promise.allSettled(
+      [...this.persistQueues.values()].map(async queue => {
+        await queue.tail
+      }),
+    )
     this.communities.clear()
     this.persistQueues.clear()
     this.persistedTeamKeyringDigests.clear()
     this.communityLoads.clear()
+    this.communityCreates.clear()
   }
 
   /**
@@ -183,43 +206,39 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     teamId: string,
     forceFetchFromStorage = false,
   ): Promise<ManagedCommunity | undefined> {
-    if (this.communities.has(teamId) && !forceFetchFromStorage) {
-      return this.communities.get(teamId)
+    if (this.shuttingDown) {
+      throw new Error(`Cannot load community ${teamId} during shutdown`)
     }
 
-    // Join a load that is already running for this team rather than starting a second one; two
-    // loads would build two sigchains for the same community and one would replace the other.
-    const inFlight = this.communityLoads.get(teamId)
-    if (inFlight != null) {
-      this.logger.verbose('Joining an in-flight community load', teamId)
-      return await inFlight
+    const cachedCommunity = this.communities.get(teamId)
+    if (cachedCommunity != null) {
+      const activeConnectionCount = cachedCommunity.authConnections?.size ?? 0
+      const communityIsLive = this.communityIsLive(teamId)
+      if (!forceFetchFromStorage || communityIsLive) {
+        if (forceFetchFromStorage && communityIsLive) {
+          const pendingWriteCount = this.persistQueues.get(teamId)?.pending ?? 0
+          this.logger.warn(
+            `Skipping forced reload for ${teamId}; ${activeConnectionCount} auth connection(s) and ${pendingWriteCount} pending write(s) still use its sigchain`,
+          )
+        }
+        return cachedCommunity
+      }
     }
 
-    const load = this.loadCommunityFromStorage(teamId)
+    const existingLoad = this.communityLoads.get(teamId)
+    if (existingLoad != null) {
+      return await existingLoad
+    }
+
+    const load = this._loadCommunity(teamId)
     this.communityLoads.set(teamId, load)
     try {
       return await load
     } finally {
-      this.communityLoads.delete(teamId)
+      if (this.communityLoads.get(teamId) === load) {
+        this.communityLoads.delete(teamId)
+      }
     }
-  }
-
-  /**
-   * Read a community out of storage and turn it into a managed community
-   *
-   * @param teamId Team ID of the community we are loading
-   * @returns Managed community, if one is stored
-   */
-  private async loadCommunityFromStorage(
-    teamId: string,
-  ): Promise<ManagedCommunity | undefined> {
-    const community = await this.storage.getCommunity(teamId)
-    if (community == null) {
-      this.logger.warn('Community not found in local cache or storage', teamId)
-      return undefined
-    }
-
-    return await this._processCommunityToManagedCommunity(teamId, community)
   }
 
   /**
@@ -227,16 +246,48 @@ export class CommunitiesManagerService implements OnModuleDestroy {
    * with the user over the websocket
    *
    * @param userId ID of the user creating the community
+   * @param deviceId ID of the device creating the community
    * @param community Community metadata
    * @param teamKeyring LFA key ring
    * @param socket Socket connection with the user creating the community
    * @returns New community
    */
+  // eslint-disable-next-line @typescript-eslint/max-params -- connection identity requires both user and device IDs
   public async create(
     userId: string,
+    deviceId: string,
     community: Community,
     teamKeyring: string,
-    socket: Socket,
+    socket: QuietSocket,
+  ): Promise<CreatedCommunity> {
+    if (this.shuttingDown) {
+      throw new Error(
+        `Cannot create community ${community.teamId} during shutdown`,
+      )
+    }
+
+    const creation = this._create(
+      userId,
+      deviceId,
+      community,
+      teamKeyring,
+      socket,
+    )
+    this.communityCreates.add(creation)
+    try {
+      return await creation
+    } finally {
+      this.communityCreates.delete(creation)
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/max-params -- connection identity requires both user and device IDs
+  private async _create(
+    userId: string,
+    deviceId: string,
+    community: Community,
+    teamKeyring: string,
+    socket: QuietSocket,
   ): Promise<CreatedCommunity> {
     this.logger.log(`Adding new community for ID ${community.teamId}`)
     try {
@@ -264,8 +315,6 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         localServerContext,
         deserializedTeamKeyring,
       )
-      const chainEventHandler = this.addSigchainListener(sigChain)
-
       const userCount = sigChain.team.members().length
       if (userCount > 1) {
         throw new NoPopulatedCommunitiesError(community.teamId, userCount)
@@ -290,14 +339,17 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         throw new Error(`Failed to store community!`)
       }
 
+      const chainEventHandler = this.addSigchainListener(sigChain)
       this.communities.set(community.teamId, {
         teamId: community.teamId,
         sigChain,
         chainEventHandler,
       })
 
-      // start the LFA sync connection over the existing websocket
-      this.startAuthSyncConnection(userId, community.teamId, {
+      // Prepare the server-side LFA connection before returning the create
+      // response. The first validated client auth-sync frame starts it after
+      // the client has received the response and initialized its connection.
+      this.prepareAuthSyncConnection(userId, deviceId, community.teamId, {
         socket,
         communitiesManager: this,
       })
@@ -510,15 +562,19 @@ export class CommunitiesManagerService implements OnModuleDestroy {
   }
 
   /**
-   * Start an LFA auth sync connection over an existing websocket connection with a user
+   * Prepare an LFA auth sync connection over an existing websocket connection
+   * with a user. The first validated client auth-sync frame starts the
+   * connection.
    *
    * @param userId ID of the user we are connecting with
+   * @param deviceId ID of the device we are connecting with
    * @param teamId Team ID of the community we are syncing
    * @param config Related metadata/config for this auth sync connection
    * @returns void
    */
-  public startAuthSyncConnection(
+  public prepareAuthSyncConnection(
     userId: string,
+    deviceId: string,
     teamId: string,
     config: AuthConnectionConfig,
   ): void {
@@ -531,33 +587,39 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     // return an existing auth connection, if found and still valid for this socket
     const authConnections: AuthConnectionMap =
       managedCommunity.authConnections ?? (new Map() as AuthConnectionMap)
-    const existingConn = authConnections.get(userId)
+    const connectionContext = `teamId=${teamId} userId=${userId} deviceId=${deviceId} socketId=${config.socket.id}`
+    this.logger.debug(
+      `Preparing auth connection request: ${connectionContext} mappedConnections=${authConnections.size}`,
+    )
+
+    const existingConn = authConnections.get(deviceId)
     if (existingConn != null) {
       if (
         existingConn.socketId === config.socket.id &&
         existingConn.status !== AuthStatus.REJECTED_OR_CLOSED
       ) {
         this.logger.debug(
-          'Already had an active auth connection for this user on the same socket, reusing...',
+          `Reusing mapped auth connection: ${connectionContext} status=${existingConn.status} mappedConnections=${authConnections.size}`,
         )
         return
       }
       // Stale connection: belongs to a previous socket or is dead. Stop it before creating a new one.
-      this.logger.log(
-        `Replacing stale auth connection; previousStatus=${existingConn.status}`,
-      )
       this.logger.debug(
-        `Replacing stale auth connection for user ${userId} (oldSocket=${existingConn.socketId}, newSocket=${config.socket.id}, status=${existingConn.status})`,
+        `Replacing mapped auth connection: teamId=${teamId} deviceId=${deviceId} requestedUserId=${userId} existingUserId=${existingConn.userId} oldSocketId=${existingConn.socketId} newSocketId=${config.socket.id} previousStatus=${existingConn.status} mappedConnections=${authConnections.size}`,
       )
       existingConn.stop()
-      authConnections.delete(userId)
+      authConnections.delete(deviceId)
+      this.logger.debug(
+        `Removed previous auth connection mapping: ${connectionContext} remainingConnections=${authConnections.size}`,
+      )
     }
 
-    // create and start a new LFA auth sync connection with this user. The connection is handed the
-    // callback that makes an admission durable; localfirst/auth invokes it before releasing an
-    // acceptance to an invitee.
+    // Create and map a new LFA auth sync connection. Starting it here can emit
+    // an auth-sync frame before the create/sign-in acknowledgement reaches the
+    // client, so handleAuthSync starts it when the first client frame arrives.
     const authConnection = new AuthConnection(
       userId,
+      deviceId,
       managedCommunity.sigChain,
       {
         ...config,
@@ -566,30 +628,51 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         },
       },
     )
-    authConnections.set(userId, authConnection)
+    authConnections.set(deviceId, authConnection)
     this.communities.set(teamId, {
       ...managedCommunity,
       authConnections,
     })
+    this.logger.debug(
+      `Mapped new auth connection: ${connectionContext} status=${authConnection.status} mappedConnections=${authConnections.size}`,
+    )
 
     // handle auth disconnection events (emitted when the LFA connection dies or the socket connection dies)
     // and remove auth connection from map/set expiry on community data in memory if no open connections left
     authConnection.on(
       AuthEvents.AuthDisconnected,
       (payload: AuthDisconnectedPayload) => {
-        this.logger.verbose(`Got an ${AuthEvents.AuthDisconnected} event`)
+        const disconnectedContext = `teamId=${payload.teamId} userId=${payload.userId} deviceId=${payload.deviceId} socketId=${authConnection.socketId}`
+        this.logger.debug(
+          `Received auth disconnect: ${disconnectedContext} status=${authConnection.status}`,
+        )
         const managedCommunity = this.communities.get(payload.teamId)
         if (managedCommunity == null) {
+          this.logger.debug(
+            `Ignoring auth disconnect because community is no longer mapped: ${disconnectedContext}`,
+          )
           return
         }
 
-        managedCommunity.authConnections?.delete(payload.userId)
-        if ((managedCommunity.authConnections?.size ?? 0) === 0) {
+        const storedConnection = managedCommunity.authConnections?.get(
+          payload.deviceId,
+        )
+        if (storedConnection !== authConnection) {
+          this.logger.debug(
+            `Ignoring stale auth disconnect for replaced mapping: ${disconnectedContext} mappedSocketId=${storedConnection?.socketId ?? 'none'} mappedStatus=${storedConnection?.status ?? 'none'}`,
+          )
+          return
+        }
+        managedCommunity.authConnections?.delete(payload.deviceId)
+        const remainingConnections = managedCommunity.authConnections?.size ?? 0
+        this.logger.debug(
+          `Unmapped auth connection after disconnect: ${disconnectedContext} remainingConnections=${remainingConnections}`,
+        )
+        if (remainingConnections === 0) {
           const communityExpiryMs =
             DateTime.utc().toMillis() + MANAGED_COMMUNITY_TTL_MS
-          this.logger.verbose(
-            'Community has no open auth connections, setting expiry',
-            communityExpiryMs,
+          this.logger.debug(
+            `Community has no mapped auth connections; setting expiry: teamId=${payload.teamId} expiryMs=${communityExpiryMs}`,
           )
           managedCommunity.expiryMs = communityExpiryMs
         }
@@ -598,10 +681,11 @@ export class CommunitiesManagerService implements OnModuleDestroy {
 
     // handle websocket disconnects and stop the auth sync connection
     config.socket.on(NativeServerWebsocketEvents.Disconnect, () => {
+      this.logger.debug(
+        `Socket disconnected; stopping auth connection: ${connectionContext} status=${authConnection.status}`,
+      )
       authConnection.stop()
     })
-
-    authConnection.start()
 
     // ensure we remove the expiry if it was set now that we have an open connection
     if (this.communities.has(teamId)) {
@@ -609,6 +693,9 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         ...this.communities.get(teamId)!,
         expiryMs: undefined,
       })
+      this.logger.debug(
+        `Cleared community expiry for mapped auth connection: ${connectionContext}`,
+      )
     }
   }
 
@@ -735,6 +822,21 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       return undefined
     }
 
+    // Replacing a SigChain would strand AuthConnections that still reference
+    // the current instance. Keep it until those connections have closed.
+    const existingManagedCommunity = this.communities.get(teamId)
+    if (
+      existingManagedCommunity != null &&
+      (existingManagedCommunity.authConnections?.size ?? 0) > 0
+    ) {
+      const activeConnectionCount =
+        existingManagedCommunity.authConnections?.size ?? 0
+      this.logger.warn(
+        `Keeping cached community ${teamId}; ${activeConnectionCount} auth connection(s) still use its sigchain`,
+      )
+      return existingManagedCommunity
+    }
+
     const rawSigchain = uint8arrays.fromString(community.sigChain, 'hex')
     const localServerContext: LocalServerContext = {
       server,
@@ -769,10 +871,14 @@ export class CommunitiesManagerService implements OnModuleDestroy {
       throw e
     }
 
-    const chainEventHandler = this.addSigchainListener(sigChain)
-
     // if we already have a managed community for this team merge it with the new data
-    const existingManagedCommunity = this.communities.get(teamId)
+    if (existingManagedCommunity != null) {
+      this.clearSigchainListeners(
+        existingManagedCommunity.sigChain,
+        existingManagedCommunity.chainEventHandler,
+      )
+    }
+    const chainEventHandler = this.addSigchainListener(sigChain)
     const managedCommunity: ManagedCommunity = {
       ...(existingManagedCommunity ?? {}),
       teamId: community.teamId,
@@ -782,6 +888,26 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     // put the new managed community into memory
     this.communities.set(community.teamId, managedCommunity)
     return managedCommunity
+  }
+
+  private async _loadCommunity(
+    teamId: string,
+  ): Promise<ManagedCommunity | undefined> {
+    if (this.shuttingDown) {
+      throw new Error(`Cannot load community ${teamId} during shutdown`)
+    }
+
+    // A cache miss can race expiry cleanup, which removes the in-memory
+    // community before its final queued snapshot reaches storage.
+    await this.persistQueues.get(teamId)?.tail
+
+    const community = await this.storage.getCommunity(teamId)
+    if (community == null) {
+      this.logger.warn('Community not found in local cache or storage', teamId)
+      return undefined
+    }
+
+    return await this._processCommunityToManagedCommunity(teamId, community)
   }
 
   /**
@@ -1121,9 +1247,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
     }
   }
 
-  private readonly addSigchainListener = (
-    sigChain: SigChain,
-  ): (() => Promise<void>) => {
+  private readonly addSigchainListener = (sigChain: SigChain): (() => void) => {
     this.logger.debug('Attaching chain update listener(s)', sigChain.team.id)
     const handler = this._updateDbOnChainUpdate(sigChain)
     sigChain.on(SigchainEvents.UPDATED, handler)
@@ -1132,7 +1256,7 @@ export class CommunitiesManagerService implements OnModuleDestroy {
 
   private readonly clearSigchainListeners = (
     sigChain: SigChain,
-    handler: () => Promise<void>,
+    handler: () => void,
   ): void => {
     this.logger.debug('Clearing chain update listeners', sigChain.team.id)
     sigChain.clearListeners()
@@ -1161,4 +1285,13 @@ export class CommunitiesManagerService implements OnModuleDestroy {
         sigChain.notifyPersistFailed(e)
       }
     }
+
+  private _clearAllSigchainListeners(): void {
+    for (const community of this.communities.values()) {
+      this.clearSigchainListeners(
+        community.sigChain,
+        community.chainEventHandler,
+      )
+    }
+  }
 }

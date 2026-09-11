@@ -75,12 +75,13 @@ export function registerCommunitiesHandlers(
         return
       }
       const { payload } = message
-      const { community, teamKeyring, userId } = payload
+      const { community, teamKeyring, userId, deviceId } = payload
       const { teamId } = community
       if (
         setSocketAttribution(config.socket, {
           teamId,
           userId,
+          deviceId,
           source: WebsocketEvents.CreateCommunity,
         })
       ) {
@@ -95,6 +96,7 @@ export function registerCommunitiesHandlers(
       config.socket.data.usedCaptchaForCreateCommunity = true
       await config.communitiesManager.create(
         userId,
+        deviceId,
         community,
         teamKeyring,
         config.socket,
@@ -136,7 +138,7 @@ export function registerCommunitiesHandlers(
         throw new Error(`Payload was nullish!`)
       }
       const { payload } = message
-      const { teamId, userId } = payload
+      const { teamId, userId, deviceId } = payload
 
       // get the community and return an error response if not found
       if ((await config.communitiesManager.get(teamId)) == null) {
@@ -152,16 +154,24 @@ export function registerCommunitiesHandlers(
         return
       }
 
-      // start the auth sync connection and return a success response
+      // Map the auth sync connection before returning success. Its first
+      // validated client frame starts the server side after the client has
+      // initialized its own auth connection.
       _logger.debug(
         `Found community for ID ${teamId}, initializing sync connection`,
       )
-      config.communitiesManager.startAuthSyncConnection(userId, teamId, config)
+      config.communitiesManager.prepareAuthSyncConnection(
+        userId,
+        deviceId,
+        teamId,
+        config,
+      )
 
       if (
         setSocketAttribution(config.socket, {
           teamId,
           userId,
+          deviceId,
           source: WebsocketEvents.SignInCommunity,
         })
       ) {

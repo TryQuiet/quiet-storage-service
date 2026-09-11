@@ -19,6 +19,7 @@ export interface QuietSocketData {
   }
   teamId?: string
   userId?: string
+  deviceId?: string
   attributionSource?: string
 }
 
@@ -38,6 +39,7 @@ export interface BaseHandlerConfig {
 interface SocketAttribution {
   teamId?: string
   userId?: string
+  deviceId?: string
   source: string
 }
 
@@ -46,7 +48,7 @@ export function setSocketAttribution(
   attribution: SocketAttribution,
 ): boolean {
   const { data } = socket
-  const { source, teamId, userId } = attribution
+  const { source, teamId, userId, deviceId } = attribution
   let attributionChanged = false
 
   if (teamId != null && teamId !== data.teamId) {
@@ -56,6 +58,11 @@ export function setSocketAttribution(
 
   if (userId != null && userId !== data.userId) {
     data.userId = userId
+    attributionChanged = true
+  }
+
+  if (deviceId != null && deviceId !== data.deviceId) {
+    data.deviceId = deviceId
     attributionChanged = true
   }
 
@@ -70,12 +77,13 @@ export function setSocketAttribution(
 
 export function formatSocketAttribution(socket: QuietSocket): string {
   const { data, id } = socket
-  const { attributionSource, teamId, userId } = data
+  const { attributionSource, teamId, userId, deviceId } = data
 
   return [
     `socketId=${formatLogValue(id)}`,
     `teamId=${formatLogValue(teamId)}`,
     `userId=${formatLogValue(userId)}`,
+    `deviceId=${formatLogValue(deviceId)}`,
     `attributionSource=${formatLogValue(attributionSource)}`,
   ].join(' ')
 }

@@ -46,7 +46,8 @@ import type { TestTeam } from '../../../../test/utils/types.js'
 import type { CommunityUpdate, ManagedCommunity } from '../types.js'
 import type { AuthConnection } from './auth.connection.js'
 import { SigChain } from './sigchain.js'
-import { SigchainEvents } from './types.js'
+import { AuthStatus, SigchainEvents } from './types.js'
+import { getDeviceId } from './device-id.js'
 import type { QuietSocket } from '../../websocket/ws.types.js'
 import { WebsocketEvents } from '../../websocket/ws.types.js'
 import type { AuthSyncMessage } from '../../websocket/handlers/types/auth-sync.types.js'
@@ -323,13 +324,19 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
       // brings it back after a rollback evicted it
       const loaded = await manager.get(teamId)
       expect(loaded).toBeDefined()
-      manager.startAuthSyncConnection(invitee.user.userId, teamId, {
-        socket,
-        communitiesManager: manager,
-      })
-      // startAuthSyncConnection installs a new managed-community object, so re-read it
+      const inviteeDeviceId = getDeviceId(invitee.device)
+      manager.prepareAuthSyncConnection(
+        invitee.user.userId,
+        inviteeDeviceId,
+        teamId,
+        {
+          socket,
+          communitiesManager: manager,
+        },
+      )
+      // prepareAuthSyncConnection installs a new managed-community object, so re-read it
       const opened = await manager.get(teamId)
-      peers.qss = opened!.authConnections!.get(invitee.user.userId)
+      peers.qss = opened!.authConnections!.get(inviteeDeviceId)
       expect(peers.qss).toBeDefined()
       qssConnection = peers.qss
       admittingSigChains.push(opened!.sigChain)
@@ -368,6 +375,9 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
             proofs.push(JSON.stringify(decoded.payload.proofOfInvitation))
           }
           setImmediate(() => {
+            if (peers.qss?.status === AuthStatus.PENDING) {
+              peers.qss.start()
+            }
             peers.qss?.lfaConnection.deliver(message)
           })
         },

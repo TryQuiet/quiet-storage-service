@@ -59,13 +59,13 @@ export function registerQpsHandlers(config: QPSHandlerConfig): void {
   async function hasJoinedAuthConnection(teamId: string): Promise<boolean> {
     const { socket } = config
     const { data } = socket
-    const { userId } = data
-    if (userId == null) {
+    const { deviceId } = data
+    if (deviceId == null) {
       return false
     }
 
     const community = await config.communitiesManager.get(teamId)
-    const authConnection = community?.authConnections?.get(userId)
+    const authConnection = community?.authConnections?.get(deviceId)
 
     return (
       authConnection?.socketId === socket.id &&

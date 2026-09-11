@@ -13,6 +13,7 @@ import {
 } from './types/index.js'
 import * as uint8arrays from 'uint8arrays'
 import type { AuthConnection } from '../../communities/auth/auth.connection.js'
+import { AuthStatus } from '../../communities/auth/types.js'
 import { type Keyset, redactKeys } from '@localfirst/crdx'
 import { AllowedServerKeyState } from '../../communities/types.js'
 import { CaptchaErrorMessages } from './types/captcha.types.js'
@@ -137,7 +138,7 @@ export function registerCommunitiesAuthHandlers(
     let authConnection: AuthConnection | undefined = undefined
     try {
       const { payload } = message
-      const { teamId, userId } = payload
+      const { teamId, userId, deviceId } = payload
 
       // get the managed community by ID and return an error if not found
       const community = await config.communitiesManager.get(teamId)
@@ -146,25 +147,40 @@ export function registerCommunitiesAuthHandlers(
       }
 
       // get the existing auth connection for this user and return an error if not found
-      authConnection = community.authConnections?.get(userId)
+      authConnection = community.authConnections?.get(deviceId)
       if (authConnection == null) {
         _logger.warn(
-          `Rejecting auth-sync: no auth connection was established for the requested community/user`,
+          `Rejecting auth-sync because device has no mapped connection: teamId=${teamId} userId=${userId} deviceId=${deviceId} socketId=${config.socket.id} mappedConnections=${community.authConnections?.size ?? 0}`,
         )
         return
       }
       if (authConnection.socketId !== config.socket.id) {
         _logger.warn(
-          `Rejecting auth-sync: socket ownership mismatch for the requested community/user`,
+          `Rejecting auth-sync because socket does not own device mapping: teamId=${teamId} userId=${userId} deviceId=${deviceId} socketId=${config.socket.id} mappedSocketId=${authConnection.socketId} status=${authConnection.status}`,
+        )
+        return
+      }
+      if (authConnection.userId !== userId) {
+        _logger.warn(
+          `Rejecting auth-sync because user does not own device mapping: teamId=${teamId} userId=${userId} mappedUserId=${authConnection.userId} deviceId=${deviceId} socketId=${config.socket.id} status=${authConnection.status}`,
         )
         return
       }
       // push the sync message onto the auth sync connection
       const decoded = uint8arrays.fromString(message.payload.message, 'base64')
+      _logger.debug(
+        `Routing inbound auth-sync to mapped connection: teamId=${teamId} userId=${userId} deviceId=${deviceId} socketId=${config.socket.id} status=${authConnection.status} bytes=${decoded.byteLength}`,
+      )
       if (decoded.byteLength >= AUTH_SYNC_LARGE_PAYLOAD_BYTES) {
         _logger.warn(
-          `Inbound auth-sync message is large: ${decoded.byteLength} bytes (user=${userId}, team=${teamId})`,
+          `Inbound auth-sync message is large: ${decoded.byteLength} bytes (user=${userId}, device=${deviceId}, team=${teamId})`,
         )
+      }
+      if (authConnection.status === AuthStatus.PENDING) {
+        _logger.debug(
+          `Starting pending auth connection from first validated client frame: teamId=${teamId} userId=${userId} deviceId=${deviceId} socketId=${config.socket.id}`,
+        )
+        authConnection.start()
       }
       authConnection.lfaConnection.deliver(decoded)
     } catch (e) {
