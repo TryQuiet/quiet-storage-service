@@ -152,7 +152,8 @@ describe('Communities', () => {
         USER_NAME,
         DEVICE_NAME,
       )
-      invite = testTeam.team.inviteMember()
+      // QSS admission requires the invitation to carry the member role grant.
+      invite = testTeam.team.inviteMember({ roleNames: ['member'] })
     })
 
     it('should validate that the context and team are defined', () => {
