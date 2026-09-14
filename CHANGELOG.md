@@ -3,6 +3,8 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+**Note:** Version bump only for package quiet-storage-service
+
 ## 2.0.0 (2026-09-14)
 
 - chore: align QSS with final Auth baseline ([1eabed0](https://github.com/TryQuiet/quiet-storage-service/commit/1eabed0))
