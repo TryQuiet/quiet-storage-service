@@ -3,6 +3,10 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>2.0.1 (2026-09-14)</small>
+
+- chore(release): publish v2.0.0 ([067010c](https://github.com/TryQuiet/quiet-storage-service/commit/067010c))
+
 **Note:** Version bump only for package quiet-storage-service
 
 ## 2.0.0 (2026-09-14)
