@@ -3,6 +3,82 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## <small>2.0.2 (2026-09-14)</small>
+
+**Note:** Version bump only for package quiet-storage-service
+
+## <small>2.0.1 (2026-09-14)</small>
+
+- chore(release): publish v2.0.0 ([067010c](https://github.com/TryQuiet/quiet-storage-service/commit/067010c))
+
+**Note:** Version bump only for package quiet-storage-service
+
+## 2.0.0 (2026-09-14)
+
+- chore: align QSS with final Auth baseline ([1eabed0](https://github.com/TryQuiet/quiet-storage-service/commit/1eabed0))
+- chore: compose QSS with Auth review head ([428048c](https://github.com/TryQuiet/quiet-storage-service/commit/428048c))
+- chore: pin merged Auth audit baseline ([6cb5bcc](https://github.com/TryQuiet/quiet-storage-service/commit/6cb5bcc))
+- chore: point auth submodule at the public repo URL ([78cfa2c](https://github.com/TryQuiet/quiet-storage-service/commit/78cfa2c))
+- chore: Update deploy scripts to support Amazon Linux instances and the new prod environment (#43) ([a3495e5](https://github.com/TryQuiet/quiet-storage-service/commit/a3495e5)), closes [#43](https://github.com/TryQuiet/quiet-storage-service/issues/43)
+- chore: update QSS to revised Auth review head ([ce8fcca](https://github.com/TryQuiet/quiet-storage-service/commit/ce8fcca))
+- chore(3344): Update auth to enforce admin-only private channels (#47) ([2f6a212](https://github.com/TryQuiet/quiet-storage-service/commit/2f6a212)), closes [#47](https://github.com/TryQuiet/quiet-storage-service/issues/47)
+- chore(ci): add organization secret migration workflow (#52) ([7794918](https://github.com/TryQuiet/quiet-storage-service/commit/7794918)), closes [#52](https://github.com/TryQuiet/quiet-storage-service/issues/52)
+- chore(ci): remove organization secret migration workflow (#54) ([48ee149](https://github.com/TryQuiet/quiet-storage-service/commit/48ee149)), closes [#54](https://github.com/TryQuiet/quiet-storage-service/issues/54)
+- chore(ci): use scoped QSS AWS secrets (#1) ([39905e9](https://github.com/TryQuiet/quiet-storage-service/commit/39905e9)), closes [#1](https://github.com/TryQuiet/quiet-storage-service/issues/1) [TryQuiet/quiet-storage-service#53](https://github.com/TryQuiet/quiet-storage-service/issues/53)
+- chore(ci): use scoped QSS AWS secrets (#53) ([1ede4df](https://github.com/TryQuiet/quiet-storage-service/commit/1ede4df)), closes [#53](https://github.com/TryQuiet/quiet-storage-service/issues/53)
+- chore(qss): re-pin auth to the audited durable-admission tip (#203) ([80f1538](https://github.com/TryQuiet/quiet-storage-service/commit/80f1538)), closes [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203)
+- chore(qss): re-pin auth to the reworded rejection contract (#203) ([ddceaa7](https://github.com/TryQuiet/quiet-storage-service/commit/ddceaa7)), closes [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203)
+- chore(qss): re-pin auth to the strict-rule-6 tip (#203) ([fb425b4](https://github.com/TryQuiet/quiet-storage-service/commit/fb425b4)), closes [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203)
+- test: exercise production websocket registrations ([884b938](https://github.com/TryQuiet/quiet-storage-service/commit/884b938))
+- test(e2e): mint invited/invalid users with derived-userId order + fix GEN_PUB_KEYS assertion ([0c936e9](https://github.com/TryQuiet/quiet-storage-service/commit/0c936e9))
+- test(qss): assert the recorded keyring digest against the row (#203) ([2ad6349](https://github.com/TryQuiet/quiet-storage-service/commit/2ad6349)), closes [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203)
+- test(security): close NSE auth acceptance gaps #115 ([06b5d6c](https://github.com/TryQuiet/quiet-storage-service/commit/06b5d6c)), closes [#115](https://github.com/TryQuiet/quiet-storage-service/issues/115)
+- test(security): cover NSE limiter windows #115 ([1735c99](https://github.com/TryQuiet/quiet-storage-service/commit/1735c99)), closes [#115](https://github.com/TryQuiet/quiet-storage-service/issues/115)
+- fix: Allow more fuzziness in team link timestamp validations and use updated logging (#27) ([2e41cc4](https://github.com/TryQuiet/quiet-storage-service/commit/2e41cc4)), closes [#27](https://github.com/TryQuiet/quiet-storage-service/issues/27)
+- fix: bind auth sync to owning socket (#40) ([4ffc16b](https://github.com/TryQuiet/quiet-storage-service/commit/4ffc16b)), closes [#40](https://github.com/TryQuiet/quiet-storage-service/issues/40)
+- fix: Ensure sigchain updates are propagated to postgres (#50) ([3a193cc](https://github.com/TryQuiet/quiet-storage-service/commit/3a193cc)), closes [#50](https://github.com/TryQuiet/quiet-storage-service/issues/50)
+- fix: Handle auth errors on QSS (#25) ([b10f52a](https://github.com/TryQuiet/quiet-storage-service/commit/b10f52a)), closes [#25](https://github.com/TryQuiet/quiet-storage-service/issues/25)
+- fix: harden websocket acknowledgement boundaries ([b054d19](https://github.com/TryQuiet/quiet-storage-service/commit/b054d19))
+- fix: make QPS relay capability fail closed ([0a9dd45](https://github.com/TryQuiet/quiet-storage-service/commit/0a9dd45))
+- fix(qss): add a durable per-team persistence path for sigchain state (#203) ([6563782](https://github.com/TryQuiet/quiet-storage-service/commit/6563782)), closes [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203) [#192](https://github.com/TryQuiet/quiet-storage-service/issues/192)
+- fix(qss): bind the admission gate to the sigchain that admitted (#203) ([c991a30](https://github.com/TryQuiet/quiet-storage-service/commit/c991a30)), closes [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203)
+- fix(qss): bound the persistence work one invitation can cause (#203) ([cb66b8f](https://github.com/TryQuiet/quiet-storage-service/commit/cb66b8f)), closes [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203)
+- fix(qss): commit the graph and keyring of one instant (#203) ([656becc](https://github.com/TryQuiet/quiet-storage-service/commit/656becc)), closes [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203)
+- fix(qss): persist admission before releasing acceptance (#203) ([a18a66b](https://github.com/TryQuiet/quiet-storage-service/commit/a18a66b)), closes [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203)
+- fix(qss): roll back to durable state when an admission cannot be persisted (#203) ([1848da0](https://github.com/TryQuiet/quiet-storage-service/commit/1848da0)), closes [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203)
+- fix(security): bind QPS payloads to UCANs ([9dcb870](https://github.com/TryQuiet/quiet-storage-service/commit/9dcb870))
+- fix(security): domain-separate NSE device proofs #115 ([0a8568f](https://github.com/TryQuiet/quiet-storage-service/commit/0a8568f)), closes [#115](https://github.com/TryQuiet/quiet-storage-service/issues/115)
+- fix(security): enforce canonical QPS requests ([d2b6d04](https://github.com/TryQuiet/quiet-storage-service/commit/d2b6d04))
+- fix(security): harden NSE proof redemption limits #115 ([abd3b9c](https://github.com/TryQuiet/quiet-storage-service/commit/abd3b9c)), closes [#115](https://github.com/TryQuiet/quiet-storage-service/issues/115)
+- fix(security): isolate push provider credentials ([a2c0c27](https://github.com/TryQuiet/quiet-storage-service/commit/a2c0c27))
+- fix(security): parse trusted proxy hops exactly #115 ([14a40a0](https://github.com/TryQuiet/quiet-storage-service/commit/14a40a0)), closes [#115](https://github.com/TryQuiet/quiet-storage-service/issues/115)
+- fix(security): remove unsupported proxy trust setting #115 ([8c268f5](https://github.com/TryQuiet/quiet-storage-service/commit/8c268f5)), closes [#115](https://github.com/TryQuiet/quiet-storage-service/issues/115)
+- fix(security): upgrade MikroORM past prototype pollution ([2cd3006](https://github.com/TryQuiet/quiet-storage-service/commit/2cd3006))
+- docs(qss): name the joiner as the adversary of the durable-admission gate (#203) ([a69aeaf](https://github.com/TryQuiet/quiet-storage-service/commit/a69aeaf)), closes [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203)
+- docs(qss): state the invariant behind the durable-admission gate (#203) ([d2a5864](https://github.com/TryQuiet/quiet-storage-service/commit/d2a5864)), closes [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203)
+- 1.0.2 (#33) ([87c5922](https://github.com/TryQuiet/quiet-storage-service/commit/87c5922)), closes [#33](https://github.com/TryQuiet/quiet-storage-service/issues/33) [#34](https://github.com/TryQuiet/quiet-storage-service/issues/34)
+- add a default title and body so that message is not treated as silent ([391802a](https://github.com/TryQuiet/quiet-storage-service/commit/391802a))
+- Add index to log entry table for community ID + hashedDbId + receivedAt (#26) ([0b5402d](https://github.com/TryQuiet/quiet-storage-service/commit/0b5402d)), closes [#26](https://github.com/TryQuiet/quiet-storage-service/issues/26)
+- Android Firebase Configuration (#31) ([49e0e3e](https://github.com/TryQuiet/quiet-storage-service/commit/49e0e3e)), closes [#31](https://github.com/TryQuiet/quiet-storage-service/issues/31)
+- Batch push notifications (#23) ([a337f38](https://github.com/TryQuiet/quiet-storage-service/commit/a337f38)), closes [#23](https://github.com/TryQuiet/quiet-storage-service/issues/23)
+- fix websocket connection rate map leak (#41) ([bfc8e5e](https://github.com/TryQuiet/quiet-storage-service/commit/bfc8e5e)), closes [#41](https://github.com/TryQuiet/quiet-storage-service/issues/41)
+- NSE Sync Protocol (#30) ([aadb8b5](https://github.com/TryQuiet/quiet-storage-service/commit/aadb8b5)), closes [#30](https://github.com/TryQuiet/quiet-storage-service/issues/30)
+- Remove Env Var Secret fallbacks (#44) ([fe26f66](https://github.com/TryQuiet/quiet-storage-service/commit/fe26f66)), closes [#44](https://github.com/TryQuiet/quiet-storage-service/issues/44)
+- Require team-authenticated sockets for QPS push events (#42) ([718f760](https://github.com/TryQuiet/quiet-storage-service/commit/718f760)), closes [#42](https://github.com/TryQuiet/quiet-storage-service/issues/42)
+- Secrets Management for Firebase (#32) ([74e1853](https://github.com/TryQuiet/quiet-storage-service/commit/74e1853)), closes [#32](https://github.com/TryQuiet/quiet-storage-service/issues/32)
+- Test change: forgot to set the ruleset to active (#28) ([c026e9f](https://github.com/TryQuiet/quiet-storage-service/commit/c026e9f)), closes [#28](https://github.com/TryQuiet/quiet-storage-service/issues/28)
+- Test commit: should be blocked by branch rules ([faa2b67](https://github.com/TryQuiet/quiet-storage-service/commit/faa2b67))
+- Update app package CHANGELOG.md ([2e43e19](https://github.com/TryQuiet/quiet-storage-service/commit/2e43e19))
+- Update auth (#37) ([63b00eb](https://github.com/TryQuiet/quiet-storage-service/commit/63b00eb)), closes [#37](https://github.com/TryQuiet/quiet-storage-service/issues/37)
+- update for compatibility with new submodule bump ([c893055](https://github.com/TryQuiet/quiet-storage-service/commit/c893055))
+- Update LFA submodule (#48) ([ce9b55b](https://github.com/TryQuiet/quiet-storage-service/commit/ce9b55b)), closes [#48](https://github.com/TryQuiet/quiet-storage-service/issues/48)
+- Update logging for production (#38) ([cdeaf5d](https://github.com/TryQuiet/quiet-storage-service/commit/cdeaf5d)), closes [#38](https://github.com/TryQuiet/quiet-storage-service/issues/38)
+- feat: adopt local-first-auth path A — self-certifying server identity ([6927bc8](https://github.com/TryQuiet/quiet-storage-service/commit/6927bc8)), closes [#81](https://github.com/TryQuiet/quiet-storage-service/issues/81) [#81](https://github.com/TryQuiet/quiet-storage-service/issues/81) [#81](https://github.com/TryQuiet/quiet-storage-service/issues/81)
+- feat: Implement websocket rate limiting configuration and functionality (#45) ([52204c2](https://github.com/TryQuiet/quiet-storage-service/commit/52204c2)), closes [#45](https://github.com/TryQuiet/quiet-storage-service/issues/45)
+- feat(3155): Update auth module to be compatible with private channels (#35) ([a5692b0](https://github.com/TryQuiet/quiet-storage-service/commit/a5692b0)), closes [#35](https://github.com/TryQuiet/quiet-storage-service/issues/35)
+- release: 1.0.3 (#39) ([4295a31](https://github.com/TryQuiet/quiet-storage-service/commit/4295a31)), closes [#39](https://github.com/TryQuiet/quiet-storage-service/issues/39) [#36](https://github.com/TryQuiet/quiet-storage-service/issues/36)
+- release: 1.1.1 (#49) ([b453160](https://github.com/TryQuiet/quiet-storage-service/commit/b453160)), closes [#49](https://github.com/TryQuiet/quiet-storage-service/issues/49)
+
 ## <small>1.1.1 (2026-06-27)</small>
 
 - enable qps ([4e2338c](https://github.com/TryQuiet/quiet-storage-service/commit/4e2338c))
