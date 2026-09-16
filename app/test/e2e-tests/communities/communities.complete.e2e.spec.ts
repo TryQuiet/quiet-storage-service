@@ -152,7 +152,9 @@ describe('Communities', () => {
         USER_NAME,
         DEVICE_NAME,
       )
-      invite = testTeam.team.inviteMember()
+      // QSS is a server principal, so it cannot grant roles while admitting an
+      // invitee. Include the member grant in the founder-authored invitation.
+      invite = testTeam.team.inviteMember({ roleNames: ['member'] })
     })
 
     it('should validate that the context and team are defined', () => {

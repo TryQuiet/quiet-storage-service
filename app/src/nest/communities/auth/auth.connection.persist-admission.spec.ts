@@ -165,15 +165,13 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
    * Used by a test that fails the first write and lets the second succeed, without needing to
    * unwind the spy mid-run.
    */
-  const realUpdateCommunity = async (teamId: string): Promise<boolean> => {
-    const managedCommunity = await manager.get(teamId)
-    expect(managedCommunity).toBeDefined()
-    return await storage
-      .updateAndFindCommunity(teamId, {
-        sigChain: managedCommunity!.sigChain.serialize(true),
-      })
+  const realUpdateCommunity = async (
+    teamId: string,
+    payload: CommunityUpdate,
+  ): Promise<boolean> =>
+    await storage
+      .updateAndFindCommunity(teamId, payload)
       .then(result => result != null)
-  }
 
   /**
    * What the harness reports back about a run: the ordered log of interesting moments, the
@@ -479,14 +477,17 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
     // link carrying the first handshake's proof, which the invitee rejects forever. Rolling back to
     // durable state makes the retry a genuine new admission.
     let failWrite = true
+    let durableAdmissionSnapshot: string | undefined
     const harness = await startAdmission(
-      events => async (): Promise<boolean> => {
-        events.push('write-attempted')
-        if (failWrite) {
-          return await Promise.resolve(false)
-        }
-        return await realUpdateCommunity(harness.teamId)
-      },
+      events =>
+        async (_teamId, payload): Promise<boolean> => {
+          events.push('write-attempted')
+          if (failWrite) {
+            return await Promise.resolve(false)
+          }
+          durableAdmissionSnapshot = payload.sigChain
+          return await realUpdateCommunity(harness.teamId, payload)
+        },
     )
 
     await waitFor(
@@ -521,7 +522,9 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
     expect(afterRedial.team.members().length).toBe(2)
     expect(harness.proofs.length).toBe(2)
     expect(harness.proofs[1]).not.toEqual(harness.proofs[0])
-    expect(headOf(afterRedial)).toEqual(headOf(harness.admittingSigChains[1]))
+    // The live sigchain can receive later sync updates after the admission snapshot is written.
+    // Compare the durable graph to the exact snapshot that the write received instead.
+    expect(afterRedial.serialize(true)).toEqual(durableAdmissionSnapshot)
     // the instance that held the un-persisted link is not the one that admitted
     expect(harness.admittingSigChains[1]).not.toBe(
       harness.admittingSigChains[0],
