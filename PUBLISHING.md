@@ -17,6 +17,7 @@ Examples below use the `3.0.0` release line; choose an unused version when publi
 | ------------ | ---------------- | ------------- |
 | 9.0.2        | 2.0.2            | 3             |
 | 10.0.0       | 3.0.0            | 4             |
+| 11.0.0       | 4.0.0            | 4             |
 
 Protocol 4 does not migrate protocol-3 communities. Quiet 10 starts fresh
 communities; upgrading an endpoint to protocol 4 prevents Quiet 9 clients from
