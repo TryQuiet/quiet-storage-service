@@ -160,7 +160,7 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
   }
 
   /**
-   * Perform the real PostgreSQL write for a team's current in-memory graph.
+   * Perform the real PostgreSQL write for the snapshot supplied by persistence.
    *
    * Used by a test that fails the first write and lets the second succeed, without needing to
    * unwind the spy mid-run.
@@ -477,16 +477,22 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
     // link carrying the first handshake's proof, which the invitee rejects forever. Rolling back to
     // durable state makes the retry a genuine new admission.
     let failWrite = true
-    let durableAdmissionSnapshot: string | undefined
+    const followupWrite = createGate()
     const harness = await startAdmission(
       events =>
-        async (_teamId, payload): Promise<boolean> => {
+        async (teamId, payload): Promise<boolean> => {
           events.push('write-attempted')
           if (failWrite) {
             return await Promise.resolve(false)
           }
-          durableAdmissionSnapshot = payload.sigChain
-          return await realUpdateCommunity(harness.teamId, payload)
+          if (events.includes('acceptance-sent')) {
+            // A joined invitee adds its user-key lockbox and claims the member
+            // role. Hold persistence of that later sync to reproduce the window
+            // where the live graph is newer than the already durable admission.
+            events.push('followup-write-started')
+            await followupWrite.promise
+          }
+          return await realUpdateCommunity(teamId, payload)
         },
     )
 
@@ -510,25 +516,53 @@ describe('AuthConnection durable-admission gate (QSS-006 / private#203)', () => 
     failWrite = false
     await harness.redial()
 
-    await waitFor(
-      () => {
-        expect(harness.joined()).toBe(true)
-      },
-      { timeout: 20_000 },
-    )
+    try {
+      await waitFor(
+        () => {
+          expect(harness.joined()).toBe(true)
+        },
+        { timeout: 20_000 },
+      )
+      await waitFor(() => {
+        expect(harness.events).toContain('followup-write-started')
+      })
 
-    // Exactly one admission for this identity is durable, and it came from the second handshake.
-    const afterRedial = await harness.coldLoadFromStorage()
-    expect(afterRedial.team.members().length).toBe(2)
-    expect(harness.proofs.length).toBe(2)
-    expect(harness.proofs[1]).not.toEqual(harness.proofs[0])
-    // The live sigchain can receive later sync updates after the admission snapshot is written.
-    // Compare the durable graph to the exact snapshot that the write received instead.
-    expect(afterRedial.serialize(true)).toEqual(durableAdmissionSnapshot)
-    // the instance that held the un-persisted link is not the one that admitted
-    expect(harness.admittingSigChains[1]).not.toBe(
-      harness.admittingSigChains[0],
-    )
+      // Exactly one admission for this identity is durable, and it came from the second handshake.
+      const afterRedial = await harness.coldLoadFromStorage()
+      expect(afterRedial.team.members().length).toBe(2)
+      expect(harness.proofs.length).toBe(2)
+      expect(harness.proofs[1]).not.toEqual(harness.proofs[0])
+      // The pinned package declarations lose the graph's concrete link type.
+      const durableGraph = afterRedial.team.graph as {
+        links: Record<
+          Hash,
+          { body: { type: string; payload: { proof?: unknown } } }
+        >
+      }
+      const durableAdmissions = Object.values(durableGraph.links).filter(
+        link => link.body.type === 'ADMIT_MEMBER',
+      )
+      expect(durableAdmissions).toHaveLength(1)
+      expect(durableAdmissions[0].body).toMatchObject({
+        type: 'ADMIT_MEMBER',
+        payload: { proof: JSON.parse(harness.proofs[1]) as unknown },
+      })
+      // The precise retry admission is durable even while a later graph update
+      // is waiting for storage. Equality with a moving live head is not the
+      // admission contract; the committed proof must belong to this handshake.
+      expect(headOf(afterRedial)).not.toEqual(
+        headOf(harness.admittingSigChains[1]),
+      )
+      // the instance that held the un-persisted link is not the one that admitted
+      expect(harness.admittingSigChains[1]).not.toBe(
+        harness.admittingSigChains[0],
+      )
+    } finally {
+      followupWrite.open()
+      await manager.persistCommunity(harness.teamId)
+    }
+    const afterFollowup = await harness.coldLoadFromStorage()
+    expect(headOf(afterFollowup)).toEqual(headOf(harness.admittingSigChains[1]))
   }, 30_000)
 
   it('fails closed when the cached sigchain is replaced mid-admission (M-2)', async () => {

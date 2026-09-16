@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 3.0.0-alpha.0 (2026-09-15)
+
+- Exercise QSS persistence with supported member admissions ([733d19f](https://github.com/TryQuiet/quiet-storage-service/commit/733d19f))
+- Keep the reviewed auth pin during QSS bootstrap ([d615a78](https://github.com/TryQuiet/quiet-storage-service/commit/d615a78))
+- Update app package CHANGELOG.md ([061b931](https://github.com/TryQuiet/quiet-storage-service/commit/061b931))
+- Use protocol 4 removal policy for QSS sigchains ([48ceae9](https://github.com/TryQuiet/quiet-storage-service/commit/48ceae9))
+- test: align admission regressions with durable proofs and invitation grants ([2dcee0f](https://github.com/TryQuiet/quiet-storage-service/commit/2dcee0f))
+- test: include member role grant in QSS invitation fixture ([a4738ec](https://github.com/TryQuiet/quiet-storage-service/commit/a4738ec))
+- test: wait for both clients to join the team room ([4227d34](https://github.com/TryQuiet/quiet-storage-service/commit/4227d34))
+- fix: make captcha grants safe for retries and concurrent requests ([0584f38](https://github.com/TryQuiet/quiet-storage-service/commit/0584f38))
+
 ## <small>2.0.2 (2026-09-14)</small>
 
 **Note:** Version bump only for package quiet-storage-service

@@ -91,6 +91,9 @@ export function registerCommunitiesHandlers(
       }
 
       // Create the community and start syncing the sigchain with this user
+      // Consume synchronously, before concurrent requests or a fresh captcha can
+      // race with the asynchronous create. Completion must not consume a new grant.
+      config.socket.data.usedCaptchaForCreateCommunity = true
       await config.communitiesManager.create(
         userId,
         deviceId,
@@ -98,7 +101,6 @@ export function registerCommunitiesHandlers(
         teamKeyring,
         config.socket,
       )
-      config.socket.data.usedCaptchaForCreateCommunity = true
 
       await config.socket.join(teamId)
 
