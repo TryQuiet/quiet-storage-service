@@ -4,6 +4,8 @@
 
 Quiet Storage Service (QSS)
 
+For alpha and production releases, see [PUBLISHING.md](PUBLISHING.md).
+
 ## Installation
 
 ### Preparation
@@ -18,13 +20,31 @@ Once Volta is installed navigating to this directory should automatically instal
 
 ```bash
 $ volta install node@22.14.0
-$ volta install npm@10.9.0
+$ volta install npm@10.9.2
 ```
 
 Once `node` and `npm` are installed via Volta you can install `pnpm`
 
 ```bash
 $ volta install pnpm@10.6.0
+```
+
+Use the versions declared in [package.json](package.json) for your checkout.
+If you use another Node version manager, select Node `22.14.0`, then install
+the matching tools with npm:
+
+```bash
+npm install --global npm@10.9.2 pnpm@10.6.0
+hash -r
+```
+
+`ERR_PNPM_UNSUPPORTED_ENGINE` means the active version does not match the
+checkout. If `pnpm i -g pnpm` reports `ERR_PNPM_NO_GLOBAL_BIN_DIR`, use the npm
+command above. If another pnpm installation still takes precedence in `PATH`,
+run bootstrap with the explicit version after initializing submodules:
+
+```bash
+npm exec --yes --package=pnpm@10.6.0 -- pnpm run bootstrap -vmc
 ```
 
 #### Docker
@@ -44,14 +64,20 @@ $ brew install docker
 $ brew install docker-compose
 $ brew install colima
 $ colima start
+```
 
 ### Dependencies and building the app
 
 ```bash
-$ pnpm run bootstrap
+git submodule sync --recursive
+git submodule update --init --recursive
+pnpm run bootstrap -vmc
 ```
 
-This will build all submodules, install dependencies and build the application.
+This installs dependencies and builds the application using the pinned submodule
+commits. The `-m` flag skips pulling newer submodule revisions; `-c` copies auth
+packages into the build workspace. Use a fresh checkout when changing auth
+revisions because existing copied packages are not refreshed automatically.
 
 ## Running commands on the app package.json
 
@@ -115,16 +141,18 @@ $ pnpm run run:app migrate:up
 
 ## Test
 
+After bootstrap, run the same test commands as CI against the local Docker
+services. These avoid repeating bootstrap or changing the submodule revisions:
+
 ```bash
-# unit tests
-$ pnpm run run:app test
-
-# e2e tests
-$ pnpm run run:app test:e2e
-
-# test coverage
-$ pnpm run run:app test:cov
+pnpm run run:app spinup:tests:ci
+pnpm run run:app test:ci
+pnpm run run:app test:e2e:ci
+pnpm run run:app spindown:tests
 ```
+
+Run `spindown:tests` even if a test fails. Do not use `start:dev` or `start:prod`
+to prepare local tests: they connect to deployed services.
 
 ## Linting and Formatting
 
