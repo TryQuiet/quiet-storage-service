@@ -4,6 +4,7 @@ import type { CommunityOperationStatus } from './common.types.js'
 export interface CommunitySignInPayload {
   teamId: string
   userId: string
+  deviceId: string
 }
 
 export interface CommunitySignInMessage

@@ -3,6 +3,7 @@ import type { CommunityOperationStatus } from './common.types.js'
 
 export interface AuthSyncMessagePayload {
   userId: string
+  deviceId: string
   teamId: string
   message: string
 }
