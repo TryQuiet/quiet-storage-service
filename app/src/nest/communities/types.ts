@@ -60,12 +60,13 @@ export interface TeamStateSnapshot {
   head: string[]
 }
 
-export type AuthConnectionMap = Map<string, AuthConnection>
+export type DeviceId = string
+export type AuthConnectionMap = Map<DeviceId, AuthConnection>
 
 export interface ManagedCommunity {
   teamId: string
   sigChain: SigChain
-  chainEventHandler: () => Promise<void>
+  chainEventHandler: () => void
   authConnections?: AuthConnectionMap
   expiryMs?: number
 }

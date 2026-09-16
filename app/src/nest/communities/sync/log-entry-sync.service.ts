@@ -14,7 +14,6 @@ import {
 } from '../../utils/errors.js'
 import { SERIALIZER } from '../../app/const.js'
 import { AuthStatus } from '../auth/types.js'
-import { Socket } from 'socket.io'
 import { DateTime } from 'luxon'
 import {
   LogEntrySyncStorageService,
@@ -27,6 +26,7 @@ import {
 } from '../../websocket/handlers/types/log-entry-sync.types.js'
 import { Serializer } from '../../utils/serialization/serializer.service.js'
 import { CommunitiesManagerService } from '../communities-manager.service.js'
+import type { QuietSocket } from '../../websocket/ws.types.js'
 
 @Injectable()
 export class LogEntrySyncManager implements OnModuleDestroy {
@@ -53,7 +53,7 @@ export class LogEntrySyncManager implements OnModuleDestroy {
    */
   public async processIncomingLogEntrySyncMessage(
     payload: LogEntrySyncPayload,
-    socket: Socket,
+    socket: QuietSocket,
   ): Promise<{ receivedAt: number; syncSeq: number } | undefined> {
     const managedCommunity = await this.communities.get(payload.teamId)
     this._validateSyncPermission(
@@ -95,7 +95,7 @@ export class LogEntrySyncManager implements OnModuleDestroy {
 
   public async getPaginatedLogEntries(
     payload: LogEntryPullPayload,
-    socket: Socket,
+    socket: QuietSocket,
   ): Promise<{
     entries: Buffer[]
     cursor?: string
@@ -377,25 +377,34 @@ export class LogEntrySyncManager implements OnModuleDestroy {
     userId: string,
     teamId: string,
     managedCommunity: ManagedCommunity | undefined,
-    socket: Socket,
+    socket: QuietSocket,
   ): void {
     if (managedCommunity == null) {
       throw new CommunityNotFoundError(teamId)
     }
 
-    // check if we have an auth connection for this user before anything else to make sure
-    // they have signed in already
-    if (
-      managedCommunity.authConnections == null ||
-      !managedCommunity.authConnections.has(userId)
-    ) {
-      throw new AuthenticationError(`User hasn't signed in to this community`)
+    const { deviceId } = socket.data
+    if (deviceId == null) {
+      throw new AuthenticationError(`Device hasn't signed in to this community`)
     }
 
-    const authConnection = managedCommunity.authConnections.get(userId)!
+    // Check that this device has signed in and authenticated as the payload user.
+    if (
+      managedCommunity.authConnections == null ||
+      !managedCommunity.authConnections.has(deviceId)
+    ) {
+      throw new AuthenticationError(`Device hasn't signed in to this community`)
+    }
+
+    const authConnection = managedCommunity.authConnections.get(deviceId)!
+    if (authConnection.userId !== userId) {
+      throw new AuthenticationError(
+        `User ID does not match authenticated device connection`,
+      )
+    }
     if (authConnection.socketId !== socket.id) {
       throw new AuthenticationError(
-        `Socket ID associated with userId does not match authenticated connection`,
+        `Socket ID associated with deviceId does not match authenticated connection`,
       )
     }
     // validate that the user has successfully authenticated on this community

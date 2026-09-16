@@ -4,5 +4,6 @@ export enum AuthEvents {
 
 export interface AuthDisconnectedPayload {
   userId: string
+  deviceId: string
   teamId: string
 }

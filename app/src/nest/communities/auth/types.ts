@@ -1,6 +1,6 @@
-import type { Socket } from 'socket.io'
 import type { Team } from '@localfirst/auth'
 import type { CommunitiesManagerService } from '../communities-manager.service.js'
+import type { QuietSocket } from '../../websocket/ws.types.js'
 
 /**
  * Durably persist a team's current sigchain and team keyring.
@@ -18,7 +18,7 @@ import type { CommunitiesManagerService } from '../communities-manager.service.j
 export type PersistAdmission = (team: Team) => Promise<void>
 
 export interface AuthConnectionConfig {
-  socket: Socket
+  socket: QuietSocket
   communitiesManager: CommunitiesManagerService
 }
 
@@ -65,4 +65,10 @@ export enum SigchainEvents {
    * would be invisible outside the logs.
    */
   PERSIST_FAILED = 'sigchainPersistFailed',
+}
+
+export interface SigChainPersistenceSnapshot {
+  teamId: string
+  sigChain: string
+  teamKeyring: Uint8Array
 }

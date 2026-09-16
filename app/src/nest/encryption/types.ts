@@ -38,3 +38,9 @@ export enum StoredKeyRingType {
 export interface StoredKeyring extends EncryptedPayload {
   type: StoredKeyRingType
 }
+
+export interface PendingKeyringUpdate {
+  clientRequestToken: string
+  secret: StoredKeyring
+  serializedSecret: string
+}

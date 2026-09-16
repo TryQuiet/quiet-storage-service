@@ -31,6 +31,7 @@ import {
 import { randomUUID } from 'crypto'
 import { ConfigService } from '../../../nest/utils/config/config.service.js'
 import { EnvVars } from '../../../nest/utils/config/env_vars.js'
+import { getDeviceId } from '../../../nest/communities/auth/device-id.js'
 
 const logger = createLogger('Client:Community')
 
@@ -143,6 +144,7 @@ const createCommunity = async (
     ts: DateTime.utc().toMillis(),
     payload: {
       userId: context.user.userId,
+      deviceId: getDeviceId(context.device),
       community,
       teamKeyring: uint8arrays.toString(
         uint8arrays.fromString(

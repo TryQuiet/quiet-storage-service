@@ -34,6 +34,7 @@ import { waitFor } from '../../../test/utils/waitFor.js'
 import type { TestTeam } from '../../../test/utils/types.js'
 import type { Community, ManagedCommunity } from './types.js'
 import type { QuietSocket } from '../websocket/ws.types.js'
+import { getDeviceId } from './auth/device-id.js'
 
 interface Gate {
   promise: Promise<undefined>
@@ -127,6 +128,7 @@ describe('CommunitiesManagerService durable persistence', () => {
     }
     await manager.create(
       testTeam.testUserContext.user.userId,
+      getDeviceId(testTeam.testUserContext.device),
       community,
       uint8arrays.toString(
         uint8arrays.fromString(JSON.stringify(keyringAtCreation), 'utf8'),
