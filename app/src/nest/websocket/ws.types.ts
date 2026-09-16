@@ -1,9 +1,22 @@
 import type { DefaultEventsMap, Server, Socket } from 'socket.io'
+import type { GeneratePublicKeysMessage } from './handlers/types/gen-pub-keys.types.js'
+import type { CaptchaVerifyResponse } from './handlers/types/captcha.types.js'
+
+export interface CaptchaKeyGrant {
+  teamId: string
+  response?: Promise<GeneratePublicKeysMessage>
+}
 
 export interface QuietSocketData {
   verifiedCaptcha?: boolean
   usedCaptchaForKeys?: boolean
   usedCaptchaForCreateCommunity?: boolean
+  captchaKeyGrant?: CaptchaKeyGrant
+  verifiedCaptchaTokenHash?: string
+  captchaVerification?: {
+    tokenHash: string
+    response: Promise<CaptchaVerifyResponse>
+  }
   teamId?: string
   userId?: string
   attributionSource?: string

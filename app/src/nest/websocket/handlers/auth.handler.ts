@@ -2,7 +2,7 @@
  * Auth websocket event handlers
  */
 
-import { WebsocketEvents } from '../ws.types.js'
+import { WebsocketEvents, type CaptchaKeyGrant } from '../ws.types.js'
 import { DateTime } from 'luxon'
 import { createLogger } from '../../app/logger/logger.js'
 import {
@@ -54,6 +54,9 @@ export function registerCommunitiesAuthHandlers(
       }
       const { payload } = message
       const { teamId } = payload
+      if (typeof teamId !== 'string' || teamId.length === 0) {
+        throw new Error('Team ID missing from generate public keys message')
+      }
 
       if (config.socket.data.verifiedCaptcha !== true) {
         _logger.warn(
@@ -67,7 +70,10 @@ export function registerCommunitiesAuthHandlers(
         callback(errorResponse)
         return
       }
-      if (config.socket.data.usedCaptchaForKeys === true) {
+      if (
+        config.socket.data.usedCaptchaForKeys === true &&
+        config.socket.data.captchaKeyGrant?.teamId !== teamId
+      ) {
         const errorResponse: GeneratePublicKeysMessage = {
           ts: DateTime.utc().toMillis(),
           status: CommunityOperationStatus.ERROR,
@@ -76,25 +82,41 @@ export function registerCommunitiesAuthHandlers(
         callback(errorResponse)
         return
       }
-      // provision the server identity for this community and return its public record. A server now
-      // has a self-certifying id (`serverId`, the fingerprint of its immutable `identityKeys`) plus
-      // a separate rotatable member keyset (`keys`); the client registers all three on the chain.
-      const serverWithSecrets = await config.communitiesManager.getServerKeys(
+      // Reserve the grant before awaiting storage. Repeated requests for this team
+      // share the public response, including when its first acknowledgement is lost.
+      // A failed provisioning attempt keeps the team reservation but can be retried.
+      const grant: CaptchaKeyGrant = config.socket.data.captchaKeyGrant ?? {
         teamId,
-        AllowedServerKeyState.NOT_STORED,
-      )
-      config.socket.data.usedCaptchaForKeys = true
-      const response: GeneratePublicKeysMessage = {
-        ts: DateTime.utc().toMillis(),
-        status: CommunityOperationStatus.SUCCESS,
-        payload: {
-          teamId,
-          serverId: serverWithSecrets.serverId,
-          identityKeys: redactKeys(serverWithSecrets.identityKeys) as Keyset,
-          keys: redactKeys(serverWithSecrets.keys) as Keyset,
-        },
       }
-      callback(response)
+      config.socket.data.captchaKeyGrant = grant
+      config.socket.data.usedCaptchaForKeys = true
+      grant.response ??= Promise.resolve()
+        .then(async (): Promise<GeneratePublicKeysMessage> => {
+          const serverWithSecrets =
+            await config.communitiesManager.getServerKeys(
+              teamId,
+              AllowedServerKeyState.NOT_STORED,
+            )
+          return {
+            ts: DateTime.utc().toMillis(),
+            status: CommunityOperationStatus.SUCCESS,
+            payload: {
+              teamId,
+              serverId: serverWithSecrets.serverId,
+              identityKeys: redactKeys(
+                serverWithSecrets.identityKeys,
+              ) as Keyset,
+              keys: redactKeys(serverWithSecrets.keys) as Keyset,
+            },
+          }
+        })
+        .catch((error: unknown) => {
+          // Only touch the captured grant: a fresh captcha may have renewed the
+          // socket's grant while this request was awaiting storage.
+          grant.response = undefined
+          throw error
+        })
+      callback(await grant.response)
     } catch (e) {
       _logger.error(`Error while processing get public keys event`, e)
       const errorResponse: GeneratePublicKeysMessage = {

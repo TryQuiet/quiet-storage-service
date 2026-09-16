@@ -12,6 +12,10 @@
  *   never again. After team keys rotated, the graph QSS kept writing contained links encrypted
  *   under a generation that existed nowhere durable, so a cold reload failed with "Can't decrypt
  *   link".
+ *
+ * Removal and key rotation are now disabled by the auth protocol. Use real member admissions for
+ * graph changes, retain write-ordering/crash checks with fixed team keys, and assert that a refused
+ * removal leaves the original keyring sufficient for a cold reload.
  */
 import { jest } from '@jest/globals'
 import { Test, type TestingModule } from '@nestjs/testing'
@@ -138,25 +142,24 @@ describe('CommunitiesManagerService durable persistence', () => {
     return { testTeam, teamId, keyringAtCreation }
   }
 
-  /**
-   * Rotate the team keys on the founder's copy of the team and sync the result into the copy QSS
-   * holds.
-   *
-   * Removing a member rotates the team keyset, and the invitation written afterwards is the first
-   * link encrypted under the new generation — that link is what a stale keyring cannot open. This
-   * is the audit's reproduction, driven through the graph QSS actually receives: `merge` is the
-   * same call the auth connection makes for a peer's graph, and it emits the `updated` event QSS
-   * persists on.
-   */
-  const rotateAndSyncToServer = async (testTeam: TestTeam): Promise<void> => {
-    await teamTestUtils.addUserToTeam(testTeam, 'rotation-trigger')
-    const rotationTrigger = testTeam.otherUsers.at(-1)!
-    testTeam.team.remove(rotationTrigger.user.userId)
-    testTeam.team.inviteMember()
-
+  /** Admit a member on the founder's graph and deliver the signed update through the real merge. */
+  const admitAndSyncToServer = async (testTeam: TestTeam): Promise<void> => {
+    await teamTestUtils.addUserToTeam(
+      testTeam,
+      `persistence-update-${testTeam.otherUsers.length}`,
+    )
     const managedCommunity = await manager.get(testTeam.team.id)
     expect(managedCommunity).toBeDefined()
     managedCommunity!.sigChain.team.merge(testTeam.team.graph)
+  }
+
+  /** Exercise the keyring write path without manufacturing a forbidden key rotation. */
+  const forgetPersistedKeyringDigest = (teamId: string): void => {
+    ;(
+      manager as unknown as {
+        persistedTeamKeyringDigests: Map<string, string>
+      }
+    ).persistedTeamKeyringDigests.delete(teamId)
   }
 
   const readStoredKeyring = async (teamId: string): Promise<Keyring> => {
@@ -203,7 +206,8 @@ describe('CommunitiesManagerService durable persistence', () => {
           return await Promise.resolve(true)
         })
 
-      await rotateAndSyncToServer(testTeam)
+      forgetPersistedKeyringDigest(teamId)
+      await admitAndSyncToServer(testTeam)
       await manager.persistCommunity(teamId)
 
       // A crash between the two writes has to leave a stored keyring that is a superset of what the
@@ -275,7 +279,8 @@ describe('CommunitiesManagerService durable persistence', () => {
         .mockRejectedValue(new Error('secrets manager unavailable'))
       const updateSpy = jest.spyOn(storage, 'updateCommunity')
 
-      await rotateAndSyncToServer(testTeam)
+      forgetPersistedKeyringDigest(teamId)
+      await admitAndSyncToServer(testTeam)
 
       await expect(manager.persistCommunity(teamId)).rejects.toThrow(
         'secrets manager unavailable',
@@ -394,18 +399,6 @@ describe('CommunitiesManagerService durable persistence', () => {
 
   describe('crash consistency (M-3)', () => {
     /**
-     * Drop the manager's memory of what it last wrote, so the next persist writes the keyring. A
-     * freshly started process is in exactly this state.
-     */
-    const forgetPersistedKeyringDigest = (teamId: string): void => {
-      ;(
-        manager as unknown as {
-          persistedTeamKeyringDigests: Map<string, string>
-        }
-      ).persistedTeamKeyringDigests.delete(teamId)
-    }
-
-    /**
      * Record the exact pair each queued task commits, without letting either write reach a real
      * store. What matters is that the keyring handed to the secrets manager and the graph handed to
      * PostgreSQL in the same task are the same instant of the same team.
@@ -449,11 +442,14 @@ describe('CommunitiesManagerService durable persistence', () => {
 
     it('commits the keyring and graph of one instant, even if the team moves on mid-write', async () => {
       const { testTeam, teamId } = await createCommunity()
-      await rotateAndSyncToServer(testTeam)
+      await admitAndSyncToServer(testTeam)
       await manager.persistCommunity(teamId)
       forgetPersistedKeyringDigest(teamId)
 
       const captured = capturePairs()
+      const graphAtSnapshot = (await manager.get(teamId))!.sigChain.serialize(
+        true,
+      )
       const persisting = manager.persistCommunity(teamId)
 
       // wait until the task is parked inside the secrets write
@@ -461,15 +457,20 @@ describe('CommunitiesManagerService durable persistence', () => {
         expect(captured.keyrings.length).toBe(1)
       })
 
-      // the team moves on while the secrets write is in flight: another rotation, another link
-      await rotateAndSyncToServer(testTeam)
+      // Another admission advances the graph while the keyring write is held open.
+      await admitAndSyncToServer(testTeam)
 
       captured.gate.open()
       await persisting
       await manager.persistCommunity(teamId)
 
-      // The pair committed first must be a matched pair. Under the old code the graph was
-      // serialized after the await and carried links the stored keyring could not open.
+      // Fixed keys can decrypt both graphs, so assert the captured instant as well as loadability.
+      // Serializing the graph after the await must still fail this test.
+      expect(captured.graphs[0]).toEqual(graphAtSnapshot)
+      expect(captured.graphs.at(-1)).toEqual(
+        (await manager.get(teamId))!.sigChain.serialize(true),
+      )
+      expect(captured.graphs.at(-1)).not.toEqual(graphAtSnapshot)
       const pairedKeyring = JSON.parse(
         uint8arrays.toString(captured.keyrings[0], 'utf8'),
       ) as Keyring
@@ -497,19 +498,19 @@ describe('CommunitiesManagerService durable persistence', () => {
         firstDigest,
       )
 
-      // and a rotation is recorded as a different one, so a cold load can tell which keyring the
-      // graph beside it was committed with
-      await rotateAndSyncToServer(testTeam)
+      // Admissions advance the graph without rotating the team keyring.
+      const graphBefore = await readStoredGraph(teamId)
+      await admitAndSyncToServer(testTeam)
       await manager.persistCommunity(teamId)
-      const rotatedDigest = (await storage.getCommunity(teamId))!
+      const admittedDigest = (await storage.getCommunity(teamId))!
         .teamKeyringDigest
-      expect(rotatedDigest).toBeDefined()
-      expect(rotatedDigest).not.toEqual(firstDigest)
+      expect(admittedDigest).toEqual(firstDigest)
+      expect(await readStoredGraph(teamId)).not.toEqual(graphBefore)
     })
 
     it('fails before the keyring reaches storage, leaving the graph untouched', async () => {
       const { testTeam, teamId } = await createCommunity()
-      await rotateAndSyncToServer(testTeam)
+      await admitAndSyncToServer(testTeam)
       await manager.persistCommunity(teamId)
       forgetPersistedKeyringDigest(teamId)
       const graphBefore = await readStoredGraph(teamId)
@@ -526,20 +527,22 @@ describe('CommunitiesManagerService durable persistence', () => {
       expect(await readStoredGraph(teamId)).toEqual(graphBefore)
     })
 
-    it('fails after the keyring is stored, leaving a keyring that still loads the older graph', async () => {
+    it('fails after a keyring rewrite, leaving a keyring that still loads the older graph', async () => {
       const { testTeam, teamId } = await createCommunity()
       const graphBefore = await readStoredGraph(teamId)
 
-      // rotate so the keyring write is real, then fail the graph write
-      await rotateAndSyncToServer(testTeam)
+      // Force the real keyring write path, then fail the graph write after a supported admission.
+      forgetPersistedKeyringDigest(teamId)
+      const storeKeyringSpy = jest.spyOn(serverKeyManager, 'storeKeyring')
+      await admitAndSyncToServer(testTeam)
       jest.spyOn(storage, 'updateCommunity').mockResolvedValue(false)
 
       await expect(manager.persistCommunity(teamId)).rejects.toThrow(
         'Error while updating community',
       )
 
-      // This is the window keyring-first ordering exists to make safe: the durable keyring is now
-      // ahead of the durable graph, and a superset keyring still opens the older graph.
+      expect(storeKeyringSpy).toHaveBeenCalled()
+      // Even when the graph write fails, the durable keyring still opens the older graph.
       const keyringNow = await readStoredKeyring(teamId)
       expect(() =>
         SigChain.create(
@@ -552,7 +555,7 @@ describe('CommunitiesManagerService durable persistence', () => {
 
     it('leaves a loadable pair once the graph is committed', async () => {
       const { testTeam, teamId } = await createCommunity()
-      await rotateAndSyncToServer(testTeam)
+      await admitAndSyncToServer(testTeam)
       await manager.persistCommunity(teamId)
 
       // a crash here, after the graph commit and before anything acknowledges it, still leaves both
@@ -656,7 +659,7 @@ describe('CommunitiesManagerService durable persistence', () => {
 
       // five chain updates arrive while that write is held
       for (let i = 0; i < 5; i++) {
-        await rotateAndSyncToServer(testTeam)
+        await admitAndSyncToServer(testTeam)
       }
 
       // the running write plus one coalesced slot, never one task per update
@@ -813,7 +816,7 @@ describe('CommunitiesManagerService durable persistence', () => {
       const { testTeam, teamId } = await createCommunity()
       const graphBefore = await readStoredGraph(teamId)
 
-      await rotateAndSyncToServer(testTeam)
+      await admitAndSyncToServer(testTeam)
       // queue behind the listener's own persist so both have settled
       await manager.persistCommunity(teamId)
 
@@ -842,40 +845,43 @@ describe('CommunitiesManagerService durable persistence', () => {
 
       // LFA emits `updated` synchronously and drops what the listener returns, so the only way a
       // failed write is visible is if the manager reports it.
-      await rotateAndSyncToServer(testTeam)
+      await admitAndSyncToServer(testTeam)
 
       await expect(persistFailed).resolves.toMatchObject({ teamId })
     })
   })
 
-  describe('team key rotation (GLOBAL-QSS-002 / private#192)', () => {
-    it('re-stores the team keyring so a cold reload of a rotated graph succeeds', async () => {
+  describe('fixed team keys under disabled removal', () => {
+    it('refuses member removal and reloads subsequent admissions with the original keyring', async () => {
       const { testTeam, teamId, keyringAtCreation } = await createCommunity()
 
-      await rotateAndSyncToServer(testTeam)
+      await admitAndSyncToServer(testTeam)
+      const retainedMember = testTeam.otherUsers.at(-1)!.user
+      expect(() => {
+        testTeam.team.remove(retainedMember.userId)
+      }).toThrow('Removal and key rotation are disabled: REMOVE_MEMBER')
+      await admitAndSyncToServer(testTeam)
       await manager.persistCommunity(teamId)
 
       const graph = await readStoredGraph(teamId)
       const context = { server: testTeam.serverWithSecrets! }
 
-      // The hazard: the keyring QSS was handed at creation cannot open the rotated graph. This is
-      // exactly the keyring that used to stay in the secrets manager forever.
-      expect(() => SigChain.create(graph, context, keyringAtCreation)).toThrow(
-        `Can't decrypt link`,
+      // Refusing removal must not rotate keys or prevent later supported graph updates.
+      const coldLoaded = SigChain.create(graph, context, keyringAtCreation)
+      expect(coldLoaded.team.members(retainedMember.userId).userId).toBe(
+        retainedMember.userId,
       )
 
-      // The fix: what is in the secrets manager now is the rotated keyring, and it loads.
       const keyringNow = await readStoredKeyring(teamId)
-      expect(Object.keys(keyringNow).length).toBeGreaterThan(
-        Object.keys(keyringAtCreation).length,
-      )
+      expect(keyringNow).toEqual(keyringAtCreation)
+      expect(testTeam.team.teamKeyring()).toEqual(keyringAtCreation)
       expect(() => SigChain.create(graph, context, keyringNow)).not.toThrow()
     })
 
     it('leaves a durable pair a restarted process can load', async () => {
       const { testTeam, teamId } = await createCommunity()
 
-      await rotateAndSyncToServer(testTeam)
+      await admitAndSyncToServer(testTeam)
       await manager.persistCommunity(teamId)
 
       // Rebuild from the stored bytes alone, touching nothing this process holds in memory. This is
