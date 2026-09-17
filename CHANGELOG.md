@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 4.0.0-alpha.0 (2026-09-17)
+
+- fix(bootstrap): keep the auth revision check quiet in deployed environments ([a6ec79c](https://github.com/TryQuiet/quiet-storage-service/commit/a6ec79c))
+- fix(bootstrap): re-copy LFA packages when the auth pin changes ([5e80ba0](https://github.com/TryQuiet/quiet-storage-service/commit/5e80ba0))
+- docs: document QSS alpha and production publishing (#59) ([b3dd8c1](https://github.com/TryQuiet/quiet-storage-service/commit/b3dd8c1)), closes [#59](https://github.com/TryQuiet/quiet-storage-service/issues/59) [#51](https://github.com/TryQuiet/quiet-storage-service/issues/51)
+- Device Linking Compatability (#51) ([2e94ece](https://github.com/TryQuiet/quiet-storage-service/commit/2e94ece)), closes [#51](https://github.com/TryQuiet/quiet-storage-service/issues/51) [#81](https://github.com/TryQuiet/quiet-storage-service/issues/81) [#81](https://github.com/TryQuiet/quiet-storage-service/issues/81) [#81](https://github.com/TryQuiet/quiet-storage-service/issues/81) [#115](https://github.com/TryQuiet/quiet-storage-service/issues/115) [#115](https://github.com/TryQuiet/quiet-storage-service/issues/115) [#115](https://github.com/TryQuiet/quiet-storage-service/issues/115) [#115](https://github.com/TryQuiet/quiet-storage-service/issues/115) [#115](https://github.com/TryQuiet/quiet-storage-service/issues/115) [#115](https://github.com/TryQuiet/quiet-storage-service/issues/115) [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203) [#192](https://github.com/TryQuiet/quiet-storage-service/issues/192) [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203) [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203) [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203) [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203) [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203) [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203) [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203) [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203) [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203) [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203) [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203) [#1](https://github.com/TryQuiet/quiet-storage-service/issues/1) [TryQuiet/quiet-storage-service#53](https://github.com/TryQuiet/quiet-storage-service/issues/53)
+- Merge QSS 2.0.2 release metadata back into main (#60) ([eb7552d](https://github.com/TryQuiet/quiet-storage-service/commit/eb7552d)), closes [#60](https://github.com/TryQuiet/quiet-storage-service/issues/60)
+- Update app package CHANGELOG.md ([716d2b1](https://github.com/TryQuiet/quiet-storage-service/commit/716d2b1))
+
 ## 3.0.0-alpha.0 (2026-09-15)
 
 - Exercise QSS persistence with supported member admissions ([733d19f](https://github.com/TryQuiet/quiet-storage-service/commit/733d19f))
