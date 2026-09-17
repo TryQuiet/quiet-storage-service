@@ -4,3 +4,5 @@ export const GIT_SUBMODULE_COMMAND = 'git submodule update --init --recursive'
 export const BASE_PNPM_I_COMMAND = 'yes | pnpm -w run install:deps'
 export const DEPLOYED_PNPM_I_COMMAND = 'pnpm -w run install:deps:deployed'
 export const PNPM_BUILD_COMMAND = 'pnpm -w run build'
+
+export const AUTH_REVISION_STAMP_FILE = '.auth-revision'
