@@ -1,11 +1,28 @@
 import { program } from '@commander-js/extra-typings'
 import { createLogger, transports, format } from 'winston'
 import { runShellCommandWithRealTimeLogging } from './common.mjs'
-import { BASE_PNPM_I_COMMAND, DEPLOYED_PNPM_I_COMMAND, GIT_SUBMODULE_COMMAND, LFA_PACKAGES, PNPM_BUILD_COMMAND } from './const.mjs'
+import { AUTH_REVISION_STAMP_FILE, BASE_PNPM_I_COMMAND, DEPLOYED_PNPM_I_COMMAND, GIT_SUBMODULE_COMMAND, LFA_PACKAGES, PNPM_BUILD_COMMAND } from './const.mjs'
 import colors from 'ansi-colors'
+import { execFileSync } from 'node:child_process'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+
+// The revision the auth submodule is currently checked out at, or undefined if it can't be read.
+// Deployed bundles ship the already-copied packages without 3rd-party/, so that case is expected
+// and stays quiet; anywhere else it's worth flagging that staleness can't be checked.
+const readAuthRevision = (lfaModuleDir, deployed, logger) => {
+  try {
+    // stderr is dropped so git's own "fatal: cannot change to ..." doesn't reach deploy logs;
+    // the catch below reports the miss at the right level.
+    return execFileSync('git', ['-C', lfaModuleDir, 'rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  } catch (err) {
+    const message = `Couldn't read the auth submodule revision, leaving any existing LFA packages in place`
+    deployed ? logger.verbose(message) : logger.warn(message)
+    logger.verbose(err.message)
+    return undefined
+  }
+}
 
 program.name('pnpm run bootstrap').description('QSS Bootstrapper Utility')
 
@@ -71,25 +88,48 @@ program
       logger.info(`Ensuring LFA package ${symlinkMessageInnerText}`)
       const lfaModuleDir = path.join(__dirname, '../3rd-party/auth')
       const lfaModulePkgDir = path.join(lfaModuleDir, '/packages')
+
+      // Symlinks always follow the submodule, but copies don't: checking out another release branch
+      // moves the auth pin and silently leaves the copies behind. Stamp the revision we copied from
+      // and re-copy whenever it no longer matches.
+      const authRevisionStamp = path.join(authPkgLfaDir, AUTH_REVISION_STAMP_FILE)
+      const authRevision = options.copySubmodules ? readAuthRevision(lfaModuleDir, options.deployed, logger) : undefined
+      const copiedRevision = fs.existsSync(authRevisionStamp) ? fs.readFileSync(authRevisionStamp, 'utf8').trim() : undefined
+      const staleCopies = authRevision != null && copiedRevision !== authRevision
+      if (staleCopies && copiedRevision != null) {
+        logger.warn(`LFA packages were copied from auth ${copiedRevision} but the submodule is at ${authRevision}, re-copying now`)
+      }
+
       for (const pkg of LFA_PACKAGES) {
         const pkgDir = path.join(authPkgLfaDir, pkg)
         const targetDir = path.join(lfaModulePkgDir, pkg)
-        if (!fs.existsSync(pkgDir)) {
-          const logMessage = options.copySubmodules ? `LFA package ${pkg} wasn't copied to workspace directory, copying now` : `Symlink for LFA package ${pkg} was missing, creating now`
+        const exists = fs.existsSync(pkgDir)
+        if (exists && !(options.copySubmodules && staleCopies)) {
+          continue
+        }
+
+        if (options.copySubmodules) {
+          const logMessage = exists ? `LFA package ${pkg} is stale, re-copying to workspace directory now` : `LFA package ${pkg} wasn't copied to workspace directory, copying now`
           logger.warn(logMessage)
           logger.verbose(`${targetDir} -> ${pkgDir}`)
-          if (options.copySubmodules) {
-            const copyTargetPath = path.join(targetDir, '/*')
-            const copyPath = path.join(pkgDir)
-            fs.cpSync(targetDir, pkgDir, { recursive: true })
-            continue
-          }
-          fs.symlinkSync(targetDir, pkgDir, 'dir')
+          // Drop the old copy wholesale: it carries a dist/ and node_modules built against the
+          // previous revision. The install and build steps below recreate both.
+          fs.rmSync(pkgDir, { recursive: true, force: true })
+          fs.cpSync(targetDir, pkgDir, { recursive: true })
+          continue
         }
+
+        logger.warn(`Symlink for LFA package ${pkg} was missing, creating now`)
+        logger.verbose(`${targetDir} -> ${pkgDir}`)
+        fs.symlinkSync(targetDir, pkgDir, 'dir')
       }
-      
+
       const lfaTsConfig = path.join(lfaModuleDir, 'tsconfig.json')
       const authPkgTsConfig = path.join(authPkgDir, 'tsconfig.json')
+      if (options.copySubmodules && staleCopies && fs.existsSync(authPkgTsConfig)) {
+        logger.verbose(`Refreshing LFA tsconfig.json alongside the re-copied packages`)
+        fs.rmSync(authPkgTsConfig, { force: true })
+      }
       if (!fs.existsSync(authPkgTsConfig)) {
         const logMessage = options.copySubmodules ? `LFA tsconfig.json wasn't copied, copying now` : `LFA tsconfig.json symlink was missing, creating now` 
         logger.warn(logMessage)
@@ -99,6 +139,11 @@ program
         } else {
           fs.symlinkSync(lfaTsConfig, authPkgTsConfig, 'file')
         }
+      }
+
+      if (authRevision != null) {
+        fs.writeFileSync(authRevisionStamp, `${authRevision}\n`)
+        logger.verbose(`LFA packages copied from auth ${authRevision}`)
       }
     }
 

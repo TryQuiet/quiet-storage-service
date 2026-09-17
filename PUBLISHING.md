@@ -54,8 +54,13 @@ git status --short
 For an existing clone, fetch and check out the chosen release branch before the
 submodule commands. Do not add `--remote`: use the pinned commits. Bootstrap's
 `-vmc` enables verbose output, skips submodule pulls, and copies auth packages.
-Previously copied auth packages are not refreshed automatically; use a fresh
-checkout when changing auth revisions.
+
+Checking out a different release branch moves the auth pin, so copies made for
+the previous branch no longer match the submodule. Bootstrap handles this: it
+stamps the revision it copied from in `auth-packages/lfa/.auth-revision`, and
+re-copies the packages whenever that no longer matches `3rd-party/auth`. It logs
+both revisions when it does. A checkout predating this stamp re-copies once on
+the next bootstrap.
 
 ## Before Publishing
 
