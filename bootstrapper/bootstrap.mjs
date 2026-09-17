@@ -8,13 +8,17 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-// The revision the auth submodule is currently checked out at, or undefined if it can't be read
-// (e.g. a deployed tarball with no git metadata).
-const readAuthRevision = (lfaModuleDir, logger) => {
+// The revision the auth submodule is currently checked out at, or undefined if it can't be read.
+// Deployed bundles ship the already-copied packages without 3rd-party/, so that case is expected
+// and stays quiet; anywhere else it's worth flagging that staleness can't be checked.
+const readAuthRevision = (lfaModuleDir, deployed, logger) => {
   try {
-    return execFileSync('git', ['-C', lfaModuleDir, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+    // stderr is dropped so git's own "fatal: cannot change to ..." doesn't reach deploy logs;
+    // the catch below reports the miss at the right level.
+    return execFileSync('git', ['-C', lfaModuleDir, 'rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
   } catch (err) {
-    logger.warn(`Couldn't read the auth submodule revision, leaving any existing LFA packages in place`)
+    const message = `Couldn't read the auth submodule revision, leaving any existing LFA packages in place`
+    deployed ? logger.verbose(message) : logger.warn(message)
     logger.verbose(err.message)
     return undefined
   }
@@ -89,7 +93,7 @@ program
       // moves the auth pin and silently leaves the copies behind. Stamp the revision we copied from
       // and re-copy whenever it no longer matches.
       const authRevisionStamp = path.join(authPkgLfaDir, AUTH_REVISION_STAMP_FILE)
-      const authRevision = options.copySubmodules ? readAuthRevision(lfaModuleDir, logger) : undefined
+      const authRevision = options.copySubmodules ? readAuthRevision(lfaModuleDir, options.deployed, logger) : undefined
       const copiedRevision = fs.existsSync(authRevisionStamp) ? fs.readFileSync(authRevisionStamp, 'utf8').trim() : undefined
       const staleCopies = authRevision != null && copiedRevision !== authRevision
       if (staleCopies && copiedRevision != null) {
