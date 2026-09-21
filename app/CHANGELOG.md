@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 4.0.1-alpha.0 (2026-09-21)
+
+- Authenticate staging notification CI with short-lived GitHub Actions identities while preserving live hCaptcha ([#64](https://github.com/TryQuiet/quiet-storage-service/pull/64)).
+- Limit each trusted develop job to one short-lived enrollment grant using durable PostgreSQL replay protection.
+- Add the isolated CI enrollment reservation migration; auth protocol 4 and existing communities remain compatible.
+
 ## 4.0.0 (2026-09-18)
 
 - docs(changelog): drop mislinked issue refs from the device-linking entry ([97a4b46](https://github.com/TryQuiet/quiet-storage-service/commit/97a4b46)), closes [#51](https://github.com/TryQuiet/quiet-storage-service/issues/51) [#51](https://github.com/TryQuiet/quiet-storage-service/issues/51) [#20](https://github.com/TryQuiet/quiet-storage-service/issues/20) [#81](https://github.com/TryQuiet/quiet-storage-service/issues/81) [#115](https://github.com/TryQuiet/quiet-storage-service/issues/115) [#192](https://github.com/TryQuiet/quiet-storage-service/issues/192) [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203) [#51](https://github.com/TryQuiet/quiet-storage-service/issues/51) [#203](https://github.com/TryQuiet/quiet-storage-service/issues/203)
