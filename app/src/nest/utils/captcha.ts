@@ -2,12 +2,19 @@ import { Injectable } from '@nestjs/common'
 import { AWSSecretsService } from './aws/aws-secrets.service.js'
 import { ConfigService } from './config/config.service.js'
 import { EnvVars } from './config/env_vars.js'
+import {
+  CiEnrollmentService,
+  CI_ENROLLMENT_PREFIX,
+  CI_ENROLLMENT_AUDIENCE,
+  type CiEnrollmentGrant,
+} from './ci-enrollment.service.js'
 
 export interface HCaptchaSiteVerifyResponse {
   success: boolean
   challenge_ts?: string
   hostname?: string
   'error-codes'?: string[]
+  ciEnrollmentGrant?: CiEnrollmentGrant
 }
 
 export function isHCaptchaSiteVerifyResponse(
@@ -23,7 +30,20 @@ export function isHCaptchaSiteVerifyResponse(
 
 @Injectable()
 export class CaptchaService {
-  constructor(private readonly awsSecretsService: AWSSecretsService) {}
+  constructor(
+    private readonly awsSecretsService: AWSSecretsService,
+    private readonly ciEnrollmentService: CiEnrollmentService,
+  ) {}
+
+  public getCiEnrollmentConfiguration(): {
+    enabled: boolean
+    audience: string
+  } {
+    return {
+      enabled: this.ciEnrollmentService.enabled,
+      audience: CI_ENROLLMENT_AUDIENCE,
+    }
+  }
 
   public async verifyToken(
     token: string | undefined,
@@ -34,6 +54,16 @@ export class CaptchaService {
         success: false,
         'error-codes': ['hCaptcha token required'],
       }
+    }
+
+    if (token.startsWith(CI_ENROLLMENT_PREFIX)) {
+      const ciEnrollmentGrant = await this.ciEnrollmentService.verify(token)
+      return ciEnrollmentGrant == null
+        ? {
+            success: false,
+            'error-codes': ['CI enrollment unavailable or unauthorized'],
+          }
+        : { success: true, ciEnrollmentGrant }
     }
 
     const hcaptchaSecret = await this.awsSecretsService.getSecretEnvVar(

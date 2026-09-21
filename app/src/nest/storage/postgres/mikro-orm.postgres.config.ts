@@ -11,6 +11,7 @@ import { AWSSecretNames } from '../../utils/aws/const.js'
 import type { ConnectionOptions } from 'tls'
 import { Community } from '../../communities/storage/entities/community.entity.js'
 import { LogEntrySync } from '../../communities/storage/entities/log-sync.entity.js'
+import { CiEnrollmentGrantEntity } from './ci-enrollment-grant.entity.js'
 import { createLogger } from '../../app/logger/logger.js'
 import { RedisClient } from '../redis/redis.client.js'
 import type { RDSCredentials } from '../../utils/aws/types.js'
@@ -92,7 +93,7 @@ export default defineConfig({
   replicas: getReplicaConfigs(),
   connect: true,
   driver: PostgreSqlDriver,
-  entities: [Community, LogEntrySync],
+  entities: [Community, LogEntrySync, CiEnrollmentGrantEntity],
   metadataProvider: preferTs
     ? TsMorphMetadataProvider
     : ReflectMetadataProvider,

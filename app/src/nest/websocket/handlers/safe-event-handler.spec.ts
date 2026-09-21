@@ -122,7 +122,10 @@ describe('safe websocket event registration with Socket.IO', () => {
       {} as never,
       {} as never,
       {} as never,
-      { getSiteKey: () => 'test-site-key' } as never,
+      {
+        getSiteKey: () => 'test-site-key',
+        getCiEnrollmentConfiguration: () => ({ enabled: false }),
+      } as never,
       {} as never,
     )
     /* eslint-enable @typescript-eslint/consistent-type-assertions */
@@ -168,7 +171,10 @@ describe('safe websocket event registration with Socket.IO', () => {
       expect(healthResponse).toEqual(
         expect.objectContaining({
           status: 'success',
-          payload: { siteKey: 'test-site-key' },
+          payload: {
+            siteKey: 'test-site-key',
+            ciEnrollment: { enabled: false },
+          },
         }),
       )
     } finally {

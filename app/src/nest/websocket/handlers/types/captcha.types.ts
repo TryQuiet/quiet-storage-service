@@ -17,6 +17,7 @@ export interface GetCaptchaSiteKeyMessage
 
 export interface GetCaptchaSiteKeyResponsePayload {
   siteKey: string
+  ciEnrollment?: { enabled: boolean; audience: string }
 }
 
 export interface GetCaptchaSiteKeyResponse

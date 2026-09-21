@@ -157,6 +157,47 @@ describe('captcha grants over Socket.IO', () => {
     })
   }
 
+  it('binds a CI grant to the provisioned team and permits only one community', async () => {
+    verifyToken.mockResolvedValueOnce({
+      success: true,
+      ciEnrollmentGrant: { expiresAt: Date.now() + 300_000 },
+    })
+    expect((await verify('ci-grant')).status).toBe('success')
+    expect((await create('unprovisioned-team')).status).toBe('error')
+    expect((await keys('ci-team')).status).toBe('success')
+    expect((await create('different-team')).status).toBe('error')
+    expect((await create('ci-team')).status).toBe('success')
+    expect((await verify('ci-grant')).status).toBe('success')
+    expect((await create('ci-team')).status).toBe('error')
+    expect(createCommunity).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects expired CI grants before provisioning or creating a community', async () => {
+    const grant = { expiresAt: Date.now() + 300_000 }
+    verifyToken.mockResolvedValueOnce({
+      success: true,
+      ciEnrollmentGrant: grant,
+    })
+    await verify('ci-grant')
+    grant.expiresAt = Date.now() - 1
+    expect((await keys('ci-team')).status).toBe('error')
+    expect((await create('ci-team')).status).toBe('error')
+    expect(getServerKeys).not.toHaveBeenCalled()
+    expect(createCommunity).not.toHaveBeenCalled()
+  })
+
+  it('a later real hCaptcha verification renews an expired CI socket through normal enrollment', async () => {
+    verifyToken.mockResolvedValueOnce({
+      success: true,
+      ciEnrollmentGrant: { expiresAt: Date.now() - 1 },
+    })
+    await verify('ci-grant')
+    expect((await keys('ordinary-team')).status).toBe('error')
+    expect((await verify('real-hcaptcha-token')).status).toBe('success')
+    expect((await keys('ordinary-team')).status).toBe('success')
+    expect((await create('ordinary-team')).status).toBe('success')
+  })
+
   it('recovers a lost key response for the same team without granting another team', async () => {
     expect((await verify('first-token')).status).toBe('success')
     dropNextKeyAck = true

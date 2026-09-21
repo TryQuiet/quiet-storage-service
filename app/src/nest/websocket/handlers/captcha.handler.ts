@@ -78,6 +78,8 @@ export function registerCaptchaHandlers(config: CaptchaHandlerConfig): void {
               await config.captchaService.verifyToken(token)
             if (hcaptchaResponse.success) {
               config.socket.data.verifiedCaptcha = true
+              config.socket.data.ciEnrollmentGrant =
+                hcaptchaResponse.ciEnrollmentGrant
               config.socket.data.verifiedCaptchaTokenHash = tokenHash
               config.socket.data.usedCaptchaForKeys = false
               config.socket.data.captchaKeyGrant = undefined
@@ -124,6 +126,7 @@ export function registerCaptchaHandlers(config: CaptchaHandlerConfig): void {
         status: CommunityOperationStatus.SUCCESS,
         payload: {
           siteKey,
+          ciEnrollment: config.captchaService.getCiEnrollmentConfiguration(),
         },
       }
       callback(response)
