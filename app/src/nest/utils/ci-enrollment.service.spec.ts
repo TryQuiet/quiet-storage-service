@@ -86,7 +86,11 @@ describe('staging CI enrollment with signed identities and durable replay protec
   })
 
   afterAll(async () => {
-    await new Promise<void>(resolve => http.close(() => { resolve(); }))
+    await new Promise<void>(resolve =>
+      http.close(() => {
+        resolve()
+      }),
+    )
     await orm.close()
   })
 
@@ -207,16 +211,14 @@ describe('staging CI enrollment with signed identities and durable replay protec
       aws as unknown as AWSSecretsService,
       service,
     )
-    const request = jest
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            success: false,
-            'error-codes': ['invalid-input-response'],
-          }),
-        ),
-      )
+    const request = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: false,
+          'error-codes': ['invalid-input-response'],
+        }),
+      ),
+    )
     const result = await captcha.verifyToken(
       '10000000-aaaa-bbbb-cccc-000000000001',
     )
