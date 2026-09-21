@@ -1,6 +1,7 @@
 import type { DefaultEventsMap, Server, Socket } from 'socket.io'
 import type { GeneratePublicKeysMessage } from './handlers/types/gen-pub-keys.types.js'
 import type { CaptchaVerifyResponse } from './handlers/types/captcha.types.js'
+import type { CiEnrollmentGrant } from '../utils/ci-enrollment.service.js'
 
 export interface CaptchaKeyGrant {
   teamId: string
@@ -9,6 +10,7 @@ export interface CaptchaKeyGrant {
 
 export interface QuietSocketData {
   verifiedCaptcha?: boolean
+  ciEnrollmentGrant?: CiEnrollmentGrant
   usedCaptchaForKeys?: boolean
   usedCaptchaForCreateCommunity?: boolean
   captchaKeyGrant?: CaptchaKeyGrant

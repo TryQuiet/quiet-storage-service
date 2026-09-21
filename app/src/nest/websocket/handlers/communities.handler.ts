@@ -78,6 +78,18 @@ export function registerCommunitiesHandlers(
       const { community, teamKeyring, userId, deviceId } = payload
       const { teamId } = community
       if (
+        config.socket.data.ciEnrollmentGrant != null &&
+        (config.socket.data.ciEnrollmentGrant.expiresAt <= Date.now() ||
+          config.socket.data.captchaKeyGrant?.teamId !== teamId)
+      ) {
+        callback({
+          ts: DateTime.utc().toMillis(),
+          status: CreateCommunityStatus.ERROR,
+          reason: CaptchaErrorMessages.CAPTCHA_VERIFICATION_REQUIRED,
+        })
+        return
+      }
+      if (
         setSocketAttribution(config.socket, {
           teamId,
           userId,

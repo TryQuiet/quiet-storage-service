@@ -60,6 +60,18 @@ export class PostgresClient implements OnModuleInit, OnModuleDestroy {
     await this.orm.connect()
   }
 
+  public async reserveCiEnrollment(id: string): Promise<boolean> {
+    const connection = this.entityManager.getConnection('write')
+    await connection.execute(
+      'delete from ci_enrollment_grants where expires_at < now()',
+    )
+    const rows = await connection.execute<Array<{ id: string }>>(
+      "insert into ci_enrollment_grants (id, expires_at) values (?, now() + interval '1 day') on conflict (id) do nothing returning id",
+      [id],
+    )
+    return rows.length === 1
+  }
+
   /**
    * Get an existing repository for a given DB entity
    *

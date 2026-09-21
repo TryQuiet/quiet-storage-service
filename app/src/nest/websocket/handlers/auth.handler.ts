@@ -59,7 +59,11 @@ export function registerCommunitiesAuthHandlers(
         throw new Error('Team ID missing from generate public keys message')
       }
 
-      if (config.socket.data.verifiedCaptcha !== true) {
+      if (
+        config.socket.data.verifiedCaptcha !== true ||
+        (config.socket.data.ciEnrollmentGrant != null &&
+          config.socket.data.ciEnrollmentGrant.expiresAt <= Date.now())
+      ) {
         _logger.warn(
           `Attempted to generate public keys without passing captcha verification`,
         )
