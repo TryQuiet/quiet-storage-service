@@ -102,6 +102,7 @@
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.4",
     "socket.io-client": "4.8.4",
+    "socket.io-parser": "^4.2.7",
     "timeout-abort-controller": "^3.0.0",
     "uint8arrays": "^5.1.0",
     "winston": "^3.17.0",

@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import { connect, type Socket as ClientSocket } from 'socket.io-client'
 import { sleep } from '../nest/utils/sleep.js'
 import { WebsocketEvents } from '../nest/websocket/ws.types.js'
+import { quietSocketParser } from '../nest/websocket/ws.parser.js'
 import { createLogger } from '../nest/app/logger/logger.js'
 import { HOSTNAME, LISTEN_PORT } from '../nest/app/const.js'
 
@@ -30,6 +31,7 @@ export class WebsocketClient {
         timeout: 15_000,
         autoUnref: true,
         closeOnBeforeunload: true,
+        parser: quietSocketParser,
       },
     )
     await this._waitForConnect()
