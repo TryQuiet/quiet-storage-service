@@ -19,7 +19,7 @@ The Node engine is managed via Volta and should be installed prior to running an
 Once Volta is installed navigating to this directory should automatically install and use the correct versions of `node` and `npm` but as a first time setup you can manually install both
 
 ```bash
-$ volta install node@22.14.0
+$ volta install node@22.23.4
 $ volta install npm@10.9.2
 ```
 
@@ -30,7 +30,7 @@ $ volta install pnpm@10.6.0
 ```
 
 Use the versions declared in [package.json](package.json) for your checkout.
-If you use another Node version manager, select Node `22.14.0`, then install
+If you use another Node version manager, select Node `22.23.4`, then install
 the matching tools with npm:
 
 ```bash

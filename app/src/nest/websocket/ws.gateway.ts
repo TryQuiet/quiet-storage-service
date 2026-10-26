@@ -10,6 +10,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets'
 import { Server } from 'socket.io'
+import { quietSocketParser } from './ws.parser.js'
 import { Inject, OnModuleDestroy, Optional } from '@nestjs/common'
 
 import {
@@ -55,6 +56,7 @@ import {
   path: '/socket.io',
   allowUpgrades: true,
   allowEIO3: false,
+  parser: quietSocketParser,
 })
 export class WebsocketGateway
   implements
